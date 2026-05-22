@@ -13,7 +13,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.user = user
         self.setWindowTitle("MKM Productivity System")
-        self.setMinimumSize(1100, 650)
+        self.setMinimumSize(900, 600)
         self.active_btn = None
         self.setup_ui()
         self.load_pages()

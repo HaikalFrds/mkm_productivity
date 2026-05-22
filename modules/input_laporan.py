@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QLineEdit, QComboBox,
     QPushButton, QDateEdit, QScrollArea, QSizePolicy,
     QTableWidget, QTableWidgetItem, QHeaderView, QTextEdit, QMessageBox,
-    QAbstractSpinBox
+    QAbstractSpinBox, QSplitter
 )
 from PySide6.QtCore import Qt, QDate, QSize
 from PySide6.QtGui import QTextOption, QColor
@@ -160,10 +160,6 @@ class InputLaporanWidget(QWidget):
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(12)
 
-        title = QLabel("Input Laporan Harian")
-        title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: bold;")
-        main_layout.addWidget(title)
-
         # Card Header Laporan
         card = QFrame()
         card.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }")
@@ -312,9 +308,10 @@ class InputLaporanWidget(QWidget):
             "Model", "Plan", "Reg", "2H OT", "3H OT", "11H OT", "Balance",
         ])
         self.tabel_produksi.setFixedHeight(160)
-        self.tabel_produksi.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tabel_produksi.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.tabel_produksi.horizontalHeader().setStretchLastSection(False)
+        for _c in range(1, 7):
+            self.tabel_produksi.horizontalHeader().setSectionResizeMode(_c, QHeaderView.Fixed)
+            self.tabel_produksi.setColumnWidth(_c, 50)
         self.tabel_produksi.verticalHeader().setVisible(False)
         self.tabel_produksi.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_produksi.setStyleSheet("""
@@ -345,8 +342,6 @@ class InputLaporanWidget(QWidget):
                 font-size: 10px;
             }
         """)
-        for _col, _w in [(1, 62), (2, 62), (3, 58), (4, 58), (5, 58), (6, 82)]:
-            self.tabel_produksi.setColumnWidth(_col, _w)
         card_dp_layout.addWidget(self.tabel_produksi)
 
         def _calc_strip_field():
@@ -411,9 +406,12 @@ class InputLaporanWidget(QWidget):
         self.tabel_mp = QTableWidget(4, 4)
         self.tabel_mp.setHorizontalHeaderLabels(["Deskripsi", "Plan", "Actual", "Balance"])
         self.tabel_mp.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.tabel_mp.horizontalHeader().setStretchLastSection(False)
-        for _c, _w in [(1, 58), (2, 58), (3, 68)]:
-            self.tabel_mp.setColumnWidth(_c, _w)
+        self.tabel_mp.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.tabel_mp.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.tabel_mp.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
+        self.tabel_mp.setColumnWidth(1, 60)
+        self.tabel_mp.setColumnWidth(2, 60)
+        self.tabel_mp.setColumnWidth(3, 60)
         self.tabel_mp.verticalHeader().setVisible(False)
         self.tabel_mp.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_mp.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -435,7 +433,7 @@ class InputLaporanWidget(QWidget):
             bal = QTableWidgetItem("0")
             bal.setFlags(Qt.ItemIsEnabled)
             bal.setTextAlignment(Qt.AlignCenter)
-            bal.setForeground(QColor(150, 155, 170))
+            bal.setForeground(QColor(80, 200, 100))
             self.tabel_mp.setItem(r, 3, bal)
 
         self.tabel_mp.itemChanged.connect(self._hitung_manpower)
@@ -474,31 +472,40 @@ class InputLaporanWidget(QWidget):
         self.tabel_absen = QTableWidget(0, 5)
         self.tabel_absen.setHorizontalHeaderLabels(["No", "Nama", "NIK", "Shop", "Keterangan"])
         self.tabel_absen.setFixedHeight(210)
-        self.tabel_absen.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.tabel_absen.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.tabel_absen.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tabel_absen.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.tabel_absen.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         self.tabel_absen.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.tabel_absen.horizontalHeader().setStretchLastSection(False)
+        self.tabel_absen.setColumnWidth(0, 28)
+        self.tabel_absen.setColumnWidth(2, 60)
+        self.tabel_absen.setColumnWidth(3, 45)
         self.tabel_absen.verticalHeader().setVisible(False)
         self.tabel_absen.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_absen.setStyleSheet(_tbl_sm)
-        for _c, _w in [(0, 35), (2, 75), (3, 60)]:
-            self.tabel_absen.setColumnWidth(_c, _w)
 
         btn_tambah_absen.clicked.connect(self.tambah_baris_absen)
         btn_hapus_absen.clicked.connect(self.hapus_baris_absen)
         card_absen_layout.addWidget(self.tabel_absen)
 
-        left_col = QVBoxLayout()
-        left_col.setSpacing(12)
-        left_col.addWidget(card_mp)
-        left_col.addWidget(card_absen)
-        left_col.addStretch()
+        left_widget = QWidget()
+        left_widget.setStyleSheet("background: transparent;")
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+        left_layout.addWidget(card_mp)
+        left_layout.addWidget(card_absen)
+        left_layout.addStretch()
 
-        main_cols = QHBoxLayout()
-        main_cols.setSpacing(12)
-        main_cols.addLayout(left_col, 2)
-        main_cols.addWidget(card_dp, 3)
-        main_layout.addLayout(main_cols)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(6)
+        splitter.setStyleSheet("QSplitter::handle { background-color: rgb(55, 60, 70); }")
+        splitter.addWidget(left_widget)
+        splitter.addWidget(card_dp)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([280, 400])
+        main_layout.addWidget(splitter)
 
         # Card Catatan Masalah
         card_masalah = QFrame()
@@ -540,10 +547,7 @@ class InputLaporanWidget(QWidget):
             "Start", "End", "Down Time (H)", "Loss Time (H)",
         ])
         self.tabel_masalah.setMinimumHeight(200)
-        self.tabel_masalah.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.tabel_masalah.horizontalHeader().setStretchLastSection(False)
-        for _col in (2, 3, 4):
-            self.tabel_masalah.horizontalHeader().setSectionResizeMode(_col, QHeaderView.Stretch)
+        self.tabel_masalah.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabel_masalah.verticalHeader().setVisible(False)
         self.tabel_masalah.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tabel_masalah.setSelectionBehavior(QTableWidget.SelectRows)
@@ -577,13 +581,6 @@ class InputLaporanWidget(QWidget):
                 font-size: 10px;
             }
         """)
-        self.tabel_masalah.setColumnWidth(0, 70)
-        self.tabel_masalah.setColumnWidth(1, 120)
-        self.tabel_masalah.setColumnWidth(5, 70)
-        self.tabel_masalah.setColumnWidth(6, 65)
-        self.tabel_masalah.setColumnWidth(7, 65)
-        self.tabel_masalah.setColumnWidth(8, 90)
-        self.tabel_masalah.setColumnWidth(9, 90)
         card_masalah_layout.addWidget(self.tabel_masalah)
         main_layout.addWidget(card_masalah)
 
@@ -631,10 +628,7 @@ class InputLaporanWidget(QWidget):
             "Faktor", "Stop (Hr)", "Lost (Hr)", "Status",
         ])
         self.tabel_claim.setMinimumHeight(180)
-        self.tabel_claim.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        for _sc in (4, 7, 8):
-            self.tabel_claim.horizontalHeader().setSectionResizeMode(_sc, QHeaderView.Stretch)
-        self.tabel_claim.horizontalHeader().setStretchLastSection(False)
+        self.tabel_claim.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabel_claim.verticalHeader().setVisible(False)
         self.tabel_claim.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_claim.setStyleSheet("""
@@ -665,9 +659,6 @@ class InputLaporanWidget(QWidget):
                 font-size: 10px;
             }
         """)
-        for _col, _w in [(0, 35), (1, 85), (2, 95), (3, 75),
-                         (5, 45), (6, 55), (9, 95), (10, 72), (11, 72), (12, 70)]:
-            self.tabel_claim.setColumnWidth(_col, _w)
         card_claim_layout.addWidget(self.tabel_claim)
         main_layout.addWidget(card_claim)
 
@@ -836,9 +827,13 @@ class InputLaporanWidget(QWidget):
         self.tabel_masalah.setCellWidget(row, 6, time_start)
         self.tabel_masalah.setCellWidget(row, 7, time_end)
 
+        item_downtime = QTableWidgetItem("")
+        item_downtime.setTextAlignment(Qt.AlignCenter)
+        self.tabel_masalah.setItem(row, 8, item_downtime)
+
         item_loss = QTableWidgetItem("")
         item_loss.setTextAlignment(Qt.AlignCenter)
-        self.tabel_masalah.setItem(row, 8, item_loss)
+        self.tabel_masalah.setItem(row, 9, item_loss)
 
     def _auto_resize_row(self, row):
         from PySide6.QtCore import QTimer
@@ -929,8 +924,7 @@ class InputLaporanWidget(QWidget):
             bal = self.tabel_mp.item(r, 3)
             if bal:
                 bal.setText(str(blc))
-                bal.setForeground(QColor(220, 80, 80) if blc < 0 else
-                                  QColor(80, 200, 100) if blc > 0 else QColor(150, 155, 170))
+                bal.setForeground(QColor(220, 80, 80) if blc < 0 else QColor(80, 200, 100))
             total_plan += plan
             total_act += act
         total_blc = total_act - total_plan
@@ -939,8 +933,7 @@ class InputLaporanWidget(QWidget):
             if it:
                 it.setText(str(val))
                 if col == 3:
-                    it.setForeground(QColor(220, 80, 80) if total_blc < 0 else
-                                     QColor(80, 200, 100) if total_blc > 0 else QColor(150, 155, 170))
+                    it.setForeground(QColor(220, 80, 80) if total_blc < 0 else QColor(80, 200, 100))
         self.tabel_mp.blockSignals(False)
 
     def _reset_manpower(self):
@@ -953,13 +946,13 @@ class InputLaporanWidget(QWidget):
             bal = self.tabel_mp.item(r, 3)
             if bal:
                 bal.setText("0")
-                bal.setForeground(QColor(150, 155, 170))
+                bal.setForeground(QColor(80, 200, 100))
         for col in [1, 2, 3]:
             it = self.tabel_mp.item(3, col)
             if it:
                 it.setText("0")
                 if col == 3:
-                    it.setForeground(QColor(150, 155, 170))
+                    it.setForeground(QColor(80, 200, 100))
         self.tabel_mp.blockSignals(False)
 
     def _reset_absen(self):
@@ -1015,7 +1008,7 @@ class InputLaporanWidget(QWidget):
             ot2h  = _cell(3)
             ot3h  = _cell(4)
             ot11h = _cell(5)
-            bal   = plan - (reg + ot2h + ot3h + ot11h)
+            bal   = (reg + ot2h + ot3h + ot11h) - plan
 
             bal_item = self.tabel_produksi.item(r, 6)
             if bal_item is None:
@@ -1046,10 +1039,9 @@ class InputLaporanWidget(QWidget):
             self.calc_cap_hour.setStyleSheet(_neutral)
 
         if cap_hour > 0 and total_balance != 0:
-            plan_loss = abs(total_balance) / cap_hour
-            color_plt = "color: rgb(220, 80, 80);" if total_balance < 0 else "color: rgb(80, 200, 100);"
-            sign = "-" if total_balance < 0 else "+"
-            self.calc_plan_loss_time.setText(f"{sign}{plan_loss:.2f} H")
+            plan_loss = total_balance / cap_hour
+            color_plt = "color: rgb(220, 80, 80);" if plan_loss < 0 else "color: rgb(80, 200, 100);"
+            self.calc_plan_loss_time.setText(f"{plan_loss:+.2f} H")
             self.calc_plan_loss_time.setStyleSheet(_calc_base + color_plt)
         else:
             plan_loss = 0.0
@@ -1058,7 +1050,7 @@ class InputLaporanWidget(QWidget):
 
         actual_loss = 0.0
         for r in range(self.tabel_masalah.rowCount()):
-            it = self.tabel_masalah.item(r, 8)
+            it = self.tabel_masalah.item(r, 9)
             if it and it.text().strip():
                 try:
                     actual_loss += float(it.text())
@@ -1067,10 +1059,10 @@ class InputLaporanWidget(QWidget):
         self.calc_actual_loss_time.setText(f"{actual_loss:.2f} H")
         self.calc_actual_loss_time.setStyleSheet(_neutral)
 
-        if plan_loss > 0:
-            sisa = plan_loss - actual_loss
+        if plan_loss != 0:
+            sisa = plan_loss + actual_loss
             color_sisa = "color: rgb(80, 200, 100);" if sisa >= 0 else "color: rgb(220, 80, 80);"
-            self.calc_sisa_balance.setText(f"{sisa:.2f} H")
+            self.calc_sisa_balance.setText(f"{sisa:+.2f} H")
             self.calc_sisa_balance.setStyleSheet(_calc_base + color_sisa)
         else:
             self.calc_sisa_balance.setText("—")
@@ -1128,7 +1120,7 @@ class InputLaporanWidget(QWidget):
             penyebab_w = self.tabel_masalah.cellWidget(row, 3)
             tindakan_w = self.tabel_masalah.cellWidget(row, 4)
             pic = self.tabel_masalah.item(row, 5)
-            loss = self.tabel_masalah.item(row, 8)
+            loss = self.tabel_masalah.item(row, 9)
 
             deskripsi = deskripsi_w.toPlainText().strip() if deskripsi_w else ""
             if not deskripsi:

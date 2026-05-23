@@ -96,7 +96,7 @@ def get_detail_laporan(report_id: int) -> tuple:
     }
     cur.execute(
         """
-        SELECT model, plan_unit, reg_actual, ot_2h, ot_3h, ot_11h
+        SELECT model, plan_unit, actual_unit, plan_whour, actual_whour
         FROM daily_production
         WHERE report_id = %s
         ORDER BY id
@@ -107,10 +107,9 @@ def get_detail_laporan(report_id: int) -> tuple:
         {
             "model": r[0],
             "plan_unit": float(r[1]) if r[1] is not None else 0.0,
-            "reg_actual": float(r[2]) if r[2] is not None else 0.0,
-            "ot_2h": float(r[3]) if r[3] is not None else 0.0,
-            "ot_3h": float(r[4]) if r[4] is not None else 0.0,
-            "ot_11h": float(r[5]) if r[5] is not None else 0.0,
+            "actual_unit": float(r[2]) if r[2] is not None else 0.0,
+            "plan_whour": float(r[3]) if r[3] is not None else 0.0,
+            "actual_whour": float(r[4]) if r[4] is not None else 0.0,
         }
         for r in cur.fetchall()
     ]

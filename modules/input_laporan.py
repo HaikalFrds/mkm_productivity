@@ -547,7 +547,18 @@ class InputLaporanWidget(QWidget):
             "Start", "End", "Down Time (H)", "Loss Time (H)",
         ])
         self.tabel_masalah.setMinimumHeight(200)
-        self.tabel_masalah.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        _mh = self.tabel_masalah.horizontalHeader()
+        _mh.setSectionResizeMode(QHeaderView.Fixed)
+        _mh.setSectionResizeMode(2, QHeaderView.Stretch)   # Deskripsi Masalah
+        _mh.setSectionResizeMode(3, QHeaderView.Stretch)   # Penyebab
+        _mh.setSectionResizeMode(4, QHeaderView.Stretch)   # Tindakan Perbaikan
+        self.tabel_masalah.setColumnWidth(0, 68)   # No. RA
+        self.tabel_masalah.setColumnWidth(1, 110)  # Kategori
+        self.tabel_masalah.setColumnWidth(5, 75)   # PIC
+        self.tabel_masalah.setColumnWidth(6, 52)   # Start
+        self.tabel_masalah.setColumnWidth(7, 52)   # End
+        self.tabel_masalah.setColumnWidth(8, 90)   # Down Time (H)
+        self.tabel_masalah.setColumnWidth(9, 82)   # Loss Time (H)
         self.tabel_masalah.verticalHeader().setVisible(False)
         self.tabel_masalah.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tabel_masalah.setSelectionBehavior(QTableWidget.SelectRows)
@@ -628,7 +639,21 @@ class InputLaporanWidget(QWidget):
             "Faktor", "Stop (Hr)", "Lost (Hr)", "Status",
         ])
         self.tabel_claim.setMinimumHeight(180)
-        self.tabel_claim.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        _ch = self.tabel_claim.horizontalHeader()
+        _ch.setSectionResizeMode(QHeaderView.Fixed)
+        _ch.setSectionResizeMode(4, QHeaderView.Stretch)   # Item
+        _ch.setSectionResizeMode(7, QHeaderView.Stretch)   # Penyebab
+        _ch.setSectionResizeMode(8, QHeaderView.Stretch)   # Tindakan
+        self.tabel_claim.setColumnWidth(0, 30)   # No
+        self.tabel_claim.setColumnWidth(1, 78)   # Tanggal
+        self.tabel_claim.setColumnWidth(2, 78)   # Model
+        self.tabel_claim.setColumnWidth(3, 70)   # OP.No/St.
+        self.tabel_claim.setColumnWidth(5, 42)   # Qty
+        self.tabel_claim.setColumnWidth(6, 55)   # Satuan
+        self.tabel_claim.setColumnWidth(9, 72)   # Faktor
+        self.tabel_claim.setColumnWidth(10, 65)  # Stop (Hr)
+        self.tabel_claim.setColumnWidth(11, 65)  # Lost (Hr)
+        self.tabel_claim.setColumnWidth(12, 65)  # Status
         self.tabel_claim.verticalHeader().setVisible(False)
         self.tabel_claim.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_claim.setStyleSheet("""
@@ -883,11 +908,14 @@ class InputLaporanWidget(QWidget):
         self.tabel_claim.setCellWidget(row, 2, _mk_combo(["T8", "T8 SHDX", "T6 STD", "T6 Long", "T7"]))
         self.tabel_claim.setCellWidget(row, 3, _mk_combo(["CM-10", "CM-20", "CM-30", "CM-40", "CM-45", "CM-52", "CM-60", "CM-68"]))
 
-        for col in [4, 5, 6, 7, 8]:
+        for col in [4, 5, 7, 8]:
             item = QTableWidgetItem("")
             item.setTextAlignment(Qt.AlignCenter)
             self.tabel_claim.setItem(row, col, item)
 
+        self.tabel_claim.setCellWidget(row, 6, _mk_combo(
+            ["Unit", "Pcs", "Set", "Lot", "Kg", "Box", "Sheet", "Roll"], popup_w=90
+        ))
         self.tabel_claim.setCellWidget(row, 9, _mk_combo(["Material", "Tool", "Machine", "Man", "Method"]))
 
         for col in [10, 11]:
@@ -1196,17 +1224,18 @@ class InputLaporanWidget(QWidget):
                     return float(val) if val else 0.0
                 except ValueError:
                     return 0.0
-            combo_m  = self.tabel_claim.cellWidget(row, 2)
-            combo_op = self.tabel_claim.cellWidget(row, 3)
-            combo_f  = self.tabel_claim.cellWidget(row, 9)
-            combo_s  = self.tabel_claim.cellWidget(row, 12)
+            combo_m   = self.tabel_claim.cellWidget(row, 2)
+            combo_op  = self.tabel_claim.cellWidget(row, 3)
+            combo_sat = self.tabel_claim.cellWidget(row, 6)
+            combo_f   = self.tabel_claim.cellWidget(row, 9)
+            combo_s   = self.tabel_claim.cellWidget(row, 12)
             claim_data.append({
                 "tanggal": self.input_tanggal.date().toString("yyyy-MM-dd"),
                 "model": combo_m.currentText() if combo_m else "",
                 "op_no_st": combo_op.currentText() if combo_op else "",
                 "item": _cval(4),
                 "qty": _cfloat(5),
-                "satuan": _cval(6),
+                "satuan": combo_sat.currentText() if combo_sat else "",
                 "penyebab": _cval(7),
                 "tindakan": _cval(8),
                 "faktor": combo_f.currentText() if combo_f else "",

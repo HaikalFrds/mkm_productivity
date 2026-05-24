@@ -169,7 +169,7 @@ def _db_ng_pending(section_id, date_from, date_to):
     cur = conn.cursor()
     sec = " AND dr.section_id = %s" if section_id is not None else ""
 
-    inhouse = []
+    inhouse_ng = []
     try:
         p = [date_from, date_to] + ([section_id] if section_id else [])
         cur.execute(f"""
@@ -177,24 +177,25 @@ def _db_ng_pending(section_id, date_from, date_to):
                    ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
             FROM inhouse_claim ic
             JOIN daily_report dr ON dr.id = ic.report_id
-            WHERE dr.date BETWEEN %s AND %s {sec}
+            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
             ORDER BY ic.tanggal DESC, ic.id DESC
         """, p)
-        inhouse = cur.fetchall()
+        inhouse_ng = cur.fetchall()
     except Exception:
         conn.rollback()
 
-    pending = []
+    inhouse_pending = []
     try:
         p = [date_from, date_to] + ([section_id] if section_id else [])
         cur.execute(f"""
-            SELECT pp.tanggal, pp.nomor_part, pp.nama_part, pp.keterangan, pp.qty
-            FROM part_pending pp
-            JOIN daily_report dr ON dr.id = pp.report_id
-            WHERE dr.date BETWEEN %s AND %s {sec}
-            ORDER BY pp.tanggal DESC, pp.id DESC
+            SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
+                   ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
+            FROM inhouse_claim ic
+            JOIN daily_report dr ON dr.id = ic.report_id
+            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
+            ORDER BY ic.tanggal DESC, ic.id DESC
         """, p)
-        pending = cur.fetchall()
+        inhouse_pending = cur.fetchall()
     except Exception:
         conn.rollback()
 
@@ -203,7 +204,7 @@ def _db_ng_pending(section_id, date_from, date_to):
         conn.close()
     except Exception:
         pass
-    return inhouse, pending
+    return inhouse_ng, inhouse_pending
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -521,9 +522,9 @@ class RiwayatLaporanWidget(QWidget):
         if produksi:
             lyt.addWidget(_sec_lbl("Data Produksi"))
             tbl_prod = QTableWidget()
-            tbl_prod.setColumnCount(5)
+            tbl_prod.setColumnCount(7)
             tbl_prod.setHorizontalHeaderLabels(
-                ["Model", "Plan Unit", "Actual Unit", "Plan W/Hour", "Actual W/Hour"]
+                ["Model", "Plan", "Reg", "2H OT", "3H OT", "11H OT", "Balance"]
             )
             tbl_prod.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             tbl_prod.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -533,11 +534,21 @@ class RiwayatLaporanWidget(QWidget):
             tbl_prod.setStyleSheet(_TABLE_STYLE)
             for i, p in enumerate(produksi):
                 tbl_prod.insertRow(i)
+                plan  = p.get("plan_unit", 0.0)
+                reg   = p.get("actual_unit", 0.0)
+                ot2h  = p.get("ot_2h", 0.0)
+                ot3h  = p.get("ot_3h", 0.0)
+                ot11h = p.get("ot_11h", 0.0)
+                bal   = (reg + ot2h + ot3h + ot11h) - plan
                 tbl_prod.setItem(i, 0, _cell(p.get("model", "")))
-                tbl_prod.setItem(i, 1, _cell(f"{p['plan_unit']:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 2, _cell(f"{p['actual_unit']:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 3, _cell(f"{p['plan_whour']:.2f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 4, _cell(f"{p['actual_whour']:.2f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 1, _cell(f"{plan:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 2, _cell(f"{reg:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 3, _cell(f"{ot2h:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 4, _cell(f"{ot3h:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 5, _cell(f"{ot11h:.0f}", Qt.AlignCenter))
+                bal_cell = _cell(f"{bal:.0f}", Qt.AlignCenter)
+                bal_cell.setForeground(QColor(220, 80, 80) if bal < 0 else QColor(80, 200, 100))
+                tbl_prod.setItem(i, 6, bal_cell)
             lyt.addWidget(tbl_prod)
 
         lyt.addWidget(_sec_lbl("Catatan Masalah"))
@@ -1011,17 +1022,16 @@ class RiwayatLaporanWidget(QWidget):
         pp_lyt.addLayout(pp_hdr)
 
         self.tabel_pp = QTableWidget()
-        self.tabel_pp.setColumnCount(6)
+        self.tabel_pp.setColumnCount(11)
         self.tabel_pp.setHorizontalHeaderLabels([
-            "No", "Tanggal", "Nomor Part", "Nama Part", "Keterangan", "Qty",
+            "No", "Tanggal", "Model", "OP/St", "Item", "Qty",
+            "Penyebab", "Tindakan", "Faktor", "Stop (H)", "Lost (H)",
         ])
-        self.tabel_pp.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.tabel_pp.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.tabel_pp.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.tabel_pp.setColumnWidth(0, 40)
-        self.tabel_pp.setColumnWidth(1, 92)
-        self.tabel_pp.setColumnWidth(2, 120)
-        self.tabel_pp.setColumnWidth(5, 70)
+        self.tabel_pp.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        for fc in (0, 1, 2, 3, 5, 9, 10):
+            self.tabel_pp.horizontalHeader().setSectionResizeMode(
+                fc, QHeaderView.ResizeToContents
+            )
         self.tabel_pp.verticalHeader().setVisible(False)
         self.tabel_pp.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_pp.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -1041,7 +1051,7 @@ class RiwayatLaporanWidget(QWidget):
         date_to = self.date_ng_to.date().toString("yyyy-MM-dd")
 
         try:
-            inhouse, pending = _db_ng_pending(section_id, date_from, date_to)
+            inhouse_ng, inhouse_pending = _db_ng_pending(section_id, date_from, date_to)
         except Exception as e:
             self.lbl_info_ic.setText(f"Gagal memuat data: {e}")
             self.tabel_ic.setRowCount(0)
@@ -1054,8 +1064,8 @@ class RiwayatLaporanWidget(QWidget):
             return it
 
         self.tabel_ic.setRowCount(0)
-        self.lbl_info_ic.setText(f"— {len(inhouse)} data")
-        for i, row in enumerate(inhouse):
+        self.lbl_info_ic.setText(f"— {len(inhouse_ng)} data")
+        for i, row in enumerate(inhouse_ng):
             tanggal, model, op_no_st, item, qty, penyebab, tindakan, faktor, stop_hr, lost_hr, status = row
             self.tabel_ic.insertRow(i)
             self.tabel_ic.setItem(i, 0,  _item(i + 1))
@@ -1070,26 +1080,26 @@ class RiwayatLaporanWidget(QWidget):
             self.tabel_ic.setItem(i, 9,  _item(f"{float(stop_hr):.2f}" if stop_hr is not None else "0.00"))
             self.tabel_ic.setItem(i, 10, _item(f"{float(lost_hr):.2f}" if lost_hr is not None else "0.00"))
             it_status = _item(status or "")
-            if status == "NG":
-                it_status.setForeground(QColor(220, 100, 100))
-            elif status == "PENDING":
-                it_status.setForeground(QColor(220, 170, 80))
-            elif status == "OK":
-                it_status.setForeground(QColor(80, 200, 100))
+            it_status.setForeground(QColor(220, 100, 100))
             self.tabel_ic.setItem(i, 11, it_status)
             self.tabel_ic.setRowHeight(i, 32)
 
         self.tabel_pp.setRowCount(0)
-        self.lbl_info_pp.setText(f"— {len(pending)} data")
-        for i, row in enumerate(pending):
-            tanggal, nomor_part, nama_part, keterangan, qty = row
+        self.lbl_info_pp.setText(f"— {len(inhouse_pending)} data")
+        for i, row in enumerate(inhouse_pending):
+            tanggal, model, op_no_st, item, qty, penyebab, tindakan, faktor, stop_hr, lost_hr = row
             self.tabel_pp.insertRow(i)
-            self.tabel_pp.setItem(i, 0, _item(i + 1))
-            self.tabel_pp.setItem(i, 1, _item(str(tanggal) if tanggal else ""))
-            self.tabel_pp.setItem(i, 2, _item(nomor_part or ""))
-            self.tabel_pp.setItem(i, 3, _item(nama_part or "", Qt.AlignLeft | Qt.AlignVCenter))
-            self.tabel_pp.setItem(i, 4, _item(keterangan or "", Qt.AlignLeft | Qt.AlignVCenter))
-            self.tabel_pp.setItem(i, 5, _item(f"{float(qty):.0f}" if qty is not None else ""))
+            self.tabel_pp.setItem(i, 0,  _item(i + 1))
+            self.tabel_pp.setItem(i, 1,  _item(str(tanggal) if tanggal else ""))
+            self.tabel_pp.setItem(i, 2,  _item(model or ""))
+            self.tabel_pp.setItem(i, 3,  _item(op_no_st or ""))
+            self.tabel_pp.setItem(i, 4,  _item(item or "", Qt.AlignLeft | Qt.AlignVCenter))
+            self.tabel_pp.setItem(i, 5,  _item(f"{float(qty):.0f}" if qty is not None else ""))
+            self.tabel_pp.setItem(i, 6,  _item(penyebab or "", Qt.AlignLeft | Qt.AlignVCenter))
+            self.tabel_pp.setItem(i, 7,  _item(tindakan or "", Qt.AlignLeft | Qt.AlignVCenter))
+            self.tabel_pp.setItem(i, 8,  _item(faktor or ""))
+            self.tabel_pp.setItem(i, 9,  _item(f"{float(stop_hr):.2f}" if stop_hr is not None else "0.00"))
+            self.tabel_pp.setItem(i, 10, _item(f"{float(lost_hr):.2f}" if lost_hr is not None else "0.00"))
             self.tabel_pp.setRowHeight(i, 32)
 
     def _export_ng_pending(self):
@@ -1138,16 +1148,19 @@ class RiwayatLaporanWidget(QWidget):
             ws_ic.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
 
         ws_pp = wb.create_sheet("Part Pending")
-        pp_cols = ["No", "Tanggal", "Nomor Part", "Nama Part", "Keterangan", "Qty"]
+        pp_cols = [
+            "No", "Tanggal", "Model", "OP/St", "Item", "Qty",
+            "Penyebab", "Tindakan", "Faktor", "Stop (H)", "Lost (H)",
+        ]
         for ci, h in enumerate(pp_cols, 1):
             c = ws_pp.cell(row=1, column=ci, value=h)
             c.fill = hdr_fill
             c.font = hdr_font
             c.alignment = Alignment(horizontal="center", vertical="center")
             c.border = border
-        center_pp = {0, 1, 2, 5}
+        center_pp = {0, 1, 2, 3, 5, 8, 9, 10}
         for ri in range(pp_count):
-            for ci in range(6):
+            for ci in range(11):
                 item = self.tabel_pp.item(ri, ci)
                 val = item.text() if item else ""
                 cell = ws_pp.cell(row=ri + 2, column=ci + 1, value=val)
@@ -1155,7 +1168,7 @@ class RiwayatLaporanWidget(QWidget):
                     horizontal="center" if ci in center_pp else "left", vertical="center"
                 )
                 cell.border = border
-        for ci, w in enumerate([5, 12, 16, 25, 30, 6], 1):
+        for ci, w in enumerate([5, 12, 12, 10, 20, 6, 22, 22, 10, 8, 8], 1):
             ws_pp.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
 
         downloads = os.path.join(os.path.expanduser("~"), "Downloads")

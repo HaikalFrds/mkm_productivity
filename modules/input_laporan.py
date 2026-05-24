@@ -143,8 +143,11 @@ class InputLaporanWidget(QWidget):
             for sid, sname in sections:
                 self.combo_section.addItem(sname, sid)
             self._sections_loaded = True
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Gagal Memuat Section",
+                f"Tidak dapat memuat daftar section dari database:\n{e}"
+            )
 
     def setup_ui(self):
         outer_layout = QVBoxLayout(self)
@@ -311,7 +314,7 @@ class InputLaporanWidget(QWidget):
         self.tabel_produksi.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         for _c in range(1, 7):
             self.tabel_produksi.horizontalHeader().setSectionResizeMode(_c, QHeaderView.Fixed)
-            self.tabel_produksi.setColumnWidth(_c, 50)
+            self.tabel_produksi.setColumnWidth(_c, 58)
         self.tabel_produksi.verticalHeader().setVisible(False)
         self.tabel_produksi.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_produksi.setStyleSheet("""
@@ -771,7 +774,7 @@ class InputLaporanWidget(QWidget):
         """)
         self.tabel_produksi.setCellWidget(row, 0, combo_model)
 
-        for col in range(1, 6):
+        for col in range(1, 6):  # Plan, Reg, 2H OT, 3H OT, 11H OT
             item = QTableWidgetItem("")
             item.setTextAlignment(Qt.AlignCenter)
             self.tabel_produksi.setItem(row, col, item)
@@ -853,8 +856,22 @@ class InputLaporanWidget(QWidget):
         self.tabel_masalah.setCellWidget(row, 7, time_end)
 
         item_downtime = QTableWidgetItem("")
+        item_downtime.setFlags(Qt.ItemIsEnabled)
         item_downtime.setTextAlignment(Qt.AlignCenter)
+        item_downtime.setForeground(QColor(150, 155, 170))
         self.tabel_masalah.setItem(row, 8, item_downtime)
+
+        def _update_downtime(r=row, ts=time_start, te=time_end):
+            secs = ts.time().secsTo(te.time())
+            if secs < 0:
+                secs += 24 * 3600
+            hours = secs / 3600.0
+            it = self.tabel_masalah.item(r, 8)
+            if it:
+                it.setText(f"{hours:.2f}" if hours > 0 else "")
+
+        time_start.timeChanged.connect(lambda *_: _update_downtime())
+        time_end.timeChanged.connect(lambda *_: _update_downtime())
 
         item_loss = QTableWidgetItem("")
         item_loss.setTextAlignment(Qt.AlignCenter)
@@ -1098,7 +1115,16 @@ class InputLaporanWidget(QWidget):
 
     def simpan_laporan(self):
         if not self.input_koordinator.text().strip():
+            QMessageBox.warning(self, "Validasi", "Nama koordinator harus diisi.")
             self.input_koordinator.setFocus()
+            return
+
+        if self.combo_section.currentData() is None:
+            QMessageBox.warning(self, "Validasi", "Pilih section terlebih dahulu.")
+            return
+
+        if self.tabel_produksi.rowCount() == 0:
+            QMessageBox.warning(self, "Validasi", "Tambahkan minimal 1 baris data produksi.")
             return
 
         def _safe_float(text):
@@ -1132,12 +1158,12 @@ class InputLaporanWidget(QWidget):
             if not model_name:
                 continue
             produksi.append({
-                "model": model_name,
-                "plan_unit": _pval(1),
-                "reg_actual": _pval(2),
-                "ot_2h": _pval(3),
-                "ot_3h": _pval(4),
-                "ot_11h": _pval(5),
+                "model":       model_name,
+                "plan_unit":   _pval(1),
+                "actual_unit": _pval(2),
+                "ot_2h":       _pval(3),
+                "ot_3h":       _pval(4),
+                "ot_11h":      _pval(5),
             })
 
         catatan = []
@@ -1147,7 +1173,8 @@ class InputLaporanWidget(QWidget):
             deskripsi_w = self.tabel_masalah.cellWidget(row, 2)
             penyebab_w = self.tabel_masalah.cellWidget(row, 3)
             tindakan_w = self.tabel_masalah.cellWidget(row, 4)
-            pic = self.tabel_masalah.item(row, 5)
+            pic  = self.tabel_masalah.item(row, 5)
+            down = self.tabel_masalah.item(row, 8)
             loss = self.tabel_masalah.item(row, 9)
 
             deskripsi = deskripsi_w.toPlainText().strip() if deskripsi_w else ""
@@ -1155,17 +1182,23 @@ class InputLaporanWidget(QWidget):
                 continue
 
             try:
+                down_time = float(down.text()) if down and down.text().strip() else 0.0
+            except ValueError:
+                down_time = 0.0
+
+            try:
                 loss_time = float(loss.text()) if loss and loss.text().strip() else 0.0
             except ValueError:
                 loss_time = 0.0
 
             catatan.append({
-                "nomor_ra": nomor_ra.text() if nomor_ra else "",
-                "kategori": kategori_w.currentText() if kategori_w else "",
+                "nomor_ra":  nomor_ra.text() if nomor_ra else "",
+                "kategori":  kategori_w.currentText() if kategori_w else "",
                 "deskripsi": deskripsi,
-                "penyebab": penyebab_w.toPlainText().strip() if penyebab_w else "",
-                "tindakan": tindakan_w.toPlainText().strip() if tindakan_w else "",
-                "pic": pic.text() if pic else "",
+                "penyebab":  penyebab_w.toPlainText().strip() if penyebab_w else "",
+                "tindakan":  tindakan_w.toPlainText().strip() if tindakan_w else "",
+                "pic":       pic.text() if pic else "",
+                "down_time": down_time,
                 "loss_time": loss_time,
             })
 

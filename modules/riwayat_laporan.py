@@ -15,6 +15,7 @@ from modules.db_laporan import (
     get_all_sections, get_riwayat_laporan,
     get_detail_laporan, hapus_laporan,
 )
+from modules.export_excel import export_loss_time_record
 
 
 # ── Shared styles ─────────────────────────────────────────────────────────────
@@ -360,7 +361,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabel_harian.setColumnWidth(3, 92)
         self.tabel_harian.setColumnWidth(4, 135)
         self.tabel_harian.setColumnWidth(5, 90)
-        self.tabel_harian.setColumnWidth(6, 180)
+        self.tabel_harian.setColumnWidth(6, 240)
         tl.addWidget(self.tabel_harian)
 
         main.addWidget(card_t)
@@ -439,9 +440,19 @@ class RiwayatLaporanWidget(QWidget):
             """)
             btn_hapus.clicked.connect(lambda _, rid=report_id: self._hapus(rid))
 
+            btn_export_row = QPushButton("Export")
+            btn_export_row.setFixedSize(60, 26)
+            btn_export_row.setStyleSheet("""
+                QPushButton { background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
+                    border: none; border-radius: 4px; font-size: 10px; }
+                QPushButton:hover { background-color: rgb(35, 110, 65); }
+            """)
+            btn_export_row.clicked.connect(lambda _, rid=report_id: self._export_laporan(rid))
+
             al.addWidget(btn_lihat)
             al.addWidget(btn_edit)
             al.addWidget(btn_hapus)
+            al.addWidget(btn_export_row)
             al.addStretch()
             self.tabel_harian.setCellWidget(i, 6, aksi_w)
             self.tabel_harian.setRowHeight(i, 36)
@@ -714,6 +725,21 @@ class RiwayatLaporanWidget(QWidget):
                 self.load_data_harian()
             else:
                 QMessageBox.critical(self, "Gagal", msg)
+
+    def _export_laporan(self, report_id):
+        try:
+            header, produksi, catatan, manpower, absen, inhouse_claim = get_detail_laporan(report_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat detail: {e}")
+            return
+        if header is None:
+            QMessageBox.warning(self, "Tidak Ditemukan", f"Laporan #{report_id} tidak ditemukan.")
+            return
+        try:
+            filepath = export_loss_time_record(header, produksi, catatan, manpower, absen, inhouse_claim)
+            QMessageBox.information(self, "Export Berhasil", f"File disimpan di:\n{filepath}")
+        except Exception as e:
+            QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor laporan: {e}")
 
     def _export_rah(self):
         try:

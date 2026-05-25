@@ -92,7 +92,7 @@ def get_detail_laporan(report_id: int) -> tuple:
         hdr = cur.fetchone()
         if not hdr:
             cur.close()
-            return None, [], []
+            return None, [], [], [], [], []
         header = {
             "id": hdr[0], "date": str(hdr[1]), "section": hdr[2],
             "shift": hdr[3], "coordinator": hdr[4],
@@ -146,8 +146,60 @@ def get_detail_laporan(report_id: int) -> tuple:
             }
             for r in cur.fetchall()
         ]
+
+        cur.execute(
+            "SELECT role, plan_count, act_count FROM manpower WHERE report_id = %s ORDER BY id",
+            (report_id,),
+        )
+        manpower = [
+            {
+                "role": r[0] or "",
+                "plan": int(r[1]) if r[1] is not None else 0,
+                "act":  int(r[2]) if r[2] is not None else 0,
+            }
+            for r in cur.fetchall()
+        ]
+
+        cur.execute(
+            "SELECT no, nama, nik, shop, keterangan FROM absen WHERE report_id = %s ORDER BY no",
+            (report_id,),
+        )
+        absen = [
+            {
+                "no":         r[0],
+                "nama":       r[1] or "",
+                "nik":        r[2] or "",
+                "shop":       r[3] or "",
+                "keterangan": r[4] or "",
+            }
+            for r in cur.fetchall()
+        ]
+
+        cur.execute(
+            """
+            SELECT model, op_no_st, item, qty, satuan,
+                   penyebab, tindakan, faktor, stop_hr, lost_hr, status
+            FROM inhouse_claim
+            WHERE report_id = %s
+            ORDER BY id
+            """,
+            (report_id,),
+        )
+        inhouse_claim = [
+            {
+                "model":    r[0] or "", "op_no_st": r[1] or "", "item":    r[2] or "",
+                "qty":      float(r[3]) if r[3] is not None else 0.0,
+                "satuan":   r[4] or "", "penyebab": r[5] or "", "tindakan": r[6] or "",
+                "faktor":   r[7] or "",
+                "stop_hr":  float(r[8])  if r[8]  is not None else 0.0,
+                "lost_hr":  float(r[9])  if r[9]  is not None else 0.0,
+                "status":   r[10] or "",
+            }
+            for r in cur.fetchall()
+        ]
+
         cur.close()
-        return header, produksi, catatan
+        return header, produksi, catatan, manpower, absen, inhouse_claim
     except Exception:
         raise
     finally:
@@ -163,6 +215,7 @@ def hapus_laporan(report_id: int) -> tuple[bool, str]:
         cur.execute("DELETE FROM inhouse_claim  WHERE report_id = %s", (report_id,))
         cur.execute("DELETE FROM problem_record WHERE report_id = %s", (report_id,))
         cur.execute("DELETE FROM daily_production WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM pending_part    WHERE report_id = %s", (report_id,))
         cur.execute("DELETE FROM daily_report   WHERE id = %s",         (report_id,))
         conn.commit()
         cur.close()

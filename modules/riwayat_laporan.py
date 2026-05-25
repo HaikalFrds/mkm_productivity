@@ -455,7 +455,7 @@ class RiwayatLaporanWidget(QWidget):
 
     def _lihat(self, report_id):
         try:
-            header, produksi, catatan = get_detail_laporan(report_id)
+            header, produksi, catatan, manpower, absen, inhouse_claim = get_detail_laporan(report_id)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat detail: {e}")
             return
@@ -465,12 +465,21 @@ class RiwayatLaporanWidget(QWidget):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Detail Laporan — #{report_id}")
-        dlg.setMinimumWidth(920)
-        dlg.setMinimumHeight(620)
+        dlg.setMinimumWidth(980)
+        dlg.setMinimumHeight(700)
         dlg.setStyleSheet("QDialog { background-color: rgb(33, 37, 43); color: rgb(220,220,220); }")
 
-        lyt = QVBoxLayout(dlg)
-        lyt.setContentsMargins(16, 16, 16, 16)
+        outer_lyt = QVBoxLayout(dlg)
+        outer_lyt.setContentsMargins(16, 16, 16, 16)
+        outer_lyt.setSpacing(10)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        lyt = QVBoxLayout(container)
+        lyt.setContentsMargins(0, 0, 0, 0)
         lyt.setSpacing(10)
 
         def _cell(val, align=Qt.AlignLeft | Qt.AlignVCenter):
@@ -485,6 +494,7 @@ class RiwayatLaporanWidget(QWidget):
             )
             return lbl
 
+        # ── Header info ──────────────────────────────────────────────────────
         hdr_frame = QFrame()
         hdr_frame.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 8px; }")
         hdr_lyt = QGridLayout(hdr_frame)
@@ -517,6 +527,7 @@ class RiwayatLaporanWidget(QWidget):
             hdr_lyt.addWidget(val, r, c * 2 + 1)
         lyt.addWidget(hdr_frame)
 
+        # ── Data Produksi ────────────────────────────────────────────────────
         if produksi:
             lyt.addWidget(_sec_lbl("Data Produksi"))
             tbl_prod = QTableWidget()
@@ -549,6 +560,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_prod.setItem(i, 6, bal_cell)
             lyt.addWidget(tbl_prod)
 
+        # ── Catatan Masalah ──────────────────────────────────────────────────
         lyt.addWidget(_sec_lbl("Catatan Masalah"))
         tbl_cat = QTableWidget()
         tbl_cat.setColumnCount(9)
@@ -562,6 +574,7 @@ class RiwayatLaporanWidget(QWidget):
         tbl_cat.verticalHeader().setVisible(False)
         tbl_cat.setEditTriggers(QAbstractItemView.NoEditTriggers)
         tbl_cat.setWordWrap(True)
+        tbl_cat.setMinimumHeight(80)
         tbl_cat.setStyleSheet(_TABLE_STYLE)
         for i, c in enumerate(catatan):
             tbl_cat.insertRow(i)
@@ -577,6 +590,102 @@ class RiwayatLaporanWidget(QWidget):
             tbl_cat.resizeRowToContents(i)
         lyt.addWidget(tbl_cat)
 
+        # ── Manpower ─────────────────────────────────────────────────────────
+        if manpower:
+            lyt.addWidget(_sec_lbl("Manpower"))
+            tbl_mp = QTableWidget()
+            tbl_mp.setColumnCount(4)
+            tbl_mp.setHorizontalHeaderLabels(["Deskripsi", "Plan", "Actual", "Balance"])
+            tbl_mp.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            for fc in (1, 2, 3):
+                tbl_mp.horizontalHeader().setSectionResizeMode(fc, QHeaderView.Fixed)
+                tbl_mp.setColumnWidth(fc, 80)
+            tbl_mp.verticalHeader().setVisible(False)
+            tbl_mp.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tbl_mp.setFixedHeight(min(len(manpower) * 32 + 32, 160))
+            tbl_mp.setStyleSheet(_TABLE_STYLE)
+            for i, m in enumerate(manpower):
+                tbl_mp.insertRow(i)
+                plan_mp = m.get("plan", 0)
+                act_mp  = m.get("act", 0)
+                bal_mp  = act_mp - plan_mp
+                tbl_mp.setItem(i, 0, _cell(m.get("role", "")))
+                tbl_mp.setItem(i, 1, _cell(str(plan_mp), Qt.AlignCenter))
+                tbl_mp.setItem(i, 2, _cell(str(act_mp),  Qt.AlignCenter))
+                bal_cell = _cell(str(bal_mp), Qt.AlignCenter)
+                bal_cell.setForeground(QColor(220, 80, 80) if bal_mp < 0 else QColor(80, 200, 100))
+                tbl_mp.setItem(i, 3, bal_cell)
+            lyt.addWidget(tbl_mp)
+
+        # ── Absen ────────────────────────────────────────────────────────────
+        if absen:
+            lyt.addWidget(_sec_lbl("Absen"))
+            tbl_absen = QTableWidget()
+            tbl_absen.setColumnCount(5)
+            tbl_absen.setHorizontalHeaderLabels(["No", "Nama", "NIK", "Shop", "Keterangan"])
+            tbl_absen.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            tbl_absen.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+            tbl_absen.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+            tbl_absen.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
+            tbl_absen.setColumnWidth(0, 40)
+            tbl_absen.setColumnWidth(2, 80)
+            tbl_absen.setColumnWidth(3, 60)
+            tbl_absen.verticalHeader().setVisible(False)
+            tbl_absen.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tbl_absen.setFixedHeight(min(len(absen) * 32 + 32, 200))
+            tbl_absen.setStyleSheet(_TABLE_STYLE)
+            for i, a in enumerate(absen):
+                tbl_absen.insertRow(i)
+                tbl_absen.setItem(i, 0, _cell(str(a.get("no", i + 1)), Qt.AlignCenter))
+                tbl_absen.setItem(i, 1, _cell(a.get("nama", "")))
+                tbl_absen.setItem(i, 2, _cell(a.get("nik", ""),  Qt.AlignCenter))
+                tbl_absen.setItem(i, 3, _cell(a.get("shop", ""), Qt.AlignCenter))
+                tbl_absen.setItem(i, 4, _cell(a.get("keterangan", "")))
+            lyt.addWidget(tbl_absen)
+
+        # ── Inhouse Claim ────────────────────────────────────────────────────
+        if inhouse_claim:
+            lyt.addWidget(_sec_lbl("Inhouse Claim"))
+            tbl_ic = QTableWidget()
+            tbl_ic.setColumnCount(11)
+            tbl_ic.setHorizontalHeaderLabels([
+                "Model", "OP/St", "Item", "Qty", "Satuan",
+                "Penyebab", "Tindakan", "Faktor", "Stop (H)", "Lost (H)", "Status",
+            ])
+            tbl_ic.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            for fc in (0, 1, 3, 4, 7, 8, 9, 10):
+                tbl_ic.horizontalHeader().setSectionResizeMode(fc, QHeaderView.ResizeToContents)
+            tbl_ic.verticalHeader().setVisible(False)
+            tbl_ic.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tbl_ic.setFixedHeight(min(len(inhouse_claim) * 32 + 32, 200))
+            tbl_ic.setStyleSheet(_TABLE_STYLE)
+            for i, ic in enumerate(inhouse_claim):
+                tbl_ic.insertRow(i)
+                tbl_ic.setItem(i, 0, _cell(ic.get("model", "")))
+                tbl_ic.setItem(i, 1, _cell(ic.get("op_no_st", ""), Qt.AlignCenter))
+                tbl_ic.setItem(i, 2, _cell(ic.get("item", "")))
+                tbl_ic.setItem(i, 3, _cell(f"{ic.get('qty', 0):.0f}", Qt.AlignCenter))
+                tbl_ic.setItem(i, 4, _cell(ic.get("satuan", ""), Qt.AlignCenter))
+                tbl_ic.setItem(i, 5, _cell(ic.get("penyebab", "")))
+                tbl_ic.setItem(i, 6, _cell(ic.get("tindakan", "")))
+                tbl_ic.setItem(i, 7, _cell(ic.get("faktor", ""), Qt.AlignCenter))
+                tbl_ic.setItem(i, 8, _cell(f"{ic.get('stop_hr', 0):.2f}", Qt.AlignCenter))
+                tbl_ic.setItem(i, 9, _cell(f"{ic.get('lost_hr', 0):.2f}", Qt.AlignCenter))
+                it_status = _cell(ic.get("status", ""), Qt.AlignCenter)
+                s = ic.get("status", "")
+                if s == "NG":
+                    it_status.setForeground(QColor(220, 100, 100))
+                elif s == "PENDING":
+                    it_status.setForeground(QColor(220, 170, 80))
+                elif s == "OK":
+                    it_status.setForeground(QColor(80, 200, 100))
+                tbl_ic.setItem(i, 10, it_status)
+            lyt.addWidget(tbl_ic)
+
+        lyt.addStretch()
+        scroll.setWidget(container)
+        outer_lyt.addWidget(scroll)
+
         btn_box = QDialogButtonBox(QDialogButtonBox.Close)
         btn_box.setStyleSheet("""
             QPushButton { background-color: rgb(60, 65, 75); color: rgb(200, 200, 200);
@@ -584,7 +693,7 @@ class RiwayatLaporanWidget(QWidget):
             QPushButton:hover { background-color: rgb(75, 80, 90); }
         """)
         btn_box.rejected.connect(dlg.close)
-        lyt.addWidget(btn_box)
+        outer_lyt.addWidget(btn_box)
         dlg.exec()
 
     def _edit(self, report_id):

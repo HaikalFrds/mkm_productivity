@@ -154,57 +154,53 @@ def _db_rekap_bulanan(section_id, bulan, tahun):
         row = cur.fetchone()
         total_hour = float(row[0]) if row and row[0] else 0.0
         cur.close()
-        conn.close()
         return rows, total_hour
     except Exception:
-        try:
-            conn.close()
-        except Exception:
-            pass
         raise
+    finally:
+        conn.close()
 
 
 def _db_ng_pending(section_id, date_from, date_to):
     conn = get_connection()
-    cur = conn.cursor()
-    sec = " AND dr.section_id = %s" if section_id is not None else ""
-
-    inhouse_ng = []
     try:
-        p = [date_from, date_to] + ([section_id] if section_id else [])
-        cur.execute(f"""
-            SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
-                   ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
-            FROM inhouse_claim ic
-            JOIN daily_report dr ON dr.id = ic.report_id
-            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
-            ORDER BY ic.tanggal DESC, ic.id DESC
-        """, p)
-        inhouse_ng = cur.fetchall()
-    except Exception:
-        conn.rollback()
+        cur = conn.cursor()
+        sec = " AND dr.section_id = %s" if section_id is not None else ""
 
-    inhouse_pending = []
-    try:
-        p = [date_from, date_to] + ([section_id] if section_id else [])
-        cur.execute(f"""
-            SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
-                   ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
-            FROM inhouse_claim ic
-            JOIN daily_report dr ON dr.id = ic.report_id
-            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
-            ORDER BY ic.tanggal DESC, ic.id DESC
-        """, p)
-        inhouse_pending = cur.fetchall()
-    except Exception:
-        conn.rollback()
+        inhouse_ng = []
+        try:
+            p = [date_from, date_to] + ([section_id] if section_id else [])
+            cur.execute(f"""
+                SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
+                       ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
+                FROM inhouse_claim ic
+                JOIN daily_report dr ON dr.id = ic.report_id
+                WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
+                ORDER BY ic.tanggal DESC, ic.id DESC
+            """, p)
+            inhouse_ng = cur.fetchall()
+        except Exception:
+            conn.rollback()
 
-    try:
+        inhouse_pending = []
+        try:
+            p = [date_from, date_to] + ([section_id] if section_id else [])
+            cur.execute(f"""
+                SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
+                       ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
+                FROM inhouse_claim ic
+                JOIN daily_report dr ON dr.id = ic.report_id
+                WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
+                ORDER BY ic.tanggal DESC, ic.id DESC
+            """, p)
+            inhouse_pending = cur.fetchall()
+        except Exception:
+            conn.rollback()
+
         cur.close()
+        return inhouse_ng, inhouse_pending
+    finally:
         conn.close()
-    except Exception:
-        pass
-    return inhouse_ng, inhouse_pending
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -498,6 +494,8 @@ class RiwayatLaporanWidget(QWidget):
         hdr_lyt.setColumnStretch(3, 1)
 
         fmt_w = lambda v: f"{v:.2f} H" if v is not None else "—"
+        plan_wh   = produksi[0].get("plan_whour")   if produksi else None
+        actual_wh = produksi[0].get("actual_whour") if produksi else None
         pairs = [
             ("Tanggal",       header.get("date", "")),
             ("Shift",         header.get("shift", "")),
@@ -505,8 +503,8 @@ class RiwayatLaporanWidget(QWidget):
             ("Koordinator",   header.get("coordinator", "")),
             ("Disetujui",     header.get("approved_by", "")),
             ("Diperiksa",     header.get("checked_by", "")),
-            ("Plan W/Hour",   fmt_w(header.get("plan_whour"))),
-            ("Actual W/Hour", fmt_w(header.get("actual_whour"))),
+            ("Plan W/Hour",   fmt_w(plan_wh)),
+            ("Actual W/Hour", fmt_w(actual_wh)),
             ("Status",        header.get("status", "")),
         ]
         for idx, (lbl_text, val_text) in enumerate(pairs):

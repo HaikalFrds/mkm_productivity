@@ -749,7 +749,6 @@ class InputLaporanWidget(QWidget):
         self.tabel_claim.setRowCount(0)
 
     def tambah_baris_produksi(self):
-        from PySide6.QtWidgets import QComboBox
         row = self.tabel_produksi.rowCount()
         self.tabel_produksi.insertRow(row)
         self.tabel_produksi.setRowHeight(row, 30)
@@ -791,7 +790,7 @@ class InputLaporanWidget(QWidget):
             self._hitung_kalkulasi()
 
     def tambah_baris_masalah(self):
-        from PySide6.QtWidgets import QComboBox, QTimeEdit
+        from PySide6.QtWidgets import QTimeEdit
 
         row = self.tabel_masalah.rowCount()
         self.tabel_masalah.insertRow(row)
@@ -915,7 +914,6 @@ class InputLaporanWidget(QWidget):
         self.tabel_claim.setItem(row, 1, item_tgl)
 
         def _mk_combo(items, popup_w=120):
-            from PySide6.QtWidgets import QComboBox
             c = QComboBox()
             c.addItems(items)
             c.setStyleSheet(_combo_style)

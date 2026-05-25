@@ -221,11 +221,10 @@ def hapus_laporan(report_id: int) -> tuple[bool, str]:
         cur.close()
         return True, f"Laporan #{report_id} berhasil dihapus."
     except Exception as e:
-        try:
-            conn.rollback()
-        finally:
-            conn.close()
+        conn.rollback()
         return False, f"Gagal menghapus laporan: {e}"
+    finally:
+        conn.close()
 
 
 def simpan_laporan_harian(
@@ -248,6 +247,7 @@ def simpan_laporan_harian(
         if not section_row:
             return False, f"Section '{header['section']}' tidak ditemukan di database"
         section_id = section_row[0]
+
 
         # 2. Insert ke daily_report
         cur.execute("""
@@ -371,8 +371,7 @@ def simpan_laporan_harian(
         return True, f"Laporan berhasil disimpan! (ID: {report_id})"
 
     except Exception as e:
-        try:
-            conn.rollback()
-        finally:
-            conn.close()
+        conn.rollback()
         return False, f"Gagal menyimpan laporan: {str(e)}"
+    finally:
+        conn.close()

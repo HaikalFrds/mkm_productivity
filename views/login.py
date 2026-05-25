@@ -25,7 +25,7 @@ class LoginWorker(QThread):
                 self.success.emit(user)
             else:
                 self.failed.emit("NIK atau password salah.")
-        except ConnectionError as e:
+        except Exception as e:
             self.failed.emit(str(e))
 
 

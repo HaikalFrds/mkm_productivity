@@ -15,7 +15,7 @@ from modules.db_laporan import (
     get_all_sections, get_riwayat_laporan,
     get_detail_laporan, hapus_laporan,
 )
-from modules.export_excel import export_loss_time_record
+from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 
 
 # ── Shared styles ─────────────────────────────────────────────────────────────
@@ -1237,83 +1237,54 @@ class RiwayatLaporanWidget(QWidget):
             self.tabel_pp.setRowHeight(i, 32)
 
     def _export_ng_pending(self):
-        try:
-            import openpyxl
-            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        except ImportError:
-            QMessageBox.critical(self, "Error", "openpyxl tidak terinstall.\nJalankan: pip install openpyxl")
-            return
-
         ic_count = self.tabel_ic.rowCount()
         pp_count = self.tabel_pp.rowCount()
         if ic_count == 0 and pp_count == 0:
             QMessageBox.warning(self, "Peringatan", "Tidak ada data untuk diekspor.")
             return
 
-        wb = openpyxl.Workbook()
-        thin = Side(style="thin", color="3C4147")
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
-        hdr_fill = PatternFill("solid", fgColor="1C2028")
-        hdr_font = Font(color="9696A0", bold=True, size=10)
+        # ── Section name ──────────────────────────────────────────────────────
+        sec_text     = self.combo_section_ng.currentText()
+        section_name = sec_text if sec_text != "Semua" else ""
 
-        ws_ic = wb.active
-        ws_ic.title = "Inhouse Claim"
-        ic_cols = [
-            "No", "Tanggal", "Model", "OP/St", "Item", "Qty",
-            "Penyebab", "Tindakan", "Faktor", "Stop (H)", "Lost (H)", "Status",
-        ]
-        for ci, h in enumerate(ic_cols, 1):
-            c = ws_ic.cell(row=1, column=ci, value=h)
-            c.fill = hdr_fill
-            c.font = hdr_font
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border
-        center_ic = {0, 1, 2, 3, 5, 8, 9, 10, 11}
-        for ri in range(ic_count):
-            for ci in range(12):
-                item = self.tabel_ic.item(ri, ci)
-                val = item.text() if item else ""
-                cell = ws_ic.cell(row=ri + 2, column=ci + 1, value=val)
-                cell.alignment = Alignment(
-                    horizontal="center" if ci in center_ic else "left", vertical="center"
-                )
-                cell.border = border
-        for ci, w in enumerate([5, 12, 12, 10, 20, 6, 22, 22, 10, 8, 8, 8], 1):
-            ws_ic.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
+        # ── Period string ─────────────────────────────────────────────────────
+        d_from = self.date_ng_from.date()
+        d_to   = self.date_ng_to.date()
+        _bln   = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN",
+                  "JUL", "AGU", "SEP", "OKT", "NOV", "DES"]
+        if d_from.month() == d_to.month() and d_from.year() == d_to.year():
+            period_str = f"{_bln[d_from.month() - 1]} {d_from.year()}"
+        else:
+            period_str = (
+                f"{d_from.toString('dd/MM/yy')} - {d_to.toString('dd/MM/yy')}"
+            )
 
-        ws_pp = wb.create_sheet("Part Pending")
-        pp_cols = [
-            "No", "Tanggal", "Model", "OP/St", "Item", "Qty",
-            "Penyebab", "Tindakan", "Faktor", "Stop (H)", "Lost (H)",
-        ]
-        for ci, h in enumerate(pp_cols, 1):
-            c = ws_pp.cell(row=1, column=ci, value=h)
-            c.fill = hdr_fill
-            c.font = hdr_font
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border
-        center_pp = {0, 1, 2, 3, 5, 8, 9, 10}
-        for ri in range(pp_count):
-            for ci in range(11):
-                item = self.tabel_pp.item(ri, ci)
-                val = item.text() if item else ""
-                cell = ws_pp.cell(row=ri + 2, column=ci + 1, value=val)
-                cell.alignment = Alignment(
-                    horizontal="center" if ci in center_pp else "left", vertical="center"
-                )
-                cell.border = border
-        for ci, w in enumerate([5, 12, 12, 10, 20, 6, 22, 22, 10, 8, 8], 1):
-            ws_pp.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
+        # ── Extract table data ────────────────────────────────────────────────
+        def _read_table(tbl, ncols):
+            """
+            Baca ncols kolom dari QTableWidget.
+            Sisipkan kolom Satuan (kosong) setelah Qty (index 5 → insert at 6).
+            """
+            rows = []
+            for r in range(tbl.rowCount()):
+                row = [
+                    (tbl.item(r, c).text() if tbl.item(r, c) else "")
+                    for c in range(ncols)
+                ]
+                row.insert(6, "")   # Satuan
+                rows.append(row)
+            return rows
 
-        downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-        filepath = os.path.join(
-            downloads, f"ng_pending_{QDate.currentDate().toString('yyyyMMdd')}.xlsx"
-        )
+        ng_rows      = _read_table(self.tabel_ic, 12)   # 12 cols → 13 setelah insert
+        pending_rows = _read_table(self.tabel_pp, 11)   # 11 cols → 12 setelah insert
+
         try:
-            wb.save(filepath)
+            filepath = export_inhouse_ng_pending(
+                ng_rows, pending_rows, section_name, period_str
+            )
             QMessageBox.information(self, "Export Berhasil", f"File disimpan di:\n{filepath}")
         except Exception as e:
-            QMessageBox.critical(self, "Gagal Export", f"Gagal menyimpan file:\n{e}")
+            QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor: {e}")
 
     @staticmethod
     def _flabel(text):

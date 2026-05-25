@@ -574,7 +574,7 @@ class RiwayatLaporanWidget(QWidget):
         tbl_cat.verticalHeader().setVisible(False)
         tbl_cat.setEditTriggers(QAbstractItemView.NoEditTriggers)
         tbl_cat.setWordWrap(True)
-        tbl_cat.setMinimumHeight(80)
+        tbl_cat.setFixedHeight(3 * 32 + 32 + 4)
         tbl_cat.setStyleSheet(_TABLE_STYLE)
         for i, c in enumerate(catatan):
             tbl_cat.insertRow(i)
@@ -602,7 +602,8 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_mp.setColumnWidth(fc, 80)
             tbl_mp.verticalHeader().setVisible(False)
             tbl_mp.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tbl_mp.setFixedHeight(min(len(manpower) * 32 + 32, 160))
+            tbl_mp.setFixedHeight(len(manpower) * 32 + 32 + 4)
+            tbl_mp.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             tbl_mp.setStyleSheet(_TABLE_STYLE)
             for i, m in enumerate(manpower):
                 tbl_mp.insertRow(i)
@@ -657,7 +658,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_ic.horizontalHeader().setSectionResizeMode(fc, QHeaderView.ResizeToContents)
             tbl_ic.verticalHeader().setVisible(False)
             tbl_ic.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tbl_ic.setFixedHeight(min(len(inhouse_claim) * 32 + 32, 200))
+            tbl_ic.setFixedHeight(2 * 32 + 32 + 4)
             tbl_ic.setStyleSheet(_TABLE_STYLE)
             for i, ic in enumerate(inhouse_claim):
                 tbl_ic.insertRow(i)

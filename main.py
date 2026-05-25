@@ -22,7 +22,7 @@ if __name__ == "__main__":
         global window
         login.close()
         window = MainWindow(user)
-        window.show()
+        window.showMaximized()
 
     login = LoginWindow()
     login.login_success.connect(on_login_success)

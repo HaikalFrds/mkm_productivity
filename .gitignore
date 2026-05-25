@@ -5,3 +5,5 @@ env/
 __pycache__/
 *.pyc
 .vscode/
+CLAUDE_1.md
+PRD.md

@@ -53,11 +53,11 @@ class LoginWindow(QWidget):
         # Title
         title = QLabel("MKM")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 28pt; font-weight: bold; color: #cc0000;")
+        title.setStyleSheet("font-size: 28pt; font-weight: bold; color: #da291c;")
 
         subtitle = QLabel("Productivity System")
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("font-size: 11pt; color: #888888;")
+        subtitle.setStyleSheet("font-size: 11pt; color: #969696;")
 
         # NIK
         lbl_nik = QLabel("NIK")

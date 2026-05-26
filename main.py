@@ -38,8 +38,11 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("assets/icons/icon.ico"))
 
-    with open("styles/style.qss", "r") as f:
-        app.setStyleSheet(f.read())
+    try:
+        with open("styles/style.qss", "r") as f:
+            app.setStyleSheet(f.read())
+    except FileNotFoundError:
+        pass
 
     show_login()
     sys.exit(app.exec())

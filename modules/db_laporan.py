@@ -722,26 +722,6 @@ def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool,
         conn.close()
 
 
-def get_all_shifts_full() -> list:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT id, name, start_time, end_time, total_hours FROM shift ORDER BY id")
-        rows = cur.fetchall()
-        cur.close()
-        return [
-            {"id": r[0], "name": r[1],
-             "start_time": str(r[2])[:5] if r[2] else "",
-             "end_time":   str(r[3])[:5] if r[3] else "",
-             "total_hours": float(r[4]) if r[4] is not None else 0.0}
-            for r in rows
-        ]
-    except Exception:
-        raise
-    finally:
-        conn.close()
-
-
 def tambah_shift(name: str, start_time: str, end_time: str, total_hours: float) -> tuple[bool, str]:
     conn = get_connection()
     try:

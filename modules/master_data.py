@@ -12,7 +12,7 @@ from modules.db_laporan import (
     get_all_sections, tambah_section, edit_section, hapus_section,
     get_all_users, tambah_user, reset_password_user, hapus_user,
     get_all_groups, get_all_kategori, tambah_kategori, edit_kategori, hapus_kategori,
-    get_all_shifts, get_all_shifts_full, tambah_shift, edit_shift, hapus_shift,
+    get_all_shifts, tambah_shift, edit_shift, hapus_shift,
     update_shift_working_hour,
 )
 
@@ -729,7 +729,7 @@ class MasterDataWidget(QWidget):
 
     def _load_shifts(self):
         try:
-            rows = get_all_shifts_full()
+            rows = get_all_shifts()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat shift: {e}")
             return
@@ -812,7 +812,7 @@ def _divider() -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.HLine)
     line.setFixedHeight(1)
-    line.setStyleSheet("background-color: rgb(55, 60, 70); border: none;")
+    line.setStyleSheet("background-color: #303030; border: none;")
     return line
 
 

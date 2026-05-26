@@ -585,7 +585,8 @@ class RiwayatLaporanWidget(QWidget):
         tbl_cat.verticalHeader().setVisible(False)
         tbl_cat.setEditTriggers(QAbstractItemView.NoEditTriggers)
         tbl_cat.setWordWrap(True)
-        tbl_cat.setFixedHeight(3 * 32 + 32 + 4)
+        row_count = max(len(catatan), 1)
+        tbl_cat.setFixedHeight(min(row_count * 32 + 36, 400))
         tbl_cat.setStyleSheet(_TABLE_STYLE)
         for i, c in enumerate(catatan):
             tbl_cat.insertRow(i)
@@ -669,7 +670,8 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_ic.horizontalHeader().setSectionResizeMode(fc, QHeaderView.ResizeToContents)
             tbl_ic.verticalHeader().setVisible(False)
             tbl_ic.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tbl_ic.setFixedHeight(2 * 32 + 32 + 4)
+            claim_count = max(len(inhouse_claim), 1)
+            tbl_ic.setFixedHeight(min(claim_count * 32 + 36, 300))
             tbl_ic.setStyleSheet(_TABLE_STYLE)
             for i, ic in enumerate(inhouse_claim):
                 tbl_ic.insertRow(i)
@@ -975,7 +977,7 @@ class RiwayatLaporanWidget(QWidget):
         else:
             self.lbl_ratio.setText("Ratio Produktivitas: —")
             self.lbl_ratio.setStyleSheet(
-                "color: rgb(130, 140, 165); font-size: 12px; font-weight: bold;"
+                "color: #969696; font-size: 12px; font-weight: bold;"
             )
 
     def _export_rekap(self):

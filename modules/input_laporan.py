@@ -884,7 +884,7 @@ class InputLaporanWidget(QWidget):
         time_style = """
             QTimeEdit {
                 background-color: transparent;
-                color: rgb(210, 210, 210);
+                color: #ffffff;
                 border: none;
                 font-size: 11px;
                 padding: 0px;
@@ -937,14 +937,14 @@ class InputLaporanWidget(QWidget):
     def tambah_baris_claim(self):
         _combo_style = """
             QComboBox {
-                background-color: transparent; color: rgb(210, 210, 210);
+                background-color: transparent; color: #ffffff;
                 border: none; padding: 2px 6px; font-size: 11px;
             }
             QComboBox::drop-down { border: none; width: 20px; }
             QComboBox QAbstractItemView {
-                background-color: rgb(33, 37, 43); color: rgb(210, 210, 210);
-                selection-background-color: rgb(100, 110, 125);
-                border: 1px solid rgb(60, 65, 75);
+                background-color: #252525; color: #ffffff;
+                selection-background-color: #303030;
+                border: 1px solid #303030;
             }
         """
         row = self.tabel_claim.rowCount()
@@ -1073,14 +1073,14 @@ class InputLaporanWidget(QWidget):
     def _hitung_kalkulasi(self, *_):
         _calc_base = """
             QLineEdit {
-                background-color: rgb(25, 28, 35);
-                border: 1px solid rgb(45, 50, 60);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 8px;
                 font-size: 11px;
             }
         """
-        _neutral = _calc_base + "color: rgb(150, 155, 170);"
+        _neutral = _calc_base + "color: #969696;"
 
         self.tabel_produksi.blockSignals(True)
         total_plan = 0.0

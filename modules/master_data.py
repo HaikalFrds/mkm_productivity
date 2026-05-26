@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame,
     QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QDialogButtonBox, QLineEdit, QComboBox,
-    QAbstractItemView, QTabWidget, QTimeEdit, QScrollArea,
+    QAbstractItemView, QTabWidget, QTimeEdit, QScrollArea, QDoubleSpinBox,
 )
 from PySide6.QtCore import Qt, QTime
 
@@ -12,7 +12,8 @@ from modules.db_laporan import (
     get_all_sections, tambah_section, edit_section, hapus_section,
     get_all_users, tambah_user, reset_password_user, hapus_user,
     get_all_groups, get_all_kategori, tambah_kategori, edit_kategori, hapus_kategori,
-    get_all_shifts_full, tambah_shift, edit_shift, hapus_shift,
+    get_all_shifts, get_all_shifts_full, tambah_shift, edit_shift, hapus_shift,
+    update_shift_working_hour,
 )
 
 
@@ -272,10 +273,14 @@ class _ShiftDialog(QDialog):
         self.time_end = QTimeEdit(QTime.fromString(end, "HH:mm"))
         self.time_end.setDisplayFormat("HH:mm"); self.time_end.setStyleSheet(_TIME_EDIT_STYLE)
         _f("Jam Selesai", self.time_end)
-        self.input_total = QLineEdit(str(total))
-        self.input_total.setPlaceholderText("Total jam kerja")
-        self.input_total.setStyleSheet(_INPUT)
-        _f("Total Jam", self.input_total)
+        self.input_total = QDoubleSpinBox()
+        self.input_total.setRange(0.0, 24.0)
+        self.input_total.setSingleStep(0.25)
+        self.input_total.setDecimals(2)
+        self.input_total.setValue(total)
+        self.input_total.setMinimumHeight(34)
+        self.input_total.setStyleSheet(_TIME_EDIT_STYLE)
+        _f("Working Hour (H)", self.input_total)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Simpan")
@@ -284,15 +289,11 @@ class _ShiftDialog(QDialog):
         lay.addWidget(btns)
 
     def get_data(self) -> dict:
-        try:
-            total = float(self.input_total.text().strip())
-        except ValueError:
-            total = 0.0
         return {
             "name":        self.input_name.text().strip(),
             "start_time":  self.time_start.time().toString("HH:mm"),
             "end_time":    self.time_end.time().toString("HH:mm"),
-            "total_hours": total,
+            "total_hours": self.input_total.value(),
         }
 
 
@@ -435,7 +436,7 @@ class MasterDataWidget(QWidget):
         self.tabel_shift = QTableWidget()
         self.tabel_shift.setColumnCount(6)
         self.tabel_shift.setHorizontalHeaderLabels(
-            ["No", "Nama Shift", "Mulai", "Selesai", "Total Jam", "Aksi"]
+            ["No", "Nama Shift", "Mulai", "Selesai", "Working Hour (H)", "Aksi"]
         )
         hh = self.tabel_shift.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.Interactive)

@@ -687,6 +687,41 @@ def hapus_kategori(cat_id: int) -> tuple[bool, str]:
 # MASTER DATA — SHIFT
 # =============================================================================
 
+def get_all_shifts() -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, start_time, end_time, total_hours FROM shift ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+        return [
+            {"id": r[0], "name": r[1],
+             "start_time": str(r[2])[:5] if r[2] else "",
+             "end_time":   str(r[3])[:5] if r[3] else "",
+             "total_hours": float(r[4]) if r[4] is not None else 0.0}
+            for r in rows
+        ]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE shift SET total_hours = %s WHERE id = %s", (working_hour, shift_id))
+        conn.commit()
+        cur.close()
+        return True, "Working hour berhasil diperbarui."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal memperbarui working hour: {e}"
+    finally:
+        conn.close()
+
+
 def get_all_shifts_full() -> list:
     conn = get_connection()
     try:

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate, QSize
 from PySide6.QtGui import QTextOption, QColor
-from modules.db_laporan import simpan_laporan_harian, get_all_sections
+from modules.db_laporan import simpan_laporan_harian, get_all_sections, get_all_shifts
 
 
 class SectionHeader(QLabel):
@@ -128,11 +128,14 @@ class InputLaporanWidget(QWidget):
         super().__init__(parent)
         self._user = user
         self._sections_loaded = False
+        self._shifts_loaded = False
+        self._shift_map: dict = {}
         self.setup_ui()
 
     def showEvent(self, event):
         super().showEvent(event)
         self._load_sections_once()
+        self._load_shifts()
 
     def _load_sections_once(self):
         if self._sections_loaded:
@@ -148,6 +151,31 @@ class InputLaporanWidget(QWidget):
                 self, "Gagal Memuat Section",
                 f"Tidak dapat memuat daftar section dari database:\n{e}"
             )
+
+    def _load_shifts(self):
+        if self._shifts_loaded:
+            return
+        try:
+            shifts = get_all_shifts()
+            self._shift_map = {s["name"]: s["total_hours"] for s in shifts}
+            self.combo_shift.blockSignals(True)
+            self.combo_shift.clear()
+            for s in shifts:
+                self.combo_shift.addItem(s["name"])
+            self.combo_shift.blockSignals(False)
+            self._shifts_loaded = True
+            self._on_shift_changed()
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Gagal Memuat Shift",
+                f"Tidak dapat memuat daftar shift dari database:\n{e}"
+            )
+
+    def _on_shift_changed(self):
+        shift_name = self.combo_shift.currentText()
+        wh = self._shift_map.get(shift_name)
+        if wh is not None:
+            self.input_plan_whour.setText(str(wh))
 
     def setup_ui(self):
         outer_layout = QVBoxLayout(self)
@@ -203,7 +231,7 @@ class InputLaporanWidget(QWidget):
 
         grid.addWidget(FormLabel("Shift"), 0, 2)
         self.combo_shift = FormCombo()
-        self.combo_shift.addItems(["Day Shift", "Night Shift"])
+        self.combo_shift.currentIndexChanged.connect(self._on_shift_changed)
         grid.addWidget(self.combo_shift, 0, 3)
 
         grid.addWidget(FormLabel("Section"), 1, 0)
@@ -1136,6 +1164,30 @@ class InputLaporanWidget(QWidget):
         if not self.input_koordinator.text().strip():
             QMessageBox.warning(self, "Validasi", "Nama koordinator harus diisi.")
             self.input_koordinator.setFocus()
+            return
+
+        sisa_text = self.calc_sisa_balance.text().strip()
+
+        if sisa_text == "—":
+            QMessageBox.warning(
+                self, "Data Belum Lengkap",
+                "Data produksi belum diisi atau belum terhitung.\n"
+                "Pastikan data produksi dan Actual W/Hour sudah diisi."
+            )
+            return
+
+        try:
+            sisa_val = float(sisa_text.replace("H", "").replace("+", "").strip())
+        except ValueError:
+            sisa_val = None
+
+        if sisa_val is None or abs(sisa_val) > 0.001:
+            QMessageBox.critical(
+                self, "Data Tidak Balance",
+                f"Sisa Balance: {sisa_text}\n\n"
+                "Laporan tidak dapat disimpan karena data produksi tidak balance.\n"
+                "Periksa kembali nilai Plan, Reg, OT, dan Loss Time."
+            )
             return
 
         if self.combo_section.currentData() is None:

@@ -185,13 +185,17 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(vis)
         self.pages["visualisasi"] = vis
 
-        # Master Data (placeholder)
-        master = QWidget()
-        master_layout = QVBoxLayout(master)
-        master_lbl = QLabel("Master Data — Coming Soon")
-        master_lbl.setAlignment(Qt.AlignCenter)
-        master_lbl.setStyleSheet("color: #666666; font-size: 14pt;")
-        master_layout.addWidget(master_lbl)
+        # Master Data — hanya admin
+        if self.user.get("role") == "admin":
+            from modules.master_data import MasterDataWidget
+            master = MasterDataWidget(self.user)
+        else:
+            master = QWidget()
+            lbl_deny = QLabel("Akses ditolak — halaman ini hanya untuk admin.")
+            lbl_deny.setAlignment(Qt.AlignCenter)
+            lbl_deny.setStyleSheet("color: #666666; font-size: 13pt;")
+            QVBoxLayout(master).addWidget(lbl_deny)
+            self.nav_buttons["master_data"].setVisible(False)
         self.stack.addWidget(master)
         self.pages["master_data"] = master
 

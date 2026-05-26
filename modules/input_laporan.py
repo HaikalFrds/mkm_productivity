@@ -832,6 +832,27 @@ class InputLaporanWidget(QWidget):
             )
             self.tabel_masalah.setCellWidget(row, col, editor)
 
+        combo_pic = QComboBox()
+        combo_pic.addItems(["MTC", "PROD", "PPC", "QC", "PE"])
+        combo_pic.setStyleSheet("""
+            QComboBox {
+                background-color: transparent;
+                color: rgb(210, 210, 210);
+                border: none;
+                padding: 2px 6px;
+                font-size: 11px;
+            }
+            QComboBox::drop-down { border: none; width: 20px; }
+            QComboBox QAbstractItemView {
+                background-color: rgb(33, 37, 43);
+                color: rgb(210, 210, 210);
+                selection-background-color: rgb(100, 110, 125);
+                border: 1px solid rgb(60, 65, 75);
+            }
+        """)
+        combo_pic.view().setMinimumWidth(80)
+        self.tabel_masalah.setCellWidget(row, 5, combo_pic)
+
         time_style = """
             QTimeEdit {
                 background-color: transparent;
@@ -1171,7 +1192,7 @@ class InputLaporanWidget(QWidget):
             deskripsi_w = self.tabel_masalah.cellWidget(row, 2)
             penyebab_w  = self.tabel_masalah.cellWidget(row, 3)
             tindakan_w  = self.tabel_masalah.cellWidget(row, 4)
-            pic         = self.tabel_masalah.item(row, 5)
+            pic_w       = self.tabel_masalah.cellWidget(row, 5)
             start_w     = self.tabel_masalah.cellWidget(row, 6)
             end_w       = self.tabel_masalah.cellWidget(row, 7)
             down        = self.tabel_masalah.item(row, 8)
@@ -1200,7 +1221,7 @@ class InputLaporanWidget(QWidget):
                 "deskripsi":  deskripsi,
                 "penyebab":   penyebab_w.toPlainText().strip() if penyebab_w else "",
                 "tindakan":   tindakan_w.toPlainText().strip() if tindakan_w else "",
-                "pic":        pic.text() if pic else "",
+                "pic":        pic_w.currentText() if pic_w else "",
                 "down_time":  down_time,
                 "loss_time":  loss_time,
                 "start_time": None if st == "00:00" else st,

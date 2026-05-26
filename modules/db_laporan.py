@@ -435,3 +435,337 @@ def simpan_laporan_harian(
         return False, f"Gagal menyimpan laporan: {str(e)}"
     finally:
         conn.close()
+
+
+# =============================================================================
+# MASTER DATA — SECTION CRUD
+# =============================================================================
+
+def tambah_section(nama: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM section WHERE LOWER(name) = LOWER(%s) LIMIT 1", (nama,))
+        if cur.fetchone():
+            return False, f"Section '{nama}' sudah ada."
+        cur.execute("INSERT INTO section (name) VALUES (%s)", (nama,))
+        conn.commit()
+        cur.close()
+        return True, f"Section '{nama}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah section: {e}"
+    finally:
+        conn.close()
+
+
+def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM section WHERE LOWER(name) = LOWER(%s) AND id != %s LIMIT 1",
+            (nama, section_id),
+        )
+        if cur.fetchone():
+            return False, f"Section '{nama}' sudah ada."
+        cur.execute("UPDATE section SET name = %s WHERE id = %s", (nama, section_id))
+        conn.commit()
+        cur.close()
+        return True, f"Section berhasil diubah menjadi '{nama}'."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal mengubah section: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_section(section_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM daily_report WHERE section_id = %s", (section_id,))
+        count = cur.fetchone()[0]
+        if count > 0:
+            return False, f"Section tidak bisa dihapus — digunakan oleh {count} laporan."
+        cur.execute("DELETE FROM section WHERE id = %s", (section_id,))
+        conn.commit()
+        cur.close()
+        return True, "Section berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus section: {e}"
+    finally:
+        conn.close()
+
+
+# =============================================================================
+# MASTER DATA — USER CRUD
+# =============================================================================
+
+def get_all_users() -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id, nik, name, role FROM "user" ORDER BY name')
+        rows = cur.fetchall()
+        cur.close()
+        return [{"id": r[0], "nik": r[1], "name": r[2], "role": r[3]} for r in rows]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id FROM "user" WHERE nik = %s LIMIT 1', (nik,))
+        if cur.fetchone():
+            return False, f"NIK '{nik}' sudah terdaftar."
+        cur.execute(
+            'INSERT INTO "user" (nik, name, role, password_hash) VALUES (%s, %s, %s, %s)',
+            (nik, nama, role, password_hash),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"User '{nama}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah user: {e}"
+    finally:
+        conn.close()
+
+
+def reset_password_user(user_id: int, password_hash: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE "user" SET password_hash = %s WHERE id = %s', (password_hash, user_id))
+        conn.commit()
+        cur.close()
+        return True, "Password berhasil direset."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal reset password: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_user(user_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM "user" WHERE id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        return True, "User berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus user: {e}"
+    finally:
+        conn.close()
+
+
+# =============================================================================
+# MASTER DATA — KATEGORI MASALAH (problem_category + problem_group)
+# =============================================================================
+
+def get_all_groups() -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name FROM problem_group ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+        return rows
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def get_all_kategori() -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT pc.id, pc.group_id, pg.name AS group_name,
+                   pc.code, pc.name, pc.order_num
+            FROM problem_category pc
+            JOIN problem_group pg ON pg.id = pc.group_id
+            ORDER BY pc.group_id, pc.order_num, pc.id
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        return [
+            {"id": r[0], "group_id": r[1], "group_name": r[2],
+             "code": r[3], "name": r[4], "order_num": r[5]}
+            for r in rows
+        ]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def tambah_kategori(name: str, group_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM problem_category WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+            (name,),
+        )
+        if cur.fetchone():
+            return False, f"Kategori '{name}' sudah ada."
+        code = name.strip().upper().replace(" ", "_")
+        cur.execute(
+            "SELECT COALESCE(MAX(order_num), 0) + 1 FROM problem_category WHERE group_id = %s",
+            (group_id,),
+        )
+        order_num = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO problem_category (group_id, code, name, order_num) VALUES (%s, %s, %s, %s)",
+            (group_id, code, name, order_num),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Kategori '{name}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah kategori: {e}"
+    finally:
+        conn.close()
+
+
+def edit_kategori(cat_id: int, name: str, group_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM problem_category WHERE LOWER(name) = LOWER(%s) AND id != %s LIMIT 1",
+            (name, cat_id),
+        )
+        if cur.fetchone():
+            return False, f"Kategori '{name}' sudah ada."
+        cur.execute(
+            "UPDATE problem_category SET name = %s, group_id = %s WHERE id = %s",
+            (name, group_id, cat_id),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Kategori berhasil diubah menjadi '{name}'."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal mengubah kategori: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_kategori(cat_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM problem_record WHERE category_id = %s", (cat_id,))
+        count = cur.fetchone()[0]
+        if count > 0:
+            return False, f"Kategori tidak bisa dihapus — digunakan oleh {count} catatan masalah."
+        cur.execute("DELETE FROM problem_category WHERE id = %s", (cat_id,))
+        conn.commit()
+        cur.close()
+        return True, "Kategori berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus kategori: {e}"
+    finally:
+        conn.close()
+
+
+# =============================================================================
+# MASTER DATA — SHIFT
+# =============================================================================
+
+def get_all_shifts_full() -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, start_time, end_time, total_hours FROM shift ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+        return [
+            {"id": r[0], "name": r[1],
+             "start_time": str(r[2])[:5] if r[2] else "",
+             "end_time":   str(r[3])[:5] if r[3] else "",
+             "total_hours": float(r[4]) if r[4] is not None else 0.0}
+            for r in rows
+        ]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def tambah_shift(name: str, start_time: str, end_time: str, total_hours: float) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM shift WHERE LOWER(name) = LOWER(%s) LIMIT 1", (name,))
+        if cur.fetchone():
+            return False, f"Shift '{name}' sudah ada."
+        cur.execute(
+            "INSERT INTO shift (name, start_time, end_time, total_hours) VALUES (%s, %s, %s, %s)",
+            (name, start_time, end_time, total_hours),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Shift '{name}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah shift: {e}"
+    finally:
+        conn.close()
+
+
+def edit_shift(shift_id: int, name: str, start_time: str, end_time: str, total_hours: float) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM shift WHERE LOWER(name) = LOWER(%s) AND id != %s LIMIT 1",
+            (name, shift_id),
+        )
+        if cur.fetchone():
+            return False, f"Shift '{name}' sudah ada."
+        cur.execute(
+            "UPDATE shift SET name=%s, start_time=%s, end_time=%s, total_hours=%s WHERE id=%s",
+            (name, start_time, end_time, total_hours, shift_id),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Shift berhasil diubah menjadi '{name}'."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal mengubah shift: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_shift(shift_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM daily_report WHERE shift_id = %s", (shift_id,))
+        count = cur.fetchone()[0]
+        if count > 0:
+            return False, f"Shift tidak bisa dihapus — digunakan oleh {count} laporan."
+        cur.execute("DELETE FROM shift WHERE id = %s", (shift_id,))
+        conn.commit()
+        cur.close()
+        return True, "Shift berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus shift: {e}"
+    finally:
+        conn.close()

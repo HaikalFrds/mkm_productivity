@@ -45,14 +45,14 @@ class MainWindow(QMainWindow):
 
         lbl_title = QLabel("MKM")
         lbl_title.setObjectName("app_title")
-        lbl_title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #cc0000; padding: 0;")
+        lbl_title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #da291c; padding: 0;")
 
         lbl_subtitle = QLabel("Productivity System")
         lbl_subtitle.setObjectName("app_subtitle")
         lbl_subtitle.setStyleSheet("font-size: 9pt; color: #666666; padding: 0;")
 
         lbl_user = QLabel(f"👤 {self.user.get('name', self.user.get('nik', ''))}")
-        lbl_user.setStyleSheet("font-size: 9pt; color: #888888; padding-top: 8px;")
+        lbl_user.setStyleSheet("font-size: 9pt; color: #969696; padding-top: 8px;")
 
         logo_layout.addWidget(lbl_title)
         logo_layout.addWidget(lbl_subtitle)
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         # Divider
         div = QFrame()
         div.setFrameShape(QFrame.HLine)
-        div.setStyleSheet("background-color: #2a2a2a; max-height: 1px;")
+        div.setStyleSheet("background-color: #303030; max-height: 1px;")
         sidebar_layout.addWidget(div)
 
         # Nav buttons
@@ -89,14 +89,14 @@ class MainWindow(QMainWindow):
             QPushButton {
                 background-color: transparent;
                 border: none;
-                border-top: 1px solid #2a2a2a;
+                border-top: 1px solid #303030;
                 padding: 12px 16px;
                 text-align: left;
-                color: #888888;
+                color: #969696;
                 font-size: 10pt;
             }
             QPushButton:hover {
-                background-color: #2a2a2a;
+                background-color: #252525;
                 color: #ffffff;
             }
         """)
@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         # Top bar
         self.topbar = QFrame()
         self.topbar.setFixedHeight(48)
-        self.topbar.setStyleSheet("background-color: #1a1a1a; border-bottom: 1px solid #2a2a2a;")
+        self.topbar.setStyleSheet("background-color: #181818; border-bottom: 1px solid #303030;")
         topbar_layout = QHBoxLayout(self.topbar)
         topbar_layout.setContentsMargins(20, 0, 20, 0)
 
@@ -143,13 +143,13 @@ class MainWindow(QMainWindow):
                 border-left: 3px solid transparent;
                 padding: 10px 10px 10px 20px;
                 text-align: left;
-                color: #aaaaaa;
+                color: #969696;
                 font-size: 10pt;
             }
             QPushButton:hover {
-                background-color: #2a2a2a;
+                background-color: #252525;
                 color: #ffffff;
-                border-left: 3px solid #666666;
+                border-left: 3px solid #303030;
             }
         """)
         btn.clicked.connect(lambda: self.navigate_to(page_id))
@@ -217,9 +217,9 @@ class MainWindow(QMainWindow):
             if pid == page_id:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #2a2a2a;
+                        background-color: #252525;
                         border: none;
-                        border-left: 3px solid #cc0000;
+                        border-left: 3px solid #da291c;
                         padding: 10px 10px 10px 20px;
                         text-align: left;
                         color: #ffffff;
@@ -234,13 +234,13 @@ class MainWindow(QMainWindow):
                         border-left: 3px solid transparent;
                         padding: 10px 10px 10px 20px;
                         text-align: left;
-                        color: #aaaaaa;
+                        color: #969696;
                         font-size: 10pt;
                     }
                     QPushButton:hover {
-                        background-color: #2a2a2a;
+                        background-color: #252525;
                         color: #ffffff;
-                        border-left: 3px solid #666666;
+                        border-left: 3px solid #303030;
                     }
                 """)
 

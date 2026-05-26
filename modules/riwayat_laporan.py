@@ -22,12 +22,12 @@ from modules.export_excel import export_loss_time_record, export_inhouse_ng_pend
 
 _DATE_STYLE = """
     QDateEdit {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75);
-        border-radius: 5px; padding-left: 8px;
-        color: rgb(220, 220, 220); font-size: 11px;
+        background-color: #1e1e1e;
+        border: 1px solid #303030;
+        border-radius: 2px; padding-left: 8px;
+        color: #ffffff; font-size: 11px;
     }
-    QDateEdit:focus { border: 1px solid rgb(150, 150, 150); }
+    QDateEdit:focus { border: 1px solid #da291c; }
     QDateEdit::drop-down {
         border: none; width: 22px;
         subcontrol-origin: padding; subcontrol-position: top right;
@@ -36,36 +36,36 @@ _DATE_STYLE = """
 
 _COMBO_STYLE = """
     QComboBox {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75);
-        border-radius: 5px; padding-left: 8px;
-        color: rgb(220, 220, 220); font-size: 11px;
+        background-color: #1e1e1e;
+        border: 1px solid #303030;
+        border-radius: 2px; padding-left: 8px;
+        color: #ffffff; font-size: 11px;
     }
-    QComboBox:focus { border: 1px solid rgb(150, 150, 150); }
+    QComboBox:focus { border: 1px solid #da291c; }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: rgb(33, 37, 43); color: rgb(220, 220, 220);
-        selection-background-color: rgb(60, 65, 75);
-        border: 1px solid rgb(60, 65, 75);
+        background-color: #252525; color: #ffffff;
+        selection-background-color: #303030;
+        border: 1px solid #303030;
     }
 """
 
 _TABLE_STYLE = """
     QTableWidget {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75); border-radius: 5px;
-        gridline-color: rgb(55, 60, 70);
+        background-color: #1e1e1e;
+        border: 1px solid #303030; border-radius: 0px;
+        gridline-color: #303030;
     }
     QTableWidget::item {
-        color: rgb(230, 230, 230); padding: 4px 8px;
-        background-color: rgb(38, 42, 50);
-        border-bottom: 1px solid rgb(55, 60, 70);
+        color: #ffffff; padding: 4px 8px;
+        background-color: #252525;
+        border-bottom: 1px solid #303030;
     }
-    QTableWidget::item:selected { background-color: rgb(100, 110, 125); color: white; }
+    QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
     QHeaderView::section {
-        background-color: rgb(28, 32, 40); color: rgb(150, 150, 150);
-        border: none; border-bottom: 1px solid rgb(60, 65, 75);
-        border-right: 1px solid rgb(60, 65, 75);
+        background-color: #111111; color: #969696;
+        border: none; border-bottom: 1px solid #303030;
+        border-right: 1px solid #303030;
         padding: 6px; font-weight: bold; font-size: 10px;
     }
 """
@@ -73,51 +73,51 @@ _TABLE_STYLE = """
 _TAB_STYLE = """
     QTabWidget::pane { background-color: transparent; border: none; }
     QTabBar::tab {
-        background-color: rgb(40, 44, 52); color: rgb(150, 150, 150);
+        background-color: #252525; color: #969696;
         padding: 8px 22px; margin-right: 3px;
-        border-top-left-radius: 6px; border-top-right-radius: 6px;
+        border-top-left-radius: 0px; border-top-right-radius: 0px;
         font-size: 11px; font-weight: bold;
     }
     QTabBar::tab:selected {
-        background-color: rgb(55, 60, 70); color: #ffffff;
-        border-bottom: 2px solid rgb(180, 30, 30);
+        background-color: #2e2e2e; color: #ffffff;
+        border-bottom: 2px solid #da291c;
     }
     QTabBar::tab:hover:!selected {
-        background-color: rgb(50, 55, 65); color: rgb(200, 200, 200);
+        background-color: #2e2e2e; color: #ffffff;
     }
 """
 
 _INPUT_STYLE = """
     QLineEdit {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75); border-radius: 5px;
-        padding-left: 8px; color: rgb(220, 220, 220); font-size: 11px;
+        background-color: #1e1e1e;
+        border: 1px solid #303030; border-radius: 2px;
+        padding-left: 8px; color: #ffffff; font-size: 11px;
     }
-    QLineEdit:focus { border: 1px solid rgb(150, 150, 150); }
+    QLineEdit:focus { border: 1px solid #da291c; }
 """
 
-_CARD_STYLE = "QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }"
+_CARD_STYLE = "QFrame { background-color: #252525; border-radius: 0px; }"
 
 _BTN_CARI = """
     QPushButton {
-        background-color: rgb(100, 60, 160); color: rgb(220, 200, 255);
-        border: none; border-radius: 5px; font-size: 11px; padding: 0 12px;
+        background-color: #da291c; color: #ffffff;
+        border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
     }
-    QPushButton:hover { background-color: rgb(120, 75, 185); }
+    QPushButton:hover { background-color: #b01e0a; }
 """
 
 _BTN_RESET = """
     QPushButton {
-        background-color: rgb(60, 65, 75); color: rgb(200, 200, 200);
-        border: none; border-radius: 5px; font-size: 11px; padding: 0 12px;
+        background-color: #252525; color: #969696;
+        border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
     }
-    QPushButton:hover { background-color: rgb(75, 80, 90); }
+    QPushButton:hover { background-color: #303030; color: #ffffff; }
 """
 
 _BTN_EXPORT = """
     QPushButton {
         background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
-        border: none; border-radius: 5px; font-size: 11px; padding: 0 12px;
+        border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
     }
     QPushButton:hover { background-color: rgb(35, 110, 65); }
 """
@@ -333,7 +333,7 @@ class RiwayatLaporanWidget(QWidget):
 
         hdr_row = QHBoxLayout()
         self.lbl_info_h = QLabel("Memuat data...")
-        self.lbl_info_h.setStyleSheet("color: rgb(130, 140, 165); font-size: 10px;")
+        self.lbl_info_h.setStyleSheet("color: #969696; font-size: 10px;")
         hdr_row.addWidget(self.lbl_info_h)
         hdr_row.addStretch()
         btn_export_rah = QPushButton("Export RAH")
@@ -408,7 +408,7 @@ class RiwayatLaporanWidget(QWidget):
 
             report_id = row["id"]
             aksi_w = QWidget()
-            aksi_w.setStyleSheet("background-color: rgb(38, 42, 50);")
+            aksi_w.setStyleSheet("background-color: #252525;")
             al = QHBoxLayout(aksi_w)
             al.setContentsMargins(4, 3, 4, 3)
             al.setSpacing(4)
@@ -417,7 +417,7 @@ class RiwayatLaporanWidget(QWidget):
             btn_lihat.setFixedSize(52, 26)
             btn_lihat.setStyleSheet("""
                 QPushButton { background-color: rgb(30, 75, 145); color: rgb(130, 185, 255);
-                    border: none; border-radius: 4px; font-size: 10px; }
+                    border: none; border-radius: 0px; font-size: 10px; }
                 QPushButton:hover { background-color: rgb(45, 95, 170); }
             """)
             btn_lihat.clicked.connect(lambda _, rid=report_id: self._lihat(rid))
@@ -426,7 +426,7 @@ class RiwayatLaporanWidget(QWidget):
             btn_edit.setFixedSize(44, 26)
             btn_edit.setStyleSheet("""
                 QPushButton { background-color: rgb(75, 60, 20); color: rgb(220, 195, 90);
-                    border: none; border-radius: 4px; font-size: 10px; }
+                    border: none; border-radius: 0px; font-size: 10px; }
                 QPushButton:hover { background-color: rgb(95, 80, 30); }
             """)
             btn_edit.clicked.connect(lambda _, rid=report_id: self._edit(rid))
@@ -435,7 +435,7 @@ class RiwayatLaporanWidget(QWidget):
             btn_hapus.setFixedSize(52, 26)
             btn_hapus.setStyleSheet("""
                 QPushButton { background-color: rgb(100, 30, 30); color: rgb(220, 120, 120);
-                    border: none; border-radius: 4px; font-size: 10px; }
+                    border: none; border-radius: 0px; font-size: 10px; }
                 QPushButton:hover { background-color: rgb(130, 40, 40); }
             """)
             btn_hapus.clicked.connect(lambda _, rid=report_id: self._hapus(rid))
@@ -444,7 +444,7 @@ class RiwayatLaporanWidget(QWidget):
             btn_export_row.setFixedSize(60, 26)
             btn_export_row.setStyleSheet("""
                 QPushButton { background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
-                    border: none; border-radius: 4px; font-size: 10px; }
+                    border: none; border-radius: 0px; font-size: 10px; }
                 QPushButton:hover { background-color: rgb(35, 110, 65); }
             """)
             btn_export_row.clicked.connect(lambda _, rid=report_id: self._export_laporan(rid))
@@ -478,7 +478,7 @@ class RiwayatLaporanWidget(QWidget):
         dlg.setWindowTitle(f"Detail Laporan — #{report_id}")
         dlg.setMinimumWidth(980)
         dlg.setMinimumHeight(700)
-        dlg.setStyleSheet("QDialog { background-color: rgb(33, 37, 43); color: rgb(220,220,220); }")
+        dlg.setStyleSheet("QDialog { background-color: #252525; color: #ffffff; }")
 
         outer_lyt = QVBoxLayout(dlg)
         outer_lyt.setContentsMargins(16, 16, 16, 16)
@@ -501,13 +501,13 @@ class RiwayatLaporanWidget(QWidget):
         def _sec_lbl(text):
             lbl = QLabel(text)
             lbl.setStyleSheet(
-                "color: rgb(189, 147, 249); font-size: 12px; font-weight: bold; padding: 4px 0;"
+                "color: #da291c; font-size: 12px; font-weight: bold; padding: 4px 0;"
             )
             return lbl
 
         # ── Header info ──────────────────────────────────────────────────────
         hdr_frame = QFrame()
-        hdr_frame.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 8px; }")
+        hdr_frame.setStyleSheet("QFrame { background-color: #2e2e2e; border-radius: 0px; }")
         hdr_lyt = QGridLayout(hdr_frame)
         hdr_lyt.setContentsMargins(14, 10, 14, 10)
         hdr_lyt.setSpacing(6)
@@ -531,9 +531,9 @@ class RiwayatLaporanWidget(QWidget):
         for idx, (lbl_text, val_text) in enumerate(pairs):
             r, c = divmod(idx, 2)
             lbl = QLabel(lbl_text + ":")
-            lbl.setStyleSheet("color: rgb(140, 150, 165); font-size: 11px;")
+            lbl.setStyleSheet("color: #969696; font-size: 11px;")
             val = QLabel(str(val_text))
-            val.setStyleSheet("color: rgb(210, 215, 225); font-size: 11px; font-weight: bold;")
+            val.setStyleSheet("color: #ffffff; font-size: 11px; font-weight: bold;")
             hdr_lyt.addWidget(lbl, r, c * 2)
             hdr_lyt.addWidget(val, r, c * 2 + 1)
         lyt.addWidget(hdr_frame)
@@ -700,9 +700,9 @@ class RiwayatLaporanWidget(QWidget):
 
         btn_box = QDialogButtonBox(QDialogButtonBox.Close)
         btn_box.setStyleSheet("""
-            QPushButton { background-color: rgb(60, 65, 75); color: rgb(200, 200, 200);
-                border: none; border-radius: 5px; padding: 6px 18px; font-size: 11px; }
-            QPushButton:hover { background-color: rgb(75, 80, 90); }
+            QPushButton { background-color: #252525; color: #969696;
+                border: none; border-radius: 0px; padding: 6px 18px; font-size: 11px; }
+            QPushButton:hover { background-color: #303030; color: #ffffff; }
         """)
         btn_box.rejected.connect(dlg.close)
         outer_lyt.addWidget(btn_box)
@@ -868,7 +868,7 @@ class RiwayatLaporanWidget(QWidget):
 
         hdr_row = QHBoxLayout()
         self.lbl_info_r = QLabel("Pilih filter dan klik Tampilkan.")
-        self.lbl_info_r.setStyleSheet("color: rgb(130, 140, 165); font-size: 10px;")
+        self.lbl_info_r.setStyleSheet("color: #969696; font-size: 10px;")
         hdr_row.addWidget(self.lbl_info_r)
         hdr_row.addStretch()
         btn_export_r = QPushButton("Export Excel")
@@ -897,7 +897,7 @@ class RiwayatLaporanWidget(QWidget):
         # Summary bar
         sum_frame = QFrame()
         sum_frame.setStyleSheet(
-            "QFrame { background-color: rgb(33, 37, 43); border-radius: 6px; }"
+            "QFrame { background-color: #2e2e2e; border-radius: 0px; }"
         )
         sum_lyt = QHBoxLayout(sum_frame)
         sum_lyt.setContentsMargins(16, 10, 16, 10)
@@ -905,11 +905,11 @@ class RiwayatLaporanWidget(QWidget):
 
         self.lbl_total_hour = QLabel("Total Working Hour: —")
         self.lbl_total_hour.setStyleSheet(
-            "color: rgb(200, 200, 200); font-size: 12px; font-weight: bold;"
+            "color: #ffffff; font-size: 12px; font-weight: bold;"
         )
         self.lbl_ratio = QLabel("Ratio Produktivitas: —")
         self.lbl_ratio.setStyleSheet(
-            "color: rgb(130, 140, 165); font-size: 12px; font-weight: bold;"
+            "color: #969696; font-size: 12px; font-weight: bold;"
         )
         sum_lyt.addWidget(self.lbl_total_hour)
         sum_lyt.addWidget(self.lbl_ratio)
@@ -1112,7 +1112,7 @@ class RiwayatLaporanWidget(QWidget):
         lbl_ic = QLabel("Inhouse Claim (NG)")
         lbl_ic.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         self.lbl_info_ic = QLabel("")
-        self.lbl_info_ic.setStyleSheet("color: rgb(130, 140, 165); font-size: 10px;")
+        self.lbl_info_ic.setStyleSheet("color: #969696; font-size: 10px;")
         ic_hdr.addWidget(lbl_ic)
         ic_hdr.addWidget(self.lbl_info_ic)
         ic_hdr.addStretch()
@@ -1149,7 +1149,7 @@ class RiwayatLaporanWidget(QWidget):
         lbl_pp = QLabel("Part Pending")
         lbl_pp.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         self.lbl_info_pp = QLabel("")
-        self.lbl_info_pp.setStyleSheet("color: rgb(130, 140, 165); font-size: 10px;")
+        self.lbl_info_pp.setStyleSheet("color: #969696; font-size: 10px;")
         pp_hdr.addWidget(lbl_pp)
         pp_hdr.addWidget(self.lbl_info_pp)
         pp_hdr.addStretch()
@@ -1289,5 +1289,5 @@ class RiwayatLaporanWidget(QWidget):
     @staticmethod
     def _flabel(text):
         lbl = QLabel(text)
-        lbl.setStyleSheet("color: rgb(150, 150, 150); font-size: 11px;")
+        lbl.setStyleSheet("color: #969696; font-size: 11px;")
         return lbl

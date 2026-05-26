@@ -15,30 +15,30 @@ from modules.db_laporan import get_all_sections, get_loss_time_per_bulan
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 
-_CARD_STYLE = "QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }"
+_CARD_STYLE = "QFrame { background-color: #252525; border-radius: 0px; }"
 
 _COMBO_STYLE = """
     QComboBox {
-        background-color: rgb(33, 37, 43); border: 1px solid rgb(60, 65, 75);
-        border-radius: 5px; padding-left: 8px;
-        color: rgb(220, 220, 220); font-size: 11px; min-height: 30px;
+        background-color: #1e1e1e; border: 1px solid #303030;
+        border-radius: 2px; padding-left: 8px;
+        color: #ffffff; font-size: 11px; min-height: 30px;
     }
-    QComboBox:focus { border: 1px solid rgb(150, 150, 150); }
+    QComboBox:focus { border: 1px solid #da291c; }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: rgb(33, 37, 43); color: rgb(220, 220, 220);
-        selection-background-color: rgb(60, 65, 75);
-        border: 1px solid rgb(60, 65, 75);
+        background-color: #252525; color: #ffffff;
+        selection-background-color: #303030;
+        border: 1px solid #303030;
     }
 """
 
 _BTN_TAMPIL = """
     QPushButton {
-        background-color: rgb(100, 60, 160); color: rgb(220, 200, 255);
-        border: none; border-radius: 5px; font-size: 11px; padding: 0 16px;
+        background-color: #da291c; color: #ffffff;
+        border: none; border-radius: 0px; font-size: 11px; padding: 0 16px;
         min-height: 30px;
     }
-    QPushButton:hover { background-color: rgb(120, 75, 185); }
+    QPushButton:hover { background-color: #b01e0a; }
 """
 
 # ── Category colour map ───────────────────────────────────────────────────────
@@ -151,9 +151,9 @@ class VisualisasiWidget(QWidget):
         stat_row = QHBoxLayout()
         stat_row.setSpacing(12)
 
-        self._lbl_total_loss, c1 = _make_stat_card("Total Loss Time", "— hr", "#FF9800")
-        self._lbl_biggest_cat, c2 = _make_stat_card("Kategori Terbesar", "—", "#2196F3")
-        self._lbl_avg_ratio,  c3 = _make_stat_card("Rata-rata Process Ratio", "— %", "#00E5FF")
+        self._lbl_total_loss, c1 = _make_stat_card("Total Loss Time", "— hr", "#da291c")
+        self._lbl_biggest_cat, c2 = _make_stat_card("Kategori Terbesar", "—", "#da291c")
+        self._lbl_avg_ratio,  c3 = _make_stat_card("Rata-rata Process Ratio", "— %", "#da291c")
 
         stat_row.addWidget(c1)
         stat_row.addWidget(c2)
@@ -329,7 +329,7 @@ def _make_stat_card(title: str, default_val: str, accent: str) -> tuple:
     """Return (value_QLabel, card_QFrame)."""
     card = QFrame()
     card.setStyleSheet(
-        "QFrame { background-color: rgb(40,44,52); border-radius: 8px; }"
+        "QFrame { background-color: #252525; border-radius: 0px; }"
     )
     card.setFixedHeight(86)
     lay = QVBoxLayout(card)
@@ -338,13 +338,13 @@ def _make_stat_card(title: str, default_val: str, accent: str) -> tuple:
 
     lbl_title = QLabel(title)
     lbl_title.setStyleSheet(
-        "color: rgb(150,150,150); font-size: 10px; background: transparent;"
+        "color: #969696; font-size: 10px; background: transparent;"
     )
     lbl_title.setAlignment(Qt.AlignLeft)
 
     lbl_val = QLabel(default_val)
     lbl_val.setStyleSheet(
-        "color: white; font-size: 18px; font-weight: bold; background: transparent;"
+        "color: #ffffff; font-size: 18px; font-weight: bold; background: transparent;"
     )
     lbl_val.setAlignment(Qt.AlignLeft)
 
@@ -364,7 +364,7 @@ def _make_stat_card(title: str, default_val: str, accent: str) -> tuple:
 
 def _lbl(text: str) -> QLabel:
     lbl = QLabel(text)
-    lbl.setStyleSheet("color: rgb(150, 150, 150); font-size: 11px;")
+    lbl.setStyleSheet("color: #969696; font-size: 11px;")
     return lbl
 
 

@@ -18,14 +18,14 @@ class SectionHeader(QLabel):
             font-size: 13px;
             font-weight: bold;
             padding: 8px 0px 4px 0px;
-            border-bottom: 1px solid rgb(60, 65, 75);
+            border-bottom: 1px solid #303030;
         """)
 
 
 class FormLabel(QLabel):
     def __init__(self, text):
         super().__init__(text)
-        self.setStyleSheet("color: rgb(150, 150, 150); font-size: 11px;")
+        self.setStyleSheet("color: #969696; font-size: 11px;")
 
 
 class FormInput(QLineEdit):
@@ -35,15 +35,15 @@ class FormInput(QLineEdit):
         self.setMinimumHeight(34)
         self.setStyleSheet("""
             QLineEdit {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 10px;
-                color: rgb(220, 220, 220);
+                color: #ffffff;
                 font-size: 11px;
             }
             QLineEdit:focus {
-                border: 1px solid rgb(150, 150, 150);
+                border: 1px solid #da291c;
             }
         """)
 
@@ -54,25 +54,25 @@ class FormCombo(QComboBox):
         self.setMinimumHeight(34)
         self.setStyleSheet("""
             QComboBox {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 10px;
-                color: rgb(220, 220, 220);
+                color: #ffffff;
                 font-size: 11px;
             }
             QComboBox:focus {
-                border: 1px solid rgb(150, 150, 150);
+                border: 1px solid #da291c;
             }
             QComboBox::drop-down {
                 border: none;
                 width: 30px;
             }
             QComboBox QAbstractItemView {
-                background-color: rgb(33, 37, 43);
-                color: rgb(220, 220, 220);
-                selection-background-color: rgb(60, 65, 75);
-                border: 1px solid rgb(60, 65, 75);
+                background-color: #252525;
+                color: #ffffff;
+                selection-background-color: #303030;
+                border: 1px solid #303030;
             }
         """)
 
@@ -92,7 +92,7 @@ class AutoResizeTextEdit(QTextEdit):
         self.setStyleSheet("""
             QTextEdit {
                 background-color: transparent;
-                color: rgb(230, 230, 230);
+                color: #ffffff;
                 border: none;
                 padding: 0px;
                 font-size: 11px;
@@ -165,7 +165,7 @@ class InputLaporanWidget(QWidget):
 
         # Card Header Laporan
         card = QFrame()
-        card.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }")
+        card.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(10)
@@ -183,15 +183,15 @@ class InputLaporanWidget(QWidget):
         self.input_tanggal.setMinimumHeight(34)
         self.input_tanggal.setStyleSheet("""
             QDateEdit {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 10px;
                 padding-right: 4px;
-                color: rgb(220, 220, 220);
+                color: #ffffff;
                 font-size: 11px;
             }
-            QDateEdit:focus { border: 1px solid rgb(150, 150, 150); }
+            QDateEdit:focus { border: 1px solid #da291c; }
             QDateEdit::drop-down {
                 border: none;
                 width: 22px;
@@ -228,7 +228,7 @@ class InputLaporanWidget(QWidget):
 
         # Card Data Produksi & Kalkulasi
         card_dp = QFrame()
-        card_dp.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }")
+        card_dp.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_dp_layout = QVBoxLayout(card_dp)
         card_dp_layout.setContentsMargins(16, 16, 16, 16)
         card_dp_layout.setSpacing(10)
@@ -236,26 +236,26 @@ class InputLaporanWidget(QWidget):
 
         _input_dp_style = """
             QLineEdit {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 8px;
-                color: rgb(220, 220, 220);
+                color: #ffffff;
                 font-size: 11px;
             }
-            QLineEdit:focus { border: 1px solid rgb(150, 150, 150); }
+            QLineEdit:focus { border: 1px solid #da291c; }
         """
         _calc_dp_style = """
             QLineEdit {
-                background-color: rgb(25, 28, 35);
-                border: 1px solid rgb(45, 50, 60);
-                border-radius: 5px;
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 2px;
                 padding-left: 8px;
-                color: rgb(150, 155, 170);
+                color: #666666;
                 font-size: 11px;
             }
         """
-        _dp_lbl_style = "color: rgb(150, 150, 150); font-size: 11px;"
+        _dp_lbl_style = "color: #969696; font-size: 11px;"
 
         whour_row = QHBoxLayout()
         whour_row.setSpacing(6)
@@ -287,7 +287,7 @@ class InputLaporanWidget(QWidget):
         btn_tambah_model.setStyleSheet("""
             QPushButton {
                 background-color: rgb(40, 80, 50); color: rgb(150, 210, 160);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(50, 100, 65); }
         """)
@@ -296,7 +296,7 @@ class InputLaporanWidget(QWidget):
         btn_hapus_model.setStyleSheet("""
             QPushButton {
                 background-color: rgb(80, 40, 40); color: rgb(200, 150, 150);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(100, 50, 50); }
         """)
@@ -319,27 +319,27 @@ class InputLaporanWidget(QWidget):
         self.tabel_produksi.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_produksi.setStyleSheet("""
             QTableWidget {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
-                gridline-color: rgb(55, 60, 70);
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 0px;
+                gridline-color: #303030;
             }
             QTableWidget::item {
-                color: rgb(230, 230, 230);
+                color: #ffffff;
                 padding: 4px;
-                background-color: rgb(38, 42, 50);
-                border-bottom: 1px solid rgb(55, 60, 70);
+                background-color: #252525;
+                border-bottom: 1px solid #303030;
             }
             QTableWidget::item:selected {
-                background-color: rgb(100, 110, 125);
-                color: white;
+                background-color: #303030;
+                color: #ffffff;
             }
             QHeaderView::section {
-                background-color: rgb(28, 32, 40);
-                color: rgb(150, 150, 150);
+                background-color: #111111;
+                color: #969696;
                 border: none;
-                border-bottom: 1px solid rgb(60, 65, 75);
-                border-right: 1px solid rgb(60, 65, 75);
+                border-bottom: 1px solid #303030;
+                border-right: 1px solid #303030;
                 padding: 4px;
                 font-weight: bold;
                 font-size: 10px;
@@ -387,20 +387,20 @@ class InputLaporanWidget(QWidget):
         self.input_actual_whour.textChanged.connect(self._hitung_kalkulasi)
 
         _tbl_sm = """
-            QTableWidget { background-color: rgb(33,37,43); border: 1px solid rgb(60,65,75);
-                border-radius: 5px; gridline-color: rgb(55,60,70); }
-            QTableWidget::item { color: rgb(230,230,230); padding: 4px;
-                background-color: rgb(38,42,50); border-bottom: 1px solid rgb(55,60,70); }
-            QTableWidget::item:selected { background-color: rgb(100,110,125); color: white; }
-            QHeaderView::section { background-color: rgb(28,32,40); color: rgb(150,150,150);
-                border: none; border-bottom: 1px solid rgb(60,65,75);
-                border-right: 1px solid rgb(60,65,75); padding: 4px;
+            QTableWidget { background-color: #1e1e1e; border: 1px solid #303030;
+                border-radius: 0px; gridline-color: #303030; }
+            QTableWidget::item { color: #ffffff; padding: 4px;
+                background-color: #252525; border-bottom: 1px solid #303030; }
+            QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
+            QHeaderView::section { background-color: #111111; color: #969696;
+                border: none; border-bottom: 1px solid #303030;
+                border-right: 1px solid #303030; padding: 4px;
                 font-weight: bold; font-size: 10px; }
         """
 
         # Card Manpower
         card_mp = QFrame()
-        card_mp.setStyleSheet("QFrame { background-color: rgb(40,44,52); border-radius: 10px; }")
+        card_mp.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_mp_layout = QVBoxLayout(card_mp)
         card_mp_layout.setContentsMargins(16, 16, 16, 16)
         card_mp_layout.setSpacing(10)
@@ -446,7 +446,7 @@ class InputLaporanWidget(QWidget):
 
         # Card Absen
         card_absen = QFrame()
-        card_absen.setStyleSheet("QFrame { background-color: rgb(40,44,52); border-radius: 10px; }")
+        card_absen.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_absen_layout = QVBoxLayout(card_absen)
         card_absen_layout.setContentsMargins(16, 16, 16, 16)
         card_absen_layout.setSpacing(10)
@@ -457,14 +457,14 @@ class InputLaporanWidget(QWidget):
         btn_tambah_absen.setMinimumHeight(28)
         btn_tambah_absen.setStyleSheet("""
             QPushButton { background-color: rgb(50,55,65); color: rgb(200,200,200);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px; }
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px; }
             QPushButton:hover { background-color: rgb(65,70,80); }
         """)
         btn_hapus_absen = QPushButton("Hapus Baris")
         btn_hapus_absen.setMinimumHeight(28)
         btn_hapus_absen.setStyleSheet("""
             QPushButton { background-color: rgb(80,40,40); color: rgb(200,150,150);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px; }
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px; }
             QPushButton:hover { background-color: rgb(100,50,50); }
         """)
         toolbar_absen.addWidget(btn_tambah_absen)
@@ -502,7 +502,7 @@ class InputLaporanWidget(QWidget):
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(6)
-        splitter.setStyleSheet("QSplitter::handle { background-color: rgb(55, 60, 70); }")
+        splitter.setStyleSheet("QSplitter::handle { background-color: #303030; }")
         splitter.addWidget(left_widget)
         splitter.addWidget(card_dp)
         splitter.setStretchFactor(0, 1)
@@ -512,7 +512,7 @@ class InputLaporanWidget(QWidget):
 
         # Card Catatan Masalah
         card_masalah = QFrame()
-        card_masalah.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }")
+        card_masalah.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_masalah_layout = QVBoxLayout(card_masalah)
         card_masalah_layout.setContentsMargins(16, 16, 16, 16)
         card_masalah_layout.setSpacing(10)
@@ -524,7 +524,7 @@ class InputLaporanWidget(QWidget):
         btn_tambah_baris.setStyleSheet("""
             QPushButton {
                 background-color: rgb(50, 55, 65); color: rgb(200, 200, 200);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(65, 70, 80); }
         """)
@@ -533,7 +533,7 @@ class InputLaporanWidget(QWidget):
         btn_hapus_baris.setStyleSheet("""
             QPushButton {
                 background-color: rgb(80, 40, 40); color: rgb(200, 150, 150);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(100, 50, 50); }
         """)
@@ -569,27 +569,27 @@ class InputLaporanWidget(QWidget):
         self.tabel_masalah.setTextElideMode(Qt.ElideNone)
         self.tabel_masalah.setStyleSheet("""
             QTableWidget {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
-                gridline-color: rgb(55, 60, 70);
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 0px;
+                gridline-color: #303030;
             }
             QTableWidget::item {
-                color: rgb(230, 230, 230);
+                color: #ffffff;
                 padding: 6px;
-                background-color: rgb(38, 42, 50);
-                border-bottom: 1px solid rgb(55, 60, 70);
+                background-color: #252525;
+                border-bottom: 1px solid #303030;
             }
             QTableWidget::item:selected {
-                background-color: rgb(100, 110, 125);
-                color: white;
+                background-color: #303030;
+                color: #ffffff;
             }
             QHeaderView::section {
-                background-color: rgb(28, 32, 40);
-                color: rgb(150, 150, 150);
+                background-color: #111111;
+                color: #969696;
                 border: none;
-                border-bottom: 1px solid rgb(60, 65, 75);
-                border-right: 1px solid rgb(60, 65, 75);
+                border-bottom: 1px solid #303030;
+                border-right: 1px solid #303030;
                 padding: 6px;
                 font-weight: bold;
                 font-size: 10px;
@@ -604,7 +604,7 @@ class InputLaporanWidget(QWidget):
 
         # Card Inhouse Claim
         card_claim = QFrame()
-        card_claim.setStyleSheet("QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }")
+        card_claim.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         card_claim_layout = QVBoxLayout(card_claim)
         card_claim_layout.setContentsMargins(16, 16, 16, 16)
         card_claim_layout.setSpacing(10)
@@ -616,7 +616,7 @@ class InputLaporanWidget(QWidget):
         btn_tambah_claim.setStyleSheet("""
             QPushButton {
                 background-color: rgb(50, 55, 65); color: rgb(200, 200, 200);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(65, 70, 80); }
         """)
@@ -625,7 +625,7 @@ class InputLaporanWidget(QWidget):
         btn_hapus_claim.setStyleSheet("""
             QPushButton {
                 background-color: rgb(80, 40, 40); color: rgb(200, 150, 150);
-                border: none; border-radius: 5px; padding: 0 12px; font-size: 11px;
+                border: none; border-radius: 0px; padding: 0 12px; font-size: 11px;
             }
             QPushButton:hover { background-color: rgb(100, 50, 50); }
         """)
@@ -661,27 +661,27 @@ class InputLaporanWidget(QWidget):
         self.tabel_claim.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabel_claim.setStyleSheet("""
             QTableWidget {
-                background-color: rgb(33, 37, 43);
-                border: 1px solid rgb(60, 65, 75);
-                border-radius: 5px;
-                gridline-color: rgb(55, 60, 70);
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                border-radius: 0px;
+                gridline-color: #303030;
             }
             QTableWidget::item {
-                color: rgb(230, 230, 230);
+                color: #ffffff;
                 padding: 4px;
-                background-color: rgb(38, 42, 50);
-                border-bottom: 1px solid rgb(55, 60, 70);
+                background-color: #252525;
+                border-bottom: 1px solid #303030;
             }
             QTableWidget::item:selected {
-                background-color: rgb(100, 110, 125);
-                color: white;
+                background-color: #303030;
+                color: #ffffff;
             }
             QHeaderView::section {
-                background-color: rgb(28, 32, 40);
-                color: rgb(150, 150, 150);
+                background-color: #111111;
+                color: #969696;
                 border: none;
-                border-bottom: 1px solid rgb(60, 65, 75);
-                border-right: 1px solid rgb(60, 65, 75);
+                border-bottom: 1px solid #303030;
+                border-right: 1px solid #303030;
                 padding: 4px;
                 font-weight: bold;
                 font-size: 10px;
@@ -700,10 +700,10 @@ class InputLaporanWidget(QWidget):
         btn_reset.setMinimumSize(100, 36)
         btn_reset.setStyleSheet("""
             QPushButton {
-                background-color: rgb(55, 60, 70); color: rgb(190, 190, 190);
-                border: none; border-radius: 5px; font-size: 11px;
+                background-color: #252525; color: #969696;
+                border: none; border-radius: 0px; font-size: 11px;
             }
-            QPushButton:hover { background-color: rgb(70, 75, 85); }
+            QPushButton:hover { background-color: #303030; color: #ffffff; }
         """)
         btn_reset.clicked.connect(self.reset_form)
 
@@ -711,11 +711,11 @@ class InputLaporanWidget(QWidget):
         btn_simpan.setMinimumSize(140, 36)
         btn_simpan.setStyleSheet("""
             QPushButton {
-                background-color: rgb(180, 30, 30); color: #ffffff;
-                border: none; border-radius: 5px; font-size: 11px; font-weight: bold;
+                background-color: #da291c; color: #ffffff;
+                border: none; border-radius: 0px; font-size: 11px; font-weight: bold;
             }
-            QPushButton:hover { background-color: rgb(200, 40, 40); }
-            QPushButton:pressed { background-color: rgb(150, 20, 20); }
+            QPushButton:hover { background-color: #b01e0a; }
+            QPushButton:pressed { background-color: #8c1a0a; }
         """)
         btn_simpan.clicked.connect(self.simpan_laporan)
 
@@ -758,17 +758,17 @@ class InputLaporanWidget(QWidget):
         combo_model.setStyleSheet("""
             QComboBox {
                 background-color: transparent;
-                color: rgb(210, 210, 210);
+                color: #ffffff;
                 border: none;
                 padding: 2px 6px;
                 font-size: 11px;
             }
             QComboBox::drop-down { border: none; width: 20px; }
             QComboBox QAbstractItemView {
-                background-color: rgb(33, 37, 43);
-                color: rgb(210, 210, 210);
-                selection-background-color: rgb(100, 110, 125);
-                border: 1px solid rgb(60, 65, 75);
+                background-color: #252525;
+                color: #ffffff;
+                selection-background-color: #303030;
+                border: 1px solid #303030;
             }
         """)
         self.tabel_produksi.setCellWidget(row, 0, combo_model)
@@ -808,17 +808,17 @@ class InputLaporanWidget(QWidget):
         combo_kategori.setStyleSheet("""
             QComboBox {
                 background-color: transparent;
-                color: rgb(210, 210, 210);
+                color: #ffffff;
                 border: none;
                 padding: 2px 6px;
                 font-size: 11px;
             }
             QComboBox::drop-down { border: none; width: 20px; }
             QComboBox QAbstractItemView {
-                background-color: rgb(33, 37, 43);
-                color: rgb(210, 210, 210);
-                selection-background-color: rgb(100, 110, 125);
-                border: 1px solid rgb(60, 65, 75);
+                background-color: #252525;
+                color: #ffffff;
+                selection-background-color: #303030;
+                border: 1px solid #303030;
             }
         """)
         combo_kategori.view().setMinimumWidth(130)
@@ -837,17 +837,17 @@ class InputLaporanWidget(QWidget):
         combo_pic.setStyleSheet("""
             QComboBox {
                 background-color: transparent;
-                color: rgb(210, 210, 210);
+                color: #ffffff;
                 border: none;
                 padding: 2px 6px;
                 font-size: 11px;
             }
             QComboBox::drop-down { border: none; width: 20px; }
             QComboBox QAbstractItemView {
-                background-color: rgb(33, 37, 43);
-                color: rgb(210, 210, 210);
-                selection-background-color: rgb(100, 110, 125);
-                border: 1px solid rgb(60, 65, 75);
+                background-color: #252525;
+                color: #ffffff;
+                selection-background-color: #303030;
+                border: 1px solid #303030;
             }
         """)
         combo_pic.view().setMinimumWidth(80)

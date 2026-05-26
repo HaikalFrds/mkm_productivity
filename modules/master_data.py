@@ -18,24 +18,24 @@ from modules.db_laporan import (
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 
-_CARD = "QFrame { background-color: rgb(40, 44, 52); border-radius: 10px; }"
+_CARD = "QFrame { background-color: #252525; border-radius: 0px; }"
 
 _TABLE = """
     QTableWidget {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75); border-radius: 5px;
-        gridline-color: rgb(55, 60, 70);
+        background-color: #1e1e1e;
+        border: 1px solid #303030; border-radius: 0px;
+        gridline-color: #303030;
     }
     QTableWidget::item {
-        color: rgb(230, 230, 230); padding: 4px 8px;
-        background-color: rgb(38, 42, 50);
-        border-bottom: 1px solid rgb(55, 60, 70);
+        color: #ffffff; padding: 4px 8px;
+        background-color: #252525;
+        border-bottom: 1px solid #303030;
     }
-    QTableWidget::item:selected { background-color: rgb(100, 110, 125); color: white; }
+    QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
     QHeaderView::section {
-        background-color: rgb(28, 32, 40); color: rgb(150, 150, 150);
-        border: none; border-bottom: 1px solid rgb(60, 65, 75);
-        border-right: 1px solid rgb(60, 65, 75);
+        background-color: #111111; color: #969696;
+        border: none; border-bottom: 1px solid #303030;
+        border-right: 1px solid #303030;
         padding: 6px; font-weight: bold; font-size: 10px;
     }
 """
@@ -43,78 +43,79 @@ _TABLE = """
 _TAB = """
     QTabWidget::pane { background-color: transparent; border: none; }
     QTabBar::tab {
-        background-color: rgb(40, 44, 52); color: rgb(150, 150, 150);
+        background-color: #252525; color: #969696;
         padding: 8px 22px; margin-right: 3px;
-        border-top-left-radius: 6px; border-top-right-radius: 6px;
+        border-top-left-radius: 0px; border-top-right-radius: 0px;
         font-size: 11px; font-weight: bold;
     }
     QTabBar::tab:selected {
-        background-color: rgb(55, 60, 70); color: #ffffff;
-        border-bottom: 2px solid rgb(180, 30, 30);
+        background-color: #2e2e2e; color: #ffffff;
+        border-bottom: 2px solid #da291c;
     }
     QTabBar::tab:hover:!selected {
-        background-color: rgb(50, 55, 65); color: rgb(200, 200, 200);
+        background-color: #2e2e2e; color: #ffffff;
     }
 """
 
 _BTN_ADD = """
     QPushButton {
-        background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
-        border: none; border-radius: 5px; font-size: 11px; padding: 0 14px;
+        background-color: #da291c; color: #ffffff;
+        border: none; border-radius: 0px; font-size: 11px; padding: 0 14px;
     }
-    QPushButton:hover { background-color: rgb(35, 110, 65); }
+    QPushButton:hover { background-color: #b01e0a; }
 """
 _BTN_EDIT = """
     QPushButton {
         background-color: rgb(60, 100, 160); color: rgb(180, 210, 255);
-        border: none; border-radius: 4px; font-size: 10px;
+        border: none; border-radius: 0px; font-size: 10px;
     }
     QPushButton:hover { background-color: rgb(75, 120, 185); }
 """
 _BTN_DEL = """
     QPushButton {
         background-color: rgb(140, 40, 40); color: rgb(255, 180, 180);
-        border: none; border-radius: 4px; font-size: 10px;
+        border: none; border-radius: 0px; font-size: 10px;
     }
     QPushButton:hover { background-color: rgb(170, 55, 55); }
 """
 _BTN_RESET_PW = """
     QPushButton {
         background-color: rgb(100, 60, 160); color: rgb(220, 200, 255);
-        border: none; border-radius: 4px; font-size: 10px;
+        border: none; border-radius: 0px; font-size: 10px;
     }
     QPushButton:hover { background-color: rgb(120, 75, 185); }
 """
 _INPUT = """
     QLineEdit {
-        background-color: rgb(33, 37, 43);
-        border: 1px solid rgb(60, 65, 75); border-radius: 5px;
-        padding: 6px 10px; color: rgb(220, 220, 220); font-size: 11px;
+        background-color: #1e1e1e;
+        border: 1px solid #303030; border-radius: 2px;
+        padding: 6px 10px; color: #ffffff; font-size: 11px;
         min-height: 30px;
     }
-    QLineEdit:focus { border: 1px solid rgb(150, 150, 150); }
+    QLineEdit:focus { border: 1px solid #da291c; }
 """
 _COMBO = """
     QComboBox {
-        background-color: rgb(33, 37, 43); border: 1px solid rgb(60, 65, 75);
-        border-radius: 5px; padding-left: 8px;
-        color: rgb(220, 220, 220); font-size: 11px; min-height: 30px;
+        background-color: #1e1e1e; border: 1px solid #303030;
+        border-radius: 2px; padding-left: 8px;
+        color: #ffffff; font-size: 11px; min-height: 30px;
     }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: rgb(33, 37, 43); color: rgb(220, 220, 220);
-        selection-background-color: rgb(60, 65, 75);
-        border: 1px solid rgb(60, 65, 75);
+        background-color: #252525; color: #ffffff;
+        selection-background-color: #303030;
+        border: 1px solid #303030;
     }
 """
-_DLG_BG    = "background-color: rgb(33, 37, 43); color: rgb(220, 220, 220);"
-_LBL_FIELD = "color: rgb(150, 150, 150); font-size: 11px;"
+_DLG_BG    = "background-color: #252525; color: #ffffff;"
+_LBL_FIELD = "color: #969696; font-size: 11px;"
 _TIME_EDIT_STYLE = """
     QTimeEdit {
-        background-color: rgb(33, 37, 43); border: 1px solid rgb(60, 65, 75);
-        border-radius: 5px; padding: 4px 8px;
-        color: rgb(220, 220, 220); font-size: 11px; min-height: 30px;
+        background-color: #1e1e1e; border: 1px solid #303030;
+        border-radius: 2px; padding: 4px 8px;
+        color: #ffffff; font-size: 11px; min-height: 30px;
     }
+    QTimeEdit:focus { border: 1px solid #da291c; }
 """
 
 
@@ -358,7 +359,7 @@ class MasterDataWidget(QWidget):
 
         hdr = QHBoxLayout()
         lbl = QLabel("Section")
-        lbl.setStyleSheet("color: white; font-size: 12px; font-weight: bold;")
+        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Section")
         btn.setMinimumSize(140, 30); btn.setStyleSheet(_BTN_ADD)
@@ -390,7 +391,7 @@ class MasterDataWidget(QWidget):
 
         hdr = QHBoxLayout()
         lbl = QLabel("Kategori Masalah")
-        lbl.setStyleSheet("color: white; font-size: 12px; font-weight: bold;")
+        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Kategori")
         btn.setMinimumSize(145, 30); btn.setStyleSheet(_BTN_ADD)
@@ -423,7 +424,7 @@ class MasterDataWidget(QWidget):
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shift")
-        lbl.setStyleSheet("color: white; font-size: 12px; font-weight: bold;")
+        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Shift")
         btn.setMinimumSize(120, 30); btn.setStyleSheet(_BTN_ADD)

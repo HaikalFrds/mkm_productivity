@@ -4,11 +4,13 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QFrame, QStackedWidget,
     QSizePolicy, QSpacerItem
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QIcon, QFont
 
 
 class MainWindow(QMainWindow):
+    logout_requested = Signal()
+
     def __init__(self, user: dict):
         super().__init__()
         self.user = user
@@ -159,6 +161,7 @@ class MainWindow(QMainWindow):
         from views.dashboard import DashboardWidget
         from modules.input_laporan import InputLaporanWidget
         from modules.riwayat_laporan import RiwayatLaporanWidget
+        from modules.visualisasi import VisualisasiWidget
 
         self.pages = {}
 
@@ -177,13 +180,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(riwayat)
         self.pages["riwayat"] = riwayat
 
-        # Visualisasi (placeholder)
-        vis = QWidget()
-        vis_layout = QVBoxLayout(vis)
-        vis_lbl = QLabel("Visualisasi — Coming Soon")
-        vis_lbl.setAlignment(Qt.AlignCenter)
-        vis_lbl.setStyleSheet("color: #666666; font-size: 14pt;")
-        vis_layout.addWidget(vis_lbl)
+        # Visualisasi
+        vis = VisualisasiWidget()
         self.stack.addWidget(vis)
         self.pages["visualisasi"] = vis
 
@@ -243,13 +241,5 @@ class MainWindow(QMainWindow):
                 """)
 
     def logout(self):
-        from views.login import LoginWindow
+        self.logout_requested.emit()
         self.close()
-        self.login = LoginWindow()
-        self.login.login_success.connect(lambda user: self._reopen(user))
-        self.login.show()
-
-    def _reopen(self, user):
-        self.login.close()
-        self._new_window = MainWindow(user)
-        self._new_window.show()

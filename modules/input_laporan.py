@@ -1166,14 +1166,16 @@ class InputLaporanWidget(QWidget):
 
         catatan = []
         for row in range(self.tabel_masalah.rowCount()):
-            nomor_ra = self.tabel_masalah.item(row, 0)
-            kategori_w = self.tabel_masalah.cellWidget(row, 1)
+            nomor_ra    = self.tabel_masalah.item(row, 0)
+            kategori_w  = self.tabel_masalah.cellWidget(row, 1)
             deskripsi_w = self.tabel_masalah.cellWidget(row, 2)
-            penyebab_w = self.tabel_masalah.cellWidget(row, 3)
-            tindakan_w = self.tabel_masalah.cellWidget(row, 4)
-            pic  = self.tabel_masalah.item(row, 5)
-            down = self.tabel_masalah.item(row, 8)
-            loss = self.tabel_masalah.item(row, 9)
+            penyebab_w  = self.tabel_masalah.cellWidget(row, 3)
+            tindakan_w  = self.tabel_masalah.cellWidget(row, 4)
+            pic         = self.tabel_masalah.item(row, 5)
+            start_w     = self.tabel_masalah.cellWidget(row, 6)
+            end_w       = self.tabel_masalah.cellWidget(row, 7)
+            down        = self.tabel_masalah.item(row, 8)
+            loss        = self.tabel_masalah.item(row, 9)
 
             deskripsi = deskripsi_w.toPlainText().strip() if deskripsi_w else ""
             if not deskripsi:
@@ -1189,29 +1191,21 @@ class InputLaporanWidget(QWidget):
             except ValueError:
                 loss_time = 0.0
 
-            catatan.append({
-                "nomor_ra":  nomor_ra.text() if nomor_ra else "",
-                "kategori":  kategori_w.currentText() if kategori_w else "",
-                "deskripsi": deskripsi,
-                "penyebab":  penyebab_w.toPlainText().strip() if penyebab_w else "",
-                "tindakan":  tindakan_w.toPlainText().strip() if tindakan_w else "",
-                "pic":       pic.text() if pic else "",
-                "down_time": down_time,
-                "loss_time": loss_time,
-            })
-
-        catatan_idx = 0
-        for row in range(self.tabel_masalah.rowCount()):
-            deskripsi_w = self.tabel_masalah.cellWidget(row, 2)
-            if not deskripsi_w or not deskripsi_w.toPlainText().strip():
-                continue
-            start_w = self.tabel_masalah.cellWidget(row, 6)
-            end_w = self.tabel_masalah.cellWidget(row, 7)
             st = start_w.time().toString("HH:mm") if start_w else None
             et = end_w.time().toString("HH:mm") if end_w else None
-            catatan[catatan_idx]["start_time"] = None if st == "00:00" else st
-            catatan[catatan_idx]["end_time"] = None if et == "00:00" else et
-            catatan_idx += 1
+
+            catatan.append({
+                "nomor_ra":   nomor_ra.text() if nomor_ra else "",
+                "kategori":   kategori_w.currentText() if kategori_w else "",
+                "deskripsi":  deskripsi,
+                "penyebab":   penyebab_w.toPlainText().strip() if penyebab_w else "",
+                "tindakan":   tindakan_w.toPlainText().strip() if tindakan_w else "",
+                "pic":        pic.text() if pic else "",
+                "down_time":  down_time,
+                "loss_time":  loss_time,
+                "start_time": None if st == "00:00" else st,
+                "end_time":   None if et == "00:00" else et,
+            })
 
         def _iv(it):
             val = it.text().strip() if it else ""

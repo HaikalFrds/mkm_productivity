@@ -206,6 +206,66 @@ def get_detail_laporan(report_id: int) -> tuple:
         conn.close()
 
 
+def get_loss_time_per_bulan(section_id, tahun) -> list:
+    """
+    Return 12-item list (Jan–Des), tiap item:
+    {
+      'bulan': 1–12,
+      'total_hour': float,
+      'process_hour': float,
+      'loss_by_category': {'Machine': 2.5, ...}
+    }
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        sec = " AND dr.section_id = %s" if section_id is not None else ""
+        p = [tahun] + ([section_id] if section_id else [])
+
+        cur.execute(f"""
+            SELECT EXTRACT(MONTH FROM dr.date)::int,
+                   SUM(dp.actual_whour)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(YEAR FROM dr.date) = %s {sec}
+            GROUP BY 1
+        """, p)
+        hours = {r[0]: float(r[1] or 0) for r in cur.fetchall()}
+
+        cur.execute(f"""
+            SELECT EXTRACT(MONTH FROM dr.date)::int,
+                   COALESCE(pc.name, 'Others'),
+                   SUM(pr.loss_time)
+            FROM problem_record pr
+            JOIN daily_report dr ON dr.id = pr.report_id
+            LEFT JOIN problem_category pc ON pc.id = pr.category_id
+            WHERE EXTRACT(YEAR FROM dr.date) = %s {sec}
+            GROUP BY 1, 2
+        """, p)
+        loss_map: dict[int, dict] = {}
+        for bulan, kat, val in cur.fetchall():
+            loss_map.setdefault(bulan, {})[kat] = float(val or 0)
+
+        cur.close()
+        result = []
+        for m in range(1, 13):
+            total = hours.get(m, 0.0)
+            lbc   = loss_map.get(m, {})
+            loss_total   = sum(lbc.values())
+            process_hour = max(total - loss_total, 0.0)
+            result.append({
+                "bulan":            m,
+                "total_hour":       total,
+                "process_hour":     process_hour,
+                "loss_by_category": lbc,
+            })
+        return result
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
 def hapus_laporan(report_id: int) -> tuple[bool, str]:
     conn = get_connection()
     try:

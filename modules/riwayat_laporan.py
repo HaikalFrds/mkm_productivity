@@ -230,8 +230,8 @@ class RiwayatLaporanWidget(QWidget):
                     combo.addItem(sname, sid)
                 combo.blockSignals(False)
             self._sections_loaded = True
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar section: {e}")
 
     def _on_tab_changed(self, idx):
         if idx == 1 and not self._tab2_loaded:

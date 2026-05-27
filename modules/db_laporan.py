@@ -1,4 +1,61 @@
+from datetime import date as _date
+
 from modules.db_auth import get_connection
+
+
+def get_dashboard_data() -> dict:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        today = _date.today()
+
+        cur.execute("""
+            SELECT COUNT(DISTINCT dr.id),
+                   COALESCE(SUM(pr.loss_time), 0)
+            FROM daily_report dr
+            LEFT JOIN problem_record pr ON pr.report_id = dr.id
+            WHERE dr.date = %s
+        """, (today,))
+        row = cur.fetchone()
+        report_count = int(row[0]) if row else 0
+        loss_today   = float(row[1]) if row else 0.0
+
+        cur.execute("""
+            SELECT pg.name, pg.order_num, COALESCE(SUM(pr.loss_time), 0)
+            FROM problem_record pr
+            JOIN daily_report dr ON dr.id = pr.report_id
+            JOIN problem_category pc ON pc.id = pr.category_id
+            JOIN problem_group pg ON pg.id = pc.group_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s
+            GROUP BY pg.name, pg.order_num
+            ORDER BY pg.order_num
+        """, (today.month, today.year))
+        categories = [{"group": r[0], "hours": float(r[2])} for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT dr.date, s.name, COALESCE(SUM(pr.loss_time), 0), dr.status
+            FROM daily_report dr
+            JOIN section s ON s.id = dr.section_id
+            LEFT JOIN problem_record pr ON pr.report_id = dr.id
+            GROUP BY dr.id, dr.date, s.name, dr.status
+            ORDER BY dr.date DESC, dr.id DESC
+            LIMIT 5
+        """)
+        recent = [{"date": r[0], "shop": r[1], "loss": float(r[2]), "status": r[3]}
+                  for r in cur.fetchall()]
+
+        cur.close()
+        return {
+            "report_count": report_count,
+            "loss_today":   loss_today,
+            "categories":   categories,
+            "recent":       recent,
+        }
+    except Exception:
+        return {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": []}
+    finally:
+        conn.close()
 
 
 def get_all_sections() -> list:
@@ -92,7 +149,7 @@ def get_detail_laporan(report_id: int) -> tuple:
         hdr = cur.fetchone()
         if not hdr:
             cur.close()
-            return None, [], [], [], [], []
+            return None, [], [], [], [], [], []
         header = {
             "id": hdr[0], "date": str(hdr[1]), "section": hdr[2],
             "shift": hdr[3], "coordinator": hdr[4],
@@ -198,8 +255,24 @@ def get_detail_laporan(report_id: int) -> tuple:
             for r in cur.fetchall()
         ]
 
+        _ensure_material_table(cur)
+        cur.execute(
+            "SELECT material_name, material_no, qty, satuan, keterangan FROM material_usage WHERE report_id = %s ORDER BY id",
+            (report_id,),
+        )
+        materials = [
+            {
+                "material_name": r[0] or "",
+                "material_no":   r[1] or "",
+                "qty":           float(r[2]) if r[2] is not None else 0.0,
+                "satuan":        r[3] or "",
+                "keterangan":    r[4] or "",
+            }
+            for r in cur.fetchall()
+        ]
+
         cur.close()
-        return header, produksi, catatan, manpower, absen, inhouse_claim
+        return header, produksi, catatan, manpower, absen, inhouse_claim, materials
     except Exception:
         raise
     finally:
@@ -266,17 +339,98 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
         conn.close()
 
 
+def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        sec = " AND dr.section_id = %s" if section_id is not None else ""
+        p   = [bulan, tahun] + ([section_id] if section_id else [])
+
+        cur.execute(f"""
+            SELECT COALESCE(SUM(s.total_hours), 0),
+                   COALESCE(SUM(s.preparation_min / 60.0), 0),
+                   COALESCE(SUM(s.sholat_min / 60.0), 0),
+                   COUNT(dr.id)
+            FROM daily_report dr
+            JOIN shift s ON s.id = dr.shift_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        r = cur.fetchone()
+        total_hour  = float(r[0] or 0)
+        prep_hour   = float(r[1] or 0)
+        sholat_hour = float(r[2] or 0)
+        report_count = int(r[3] or 0)
+
+        cur.execute(f"""
+            SELECT COALESCE(SUM(dp.actual_whour), 0)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        process_hour = float((cur.fetchone() or [0])[0] or 0)
+
+        cur.execute(f"""
+            SELECT COALESCE(pcg.name, 'Others') AS grp,
+                   COALESCE(pc.name,  'Others') AS cat,
+                   COALESCE(SUM(pr.loss_time), 0)
+            FROM problem_record pr
+            LEFT JOIN problem_category pc        ON pc.id  = pr.category_id
+            LEFT JOIN problem_group pcg ON pcg.id = pc.group_id
+            JOIN daily_report dr ON dr.id = pr.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+            GROUP BY grp, cat
+            ORDER BY grp, cat
+        """, p)
+        categories = [
+            {"group": row[0], "name": row[1], "hours": float(row[2] or 0)}
+            for row in cur.fetchall()
+        ]
+
+        cur.execute(f"""
+            SELECT COALESCE(SUM(
+                CASE WHEN a.keterangan ~ '^[0-9]+(\\.[0-9]+)?$'
+                     THEN a.keterangan::FLOAT ELSE 0 END
+            ), 0)
+            FROM absen a
+            JOIN daily_report dr ON dr.id = a.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        absence_hour = float((cur.fetchone() or [0])[0] or 0)
+
+        cur.close()
+        return {
+            "total_hour":   total_hour,
+            "process_hour": process_hour,
+            "prep_hour":    prep_hour,
+            "sholat_hour":  sholat_hour,
+            "absence_hour": absence_hour,
+            "categories":   categories,
+            "report_count": report_count,
+        }
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
 def hapus_laporan(report_id: int) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM manpower       WHERE report_id = %s", (report_id,))
-        cur.execute("DELETE FROM absen          WHERE report_id = %s", (report_id,))
-        cur.execute("DELETE FROM inhouse_claim  WHERE report_id = %s", (report_id,))
-        cur.execute("DELETE FROM problem_record WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM manpower        WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM absen           WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM inhouse_claim   WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM problem_record  WHERE report_id = %s", (report_id,))
         cur.execute("DELETE FROM daily_production WHERE report_id = %s", (report_id,))
-        cur.execute("DELETE FROM pending_part    WHERE report_id = %s", (report_id,))
-        cur.execute("DELETE FROM daily_report   WHERE id = %s",         (report_id,))
+        cur.execute("DELETE FROM pending_part     WHERE report_id = %s", (report_id,))
+        cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'material_usage')")
+        if cur.fetchone()[0]:
+            cur.execute("DELETE FROM material_usage WHERE report_id = %s", (report_id,))
+        cur.execute("DELETE FROM daily_report    WHERE id = %s",         (report_id,))
         conn.commit()
         cur.close()
         return True, f"Laporan #{report_id} berhasil dihapus."
@@ -290,6 +444,7 @@ def hapus_laporan(report_id: int) -> tuple[bool, str]:
 def simpan_laporan_harian(
     user_id: int, header: dict, catatan: list, produksi: list,
     inhouse_claim: list = None, manpower: list = None, absen: list = None,
+    material_usage: list = None,
 ) -> tuple[bool, str]:
     conn = get_connection()
     try:
@@ -426,6 +581,24 @@ def simpan_laporan_harian(
                 ab["keterangan"]  or None,
             ))
 
+        # 8. Insert material usage
+        _ensure_material_table(cur)
+        for mat in (material_usage or []):
+            if not mat.get("material_name"):
+                continue
+            cur.execute("""
+                INSERT INTO material_usage
+                    (report_id, material_name, material_no, qty, satuan, keterangan)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                report_id,
+                mat["material_name"] or None,
+                mat.get("material_no") or None,
+                mat.get("qty") or 0,
+                mat.get("satuan") or None,
+                mat.get("keterangan") or None,
+            ))
+
         conn.commit()
         cur.close()
         return True, f"Laporan berhasil disimpan! (ID: {report_id})"
@@ -448,7 +621,8 @@ def tambah_section(nama: str) -> tuple[bool, str]:
         cur.execute("SELECT id FROM section WHERE LOWER(name) = LOWER(%s) LIMIT 1", (nama,))
         if cur.fetchone():
             return False, f"Shop '{nama}' sudah ada."
-        cur.execute("INSERT INTO section (name) VALUES (%s)", (nama,))
+        code = nama.strip().upper().replace(" ", "_")
+        cur.execute("INSERT INTO section (code, name) VALUES (%s, %s)", (code, nama))
         conn.commit()
         cur.close()
         return True, f"Shop '{nama}' berhasil ditambahkan."
@@ -469,7 +643,8 @@ def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
         )
         if cur.fetchone():
             return False, f"Shop '{nama}' sudah ada."
-        cur.execute("UPDATE section SET name = %s WHERE id = %s", (nama, section_id))
+        code = nama.strip().upper().replace(" ", "_")
+        cur.execute("UPDATE section SET code = %s, name = %s WHERE id = %s", (code, nama, section_id))
         conn.commit()
         cur.close()
         return True, f"Shop berhasil diubah menjadi '{nama}'."
@@ -525,8 +700,8 @@ def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[boo
         if cur.fetchone():
             return False, f"NIK '{nik}' sudah terdaftar."
         cur.execute(
-            'INSERT INTO "user" (nik, name, role, password_hash) VALUES (%s, %s, %s, %s)',
-            (nik, nama, role, password_hash),
+            'INSERT INTO "user" (nik, username, name, role, password_hash) VALUES (%s, %s, %s, %s, %s)',
+            (nik, nik, nama, role, password_hash),
         )
         conn.commit()
         cur.close()
@@ -601,11 +776,30 @@ def get_all_kategori() -> list:
         cur.close()
         return [
             {"id": r[0], "group_id": r[1], "group_name": r[2],
-             "code": r[3], "name": r[4], "order_num": r[5]}
+             "code": r[3], "name": r[4], "order_num": r[5],
+             "parent_id": None}
             for r in rows
         ]
     except Exception:
         raise
+    finally:
+        conn.close()
+
+
+def get_all_category_names() -> list[str]:
+    """Returns ordered list of category names for dropdowns."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT pc.name
+            FROM problem_category pc
+            JOIN problem_group pg ON pg.id = pc.group_id
+            ORDER BY pg.order_num, pc.order_num, pc.id
+        """)
+        return [r[0] for r in cur.fetchall()]
+    except Exception:
+        return []
     finally:
         conn.close()
 
@@ -840,7 +1034,8 @@ def _ensure_shop_model_table(cur):
     """)
     cur.execute("""
         ALTER TABLE shop_model
-            ADD COLUMN IF NOT EXISTS working_hour FLOAT DEFAULT 0
+            ADD COLUMN IF NOT EXISTS working_hour FLOAT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS cycle_time   FLOAT DEFAULT 0
     """)
 
 
@@ -851,19 +1046,26 @@ def get_models_by_section(section_id: int) -> list:
         _ensure_shop_model_table(cur)
         conn.commit()
         cur.execute(
-            "SELECT id, model_name, working_hour FROM shop_model WHERE section_id = %s ORDER BY model_name",
+            "SELECT id, model_name, working_hour, cycle_time FROM shop_model WHERE section_id = %s ORDER BY model_name",
             (section_id,),
         )
         rows = cur.fetchall()
         cur.close()
-        return [{"id": r[0], "model_name": r[1], "working_hour": float(r[2] or 0)} for r in rows]
+        return [
+            {
+                "id": r[0], "model_name": r[1],
+                "working_hour": float(r[2] or 0),
+                "cycle_time":   float(r[3] or 0),
+            }
+            for r in rows
+        ]
     except Exception:
         raise
     finally:
         conn.close()
 
 
-def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.0) -> tuple[bool, str]:
+def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.0, cycle_time: float = 0.0) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -875,8 +1077,8 @@ def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.
         if cur.fetchone():
             return False, f"Model '{model_name}' sudah ada di shop ini."
         cur.execute(
-            "INSERT INTO shop_model (section_id, model_name, working_hour) VALUES (%s, %s, %s)",
-            (section_id, model_name, working_hour),
+            "INSERT INTO shop_model (section_id, model_name, working_hour, cycle_time) VALUES (%s, %s, %s, %s)",
+            (section_id, model_name, working_hour, cycle_time),
         )
         conn.commit()
         cur.close()
@@ -888,13 +1090,13 @@ def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.
         conn.close()
 
 
-def edit_shop_model(model_id: int, model_name: str, working_hour: float) -> tuple[bool, str]:
+def edit_shop_model(model_id: int, model_name: str, working_hour: float, cycle_time: float = 0.0) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE shop_model SET model_name = %s, working_hour = %s WHERE id = %s",
-            (model_name, working_hour, model_id),
+            "UPDATE shop_model SET model_name = %s, working_hour = %s, cycle_time = %s WHERE id = %s",
+            (model_name, working_hour, cycle_time, model_id),
         )
         conn.commit()
         cur.close()
@@ -917,5 +1119,115 @@ def hapus_shop_model(model_id: int) -> tuple[bool, str]:
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menghapus model: {e}"
+    finally:
+        conn.close()
+
+
+# =============================================================================
+# MATERIAL USAGE
+# =============================================================================
+
+def _ensure_material_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS material_usage (
+            id            SERIAL PRIMARY KEY,
+            report_id     INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
+            material_name VARCHAR(200),
+            material_no   VARCHAR(100),
+            qty           FLOAT DEFAULT 0,
+            satuan        VARCHAR(50),
+            keterangan    TEXT
+        )
+    """)
+
+
+# =============================================================================
+# MASTER DATA — WORK CENTER
+# =============================================================================
+
+def _ensure_work_center_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS work_center (
+            id         SERIAL PRIMARY KEY,
+            section_id INTEGER NOT NULL REFERENCES section(id) ON DELETE CASCADE,
+            name       VARCHAR(100) NOT NULL,
+            UNIQUE(section_id, name)
+        )
+    """)
+
+
+def get_work_centers_by_section(section_id: int) -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_work_center_table(cur)
+        conn.commit()
+        cur.execute(
+            "SELECT id, name FROM work_center WHERE section_id = %s ORDER BY name",
+            (section_id,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        return [{"id": r[0], "name": r[1]} for r in rows]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def tambah_work_center(section_id: int, name: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_work_center_table(cur)
+        cur.execute(
+            "SELECT id FROM work_center WHERE section_id = %s AND LOWER(name) = LOWER(%s) LIMIT 1",
+            (section_id, name),
+        )
+        if cur.fetchone():
+            return False, f"Work Center '{name}' sudah ada di shop ini."
+        cur.execute(
+            "INSERT INTO work_center (section_id, name) VALUES (%s, %s)",
+            (section_id, name),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Work Center '{name}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah work center: {e}"
+    finally:
+        conn.close()
+
+
+def edit_work_center(wc_id: int, name: str) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE work_center SET name = %s WHERE id = %s",
+            (name, wc_id),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Work Center berhasil diubah menjadi '{name}'."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal mengubah work center: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_work_center(wc_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM work_center WHERE id = %s", (wc_id,))
+        conn.commit()
+        cur.close()
+        return True, "Work Center berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus work center: {e}"
     finally:
         conn.close()

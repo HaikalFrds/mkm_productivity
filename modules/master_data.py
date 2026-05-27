@@ -15,6 +15,7 @@ from modules.db_laporan import (
     get_all_shifts, tambah_shift, edit_shift, hapus_shift,
     update_shift_working_hour, ensure_shift_columns,
     get_models_by_section, tambah_shop_model, edit_shop_model, hapus_shop_model,
+    get_work_centers_by_section, tambah_work_center, edit_work_center, hapus_work_center,
 )
 
 
@@ -254,7 +255,7 @@ class _KategoriDialog(QDialog):
 
 class _ModelDialog(QDialog):
     """Dialog untuk tambah/edit model dan working hour-nya."""
-    def __init__(self, parent, nama: str = "", working_hour: float = 0.0):
+    def __init__(self, parent, nama: str = "", working_hour: float = 0.0, cycle_time: float = 0.0):
         super().__init__(parent)
         is_edit = bool(nama)
         self.setWindowTitle("Edit Model" if is_edit else "Tambah Model")
@@ -281,9 +282,19 @@ class _ModelDialog(QDialog):
         self.input_wh.setSuffix(" H/unit")
         self.input_wh.setMinimumHeight(32)
         self.input_wh.setStyleSheet(_TIME_EDIT_STYLE)
-        _f("Working Hour (H/unit)", self.input_wh)
+        _f("Working Hour / MHU (H/unit)", self.input_wh)
 
-        lbl_hint = QLabel("Contoh: Qty 10 unit × 0.5 H/unit = 5.0 H")
+        self.input_ct = QDoubleSpinBox()
+        self.input_ct.setRange(0.0, 9999.0)
+        self.input_ct.setDecimals(1)
+        self.input_ct.setSingleStep(1.0)
+        self.input_ct.setValue(cycle_time)
+        self.input_ct.setSuffix(" s/unit")
+        self.input_ct.setMinimumHeight(32)
+        self.input_ct.setStyleSheet(_TIME_EDIT_STYLE)
+        _f("Cycle Time (s/unit)", self.input_ct)
+
+        lbl_hint = QLabel("MHU: Qty 10 unit × 0.5 H/unit = 5.0 H")
         lbl_hint.setStyleSheet("color: #555555; font-size: 10px;")
         lay.addWidget(lbl_hint)
 
@@ -297,7 +308,33 @@ class _ModelDialog(QDialog):
         return {
             "nama":         self.input_nama.text().strip(),
             "working_hour": self.input_wh.value(),
+            "cycle_time":   self.input_ct.value(),
         }
+
+
+class _WorkCenterDialog(QDialog):
+    def __init__(self, parent, nama: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Work Center" if nama else "Tambah Work Center")
+        self.setFixedWidth(340)
+        self.setStyleSheet(_DLG_BG)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 20, 20, 16)
+        lay.setSpacing(10)
+        lbl = QLabel("Nama Work Center"); lbl.setStyleSheet(_LBL_FIELD)
+        lay.addWidget(lbl)
+        self.input_nama = QLineEdit(nama)
+        self.input_nama.setPlaceholderText("Contoh: WC-01")
+        self.input_nama.setStyleSheet(_INPUT)
+        lay.addWidget(self.input_nama)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.button(QDialogButtonBox.Ok).setText("Simpan")
+        btns.button(QDialogButtonBox.Cancel).setText("Batal")
+        btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
+
+    def get_nama(self) -> str:
+        return self.input_nama.text().strip()
 
 
 class _ShiftDialog(QDialog):
@@ -785,7 +822,7 @@ class MasterDataWidget(QWidget):
         if not d["nama"]:
             QMessageBox.warning(self, "Validasi", "Nama model tidak boleh kosong.")
             return
-        ok, msg = tambah_shop_model(section_id, d["nama"], d["working_hour"])
+        ok, msg = tambah_shop_model(section_id, d["nama"], d["working_hour"], d["cycle_time"])
         if ok:
             self._on_shop_model_changed()
             QMessageBox.information(self, "Berhasil", msg)
@@ -793,14 +830,14 @@ class MasterDataWidget(QWidget):
             QMessageBox.warning(self, "Gagal", msg)
 
     def _edit_shop_model(self, m: dict):
-        dlg = _ModelDialog(self, m["model_name"], m["working_hour"])
+        dlg = _ModelDialog(self, m["model_name"], m["working_hour"], m.get("cycle_time", 0.0))
         if dlg.exec() != QDialog.Accepted:
             return
         d = dlg.get_data()
         if not d["nama"]:
             QMessageBox.warning(self, "Validasi", "Nama model tidak boleh kosong.")
             return
-        ok, msg = edit_shop_model(m["id"], d["nama"], d["working_hour"])
+        ok, msg = edit_shop_model(m["id"], d["nama"], d["working_hour"], d["cycle_time"])
         if ok:
             self._on_shop_model_changed()
         else:
@@ -816,6 +853,145 @@ class MasterDataWidget(QWidget):
         ok, msg = hapus_shop_model(model_id)
         if ok:
             self._on_shop_model_changed()
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    # ── Work Center CRUD ──────────────────────────────────────────────────────
+
+    def _build_work_center_card(self) -> QFrame:
+        card = QFrame(); card.setStyleSheet(_CARD)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(10)
+
+        hdr = QHBoxLayout()
+        lbl = QLabel("Work Center per Shop")
+        lbl.setStyleSheet(_CARD_HDR)
+        hdr.addWidget(lbl)
+        hdr.addStretch()
+        btn_add = QPushButton("+ Tambah Work Center")
+        btn_add.setMinimumSize(155, 30); btn_add.setStyleSheet(_BTN_ADD)
+        btn_add.clicked.connect(self._tambah_work_center)
+        hdr.addWidget(btn_add)
+        lay.addLayout(hdr)
+
+        sel_row = QHBoxLayout()
+        lbl_shop = QLabel("Shop :"); lbl_shop.setStyleSheet(_LBL_FIELD)
+        self._combo_wc_shop = QComboBox()
+        self._combo_wc_shop.setMinimumHeight(30)
+        self._combo_wc_shop.setStyleSheet(_COMBO)
+        self._combo_wc_shop.currentIndexChanged.connect(self._on_wc_shop_changed)
+        sel_row.addWidget(lbl_shop)
+        sel_row.addWidget(self._combo_wc_shop, 1)
+        sel_row.addStretch()
+        lay.addLayout(sel_row)
+
+        self.tabel_wc = QTableWidget()
+        self.tabel_wc.setColumnCount(3)
+        self.tabel_wc.setHorizontalHeaderLabels(["No", "Work Center", "Aksi"])
+        hh = self.tabel_wc.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Interactive)
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tabel_wc.verticalHeader().setVisible(False)
+        self.tabel_wc.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tabel_wc.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_wc.setStyleSheet(_TABLE)
+        self.tabel_wc.setColumnWidth(0, 45)
+        self.tabel_wc.setColumnWidth(2, 145)
+        self.tabel_wc.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        lay.addWidget(self.tabel_wc)
+        return card
+
+    def _load_work_center_sections(self):
+        try:
+            rows = get_all_sections()
+        except Exception:
+            return
+        prev = self._combo_wc_shop.currentData()
+        self._combo_wc_shop.blockSignals(True)
+        self._combo_wc_shop.clear()
+        for sid, sname in rows:
+            self._combo_wc_shop.addItem(sname, sid)
+        if prev is not None:
+            idx = self._combo_wc_shop.findData(prev)
+            if idx >= 0:
+                self._combo_wc_shop.setCurrentIndex(idx)
+        self._combo_wc_shop.blockSignals(False)
+        self._on_wc_shop_changed()
+
+    def _on_wc_shop_changed(self):
+        section_id = self._combo_wc_shop.currentData()
+        if section_id is None:
+            self.tabel_wc.setRowCount(0)
+            _fit_table(self.tabel_wc)
+            return
+        try:
+            wcs = get_work_centers_by_section(section_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat work center: {e}")
+            return
+        self.tabel_wc.setRowCount(0)
+        for i, wc in enumerate(wcs):
+            self.tabel_wc.insertRow(i)
+            self.tabel_wc.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
+            self.tabel_wc.setItem(i, 1, _item(wc["name"]))
+            self.tabel_wc.setCellWidget(i, 2, self._aksi_wc(wc))
+            self.tabel_wc.setRowHeight(i, 38)
+        _fit_table(self.tabel_wc)
+
+    def _aksi_wc(self, wc: dict) -> QWidget:
+        w = QWidget(); w.setStyleSheet("background: transparent;")
+        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
+        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e.clicked.connect(lambda _, x=wc: self._edit_work_center(x))
+        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d.clicked.connect(lambda _, x=wc: self._hapus_work_center(x))
+        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        return w
+
+    def _tambah_work_center(self):
+        section_id = self._combo_wc_shop.currentData()
+        if section_id is None:
+            QMessageBox.warning(self, "Pilih Shop", "Pilih shop terlebih dahulu.")
+            return
+        dlg = _WorkCenterDialog(self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        nama = dlg.get_nama()
+        if not nama:
+            QMessageBox.warning(self, "Validasi", "Nama work center tidak boleh kosong.")
+            return
+        ok, msg = tambah_work_center(section_id, nama)
+        if ok:
+            self._on_wc_shop_changed()
+            QMessageBox.information(self, "Berhasil", msg)
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    def _edit_work_center(self, wc: dict):
+        dlg = _WorkCenterDialog(self, wc["name"])
+        if dlg.exec() != QDialog.Accepted:
+            return
+        nama = dlg.get_nama()
+        if not nama:
+            QMessageBox.warning(self, "Validasi", "Nama work center tidak boleh kosong.")
+            return
+        ok, msg = edit_work_center(wc["id"], nama)
+        if ok:
+            self._on_wc_shop_changed()
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    def _hapus_work_center(self, wc: dict):
+        ans = QMessageBox.question(
+            self, "Konfirmasi Hapus", f"Hapus work center '{wc['name']}'?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ans != QMessageBox.Yes:
+            return
+        ok, msg = hapus_work_center(wc["id"])
+        if ok:
+            self._on_wc_shop_changed()
         else:
             QMessageBox.warning(self, "Gagal", msg)
 
@@ -909,19 +1085,19 @@ class MasterDataWidget(QWidget):
         try:
             rows   = get_all_kategori()
             groups = get_all_groups()
+            self._groups_cache = groups
+            self.tabel_kategori.setRowCount(0)
+            for i, k in enumerate(rows):
+                self.tabel_kategori.insertRow(i)
+                self.tabel_kategori.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
+                self.tabel_kategori.setItem(i, 1, _item(str(k.get("group_name") or "")))
+                self.tabel_kategori.setItem(i, 2, _item(str(k.get("name") or "")))
+                self.tabel_kategori.setCellWidget(i, 3, self._aksi_kategori(k))
+                self.tabel_kategori.setRowHeight(i, 38)
+            _fit_table(self.tabel_kategori)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat kategori: {e}")
             return
-        self._groups_cache = groups
-        self.tabel_kategori.setRowCount(0)
-        for i, k in enumerate(rows):
-            self.tabel_kategori.insertRow(i)
-            self.tabel_kategori.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
-            self.tabel_kategori.setItem(i, 1, _item(k["group_name"]))
-            self.tabel_kategori.setItem(i, 2, _item(k["name"]))
-            self.tabel_kategori.setCellWidget(i, 3, self._aksi_kategori(k))
-            self.tabel_kategori.setRowHeight(i, 38)
-        _fit_table(self.tabel_kategori)
 
     def _aksi_kategori(self, k: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")

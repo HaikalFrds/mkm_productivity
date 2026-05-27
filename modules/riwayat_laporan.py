@@ -13,7 +13,7 @@ from PySide6.QtGui import QColor
 from modules.db_auth import get_connection
 from modules.db_laporan import (
     get_all_sections, get_all_shifts, get_riwayat_laporan,
-    get_detail_laporan, hapus_laporan,
+    get_detail_laporan, hapus_laporan, get_monthly_productivity,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 
@@ -168,38 +168,31 @@ def _db_ng_pending(section_id, date_from, date_to):
         cur = conn.cursor()
         sec = " AND dr.section_id = %s" if section_id is not None else ""
 
-        inhouse_ng = []
-        try:
-            p = [date_from, date_to] + ([section_id] if section_id else [])
-            cur.execute(f"""
-                SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
-                       ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
-                FROM inhouse_claim ic
-                JOIN daily_report dr ON dr.id = ic.report_id
-                WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
-                ORDER BY ic.tanggal DESC, ic.id DESC
-            """, p)
-            inhouse_ng = cur.fetchall()
-        except Exception:
-            conn.rollback()
+        p = [date_from, date_to] + ([section_id] if section_id else [])
+        cur.execute(f"""
+            SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
+                   ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
+            FROM inhouse_claim ic
+            JOIN daily_report dr ON dr.id = ic.report_id
+            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
+            ORDER BY ic.tanggal DESC, ic.id DESC
+        """, p)
+        inhouse_ng = cur.fetchall()
 
-        inhouse_pending = []
-        try:
-            p = [date_from, date_to] + ([section_id] if section_id else [])
-            cur.execute(f"""
-                SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
-                       ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
-                FROM inhouse_claim ic
-                JOIN daily_report dr ON dr.id = ic.report_id
-                WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
-                ORDER BY ic.tanggal DESC, ic.id DESC
-            """, p)
-            inhouse_pending = cur.fetchall()
-        except Exception:
-            conn.rollback()
+        cur.execute(f"""
+            SELECT ic.tanggal, ic.model, ic.op_no_st, ic.item, ic.qty,
+                   ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
+            FROM inhouse_claim ic
+            JOIN daily_report dr ON dr.id = ic.report_id
+            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
+            ORDER BY ic.tanggal DESC, ic.id DESC
+        """, p)
+        inhouse_pending = cur.fetchall()
 
         cur.close()
         return inhouse_ng, inhouse_pending
+    except Exception:
+        raise
     finally:
         conn.close()
 
@@ -212,6 +205,7 @@ class RiwayatLaporanWidget(QWidget):
         self._sections_loaded = False
         self._tab2_loaded = False
         self._tab3_loaded = False
+        self._tab4_loaded = False
         self._setup_ui()
 
     def showEvent(self, event):
@@ -224,7 +218,8 @@ class RiwayatLaporanWidget(QWidget):
             return
         try:
             sections = get_all_sections()
-            for combo in (self.combo_section, self.combo_section_rekap, self.combo_section_ng):
+            for combo in (self.combo_section, self.combo_section_rekap,
+                          self.combo_section_ng, self.combo_prod_section):
                 combo.blockSignals(True)
                 for sid, sname in sections:
                     combo.addItem(sname, sid)
@@ -239,8 +234,8 @@ class RiwayatLaporanWidget(QWidget):
             for s in shifts:
                 self.combo_shift.addItem(s["name"])
             self.combo_shift.blockSignals(False)
-        except Exception:
-            pass
+        except Exception as e:
+            QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar shift: {e}")
         self._sections_loaded = True
 
     def _on_tab_changed(self, idx):
@@ -250,6 +245,9 @@ class RiwayatLaporanWidget(QWidget):
         elif idx == 2 and not self._tab3_loaded:
             self.load_ng_pending()
             self._tab3_loaded = True
+        elif idx == 3 and not self._tab4_loaded:
+            self.load_produktivitas()
+            self._tab4_loaded = True
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
@@ -260,6 +258,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabs.addTab(self._build_tab_harian(), "Riwayat Harian")
         self.tabs.addTab(self._build_tab_rekap(), "Rekap Bulanan")
         self.tabs.addTab(self._build_tab_ng_pending(), "NG & Pending")
+        self.tabs.addTab(self._build_tab_produktivitas(), "Produktivitas")
         outer.addWidget(self.tabs)
 
     # ── Tab 1: Riwayat Harian ────────────────────────────────────────────────
@@ -476,7 +475,7 @@ class RiwayatLaporanWidget(QWidget):
 
     def _lihat(self, report_id):
         try:
-            header, produksi, catatan, manpower, absen, inhouse_claim = get_detail_laporan(report_id)
+            header, produksi, catatan, manpower, absen, inhouse_claim, materials = get_detail_laporan(report_id)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat detail: {e}")
             return
@@ -525,8 +524,8 @@ class RiwayatLaporanWidget(QWidget):
         hdr_lyt.setColumnStretch(3, 1)
 
         fmt_w = lambda v: f"{v:.2f} H" if v is not None else "—"
-        plan_wh   = produksi[0].get("plan_whour")   if produksi else None
-        actual_wh = produksi[0].get("actual_whour") if produksi else None
+        plan_wh   = sum(p.get("plan_whour", 0) or 0   for p in produksi) if produksi else None
+        actual_wh = sum(p.get("actual_whour", 0) or 0 for p in produksi) if produksi else None
         pairs = [
             ("Tanggal",       header.get("date", "")),
             ("Shift",         header.get("shift", "")),
@@ -552,9 +551,9 @@ class RiwayatLaporanWidget(QWidget):
         if produksi:
             lyt.addWidget(_sec_lbl("Data Produksi"))
             tbl_prod = QTableWidget()
-            tbl_prod.setColumnCount(7)
+            tbl_prod.setColumnCount(6)
             tbl_prod.setHorizontalHeaderLabels(
-                ["Model", "Plan", "Reg", "2H OT", "3H OT", "11H OT", "Balance"]
+                ["Model", "Plan Qty", "Act Qty", "Plan H", "Act H", "Bal Qty"]
             )
             tbl_prod.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             tbl_prod.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -564,21 +563,19 @@ class RiwayatLaporanWidget(QWidget):
             tbl_prod.setStyleSheet(_TABLE_STYLE)
             for i, p in enumerate(produksi):
                 tbl_prod.insertRow(i)
-                plan  = p.get("plan_unit", 0.0)
-                reg   = p.get("actual_unit", 0.0)
-                ot2h  = p.get("ot_2h", 0.0)
-                ot3h  = p.get("ot_3h", 0.0)
-                ot11h = p.get("ot_11h", 0.0)
-                bal   = (reg + ot2h + ot3h + ot11h) - plan
+                plan_u = p.get("plan_unit", 0.0) or 0.0
+                act_u  = p.get("actual_unit", 0.0) or 0.0
+                plan_h = p.get("plan_whour", 0.0) or 0.0
+                act_h  = p.get("actual_whour", 0.0) or 0.0
+                bal    = act_u - plan_u
                 tbl_prod.setItem(i, 0, _cell(p.get("model", "")))
-                tbl_prod.setItem(i, 1, _cell(f"{plan:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 2, _cell(f"{reg:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 3, _cell(f"{ot2h:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 4, _cell(f"{ot3h:.0f}", Qt.AlignCenter))
-                tbl_prod.setItem(i, 5, _cell(f"{ot11h:.0f}", Qt.AlignCenter))
-                bal_cell = _cell(f"{bal:.0f}", Qt.AlignCenter)
+                tbl_prod.setItem(i, 1, _cell(f"{plan_u:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 2, _cell(f"{act_u:.0f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 3, _cell(f"{plan_h:.4f}", Qt.AlignCenter))
+                tbl_prod.setItem(i, 4, _cell(f"{act_h:.4f}", Qt.AlignCenter))
+                bal_cell = _cell(f"{bal:+.0f}", Qt.AlignCenter)
                 bal_cell.setForeground(QColor(220, 80, 80) if bal < 0 else QColor(80, 200, 100))
-                tbl_prod.setItem(i, 6, bal_cell)
+                tbl_prod.setItem(i, 5, bal_cell)
             lyt.addWidget(tbl_prod)
 
         # ── Catatan Masalah ──────────────────────────────────────────────────
@@ -706,6 +703,30 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_ic.setItem(i, 10, it_status)
             lyt.addWidget(tbl_ic)
 
+        # ── Material Used ────────────────────────────────────────────────────
+        if materials:
+            lyt.addWidget(_sec_lbl("Material Used"))
+            tbl_mat = QTableWidget()
+            tbl_mat.setColumnCount(5)
+            tbl_mat.setHorizontalHeaderLabels(
+                ["Material Name", "Mat. No", "Qty", "Satuan", "Keterangan"]
+            )
+            tbl_mat.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            for fc in (1, 2, 3):
+                tbl_mat.horizontalHeader().setSectionResizeMode(fc, QHeaderView.ResizeToContents)
+            tbl_mat.verticalHeader().setVisible(False)
+            tbl_mat.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tbl_mat.setFixedHeight(min(len(materials) * 32 + 32, 200))
+            tbl_mat.setStyleSheet(_TABLE_STYLE)
+            for i, m in enumerate(materials):
+                tbl_mat.insertRow(i)
+                tbl_mat.setItem(i, 0, _cell(m.get("material_name", "")))
+                tbl_mat.setItem(i, 1, _cell(m.get("material_no", ""), Qt.AlignCenter))
+                tbl_mat.setItem(i, 2, _cell(f"{m.get('qty', 0):.0f}", Qt.AlignCenter))
+                tbl_mat.setItem(i, 3, _cell(m.get("satuan", ""), Qt.AlignCenter))
+                tbl_mat.setItem(i, 4, _cell(m.get("keterangan", "")))
+            lyt.addWidget(tbl_mat)
+
         lyt.addStretch()
         scroll.setWidget(container)
         outer_lyt.addWidget(scroll)
@@ -740,7 +761,7 @@ class RiwayatLaporanWidget(QWidget):
 
     def _export_laporan(self, report_id):
         try:
-            header, produksi, catatan, manpower, absen, inhouse_claim = get_detail_laporan(report_id)
+            header, produksi, catatan, manpower, absen, inhouse_claim, _ = get_detail_laporan(report_id)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat detail: {e}")
             return
@@ -1303,6 +1324,282 @@ class RiwayatLaporanWidget(QWidget):
             QMessageBox.information(self, "Export Berhasil", f"File disimpan di:\n{filepath}")
         except Exception as e:
             QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor: {e}")
+
+    # ── Tab 4: Produktivitas Bulanan ─────────────────────────────────────────
+
+    def _build_tab_produktivitas(self):
+        tab = QWidget()
+        tab.setStyleSheet("background: transparent;")
+        outer = QVBoxLayout(tab)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        main = QVBoxLayout(container)
+        main.setContentsMargins(15, 15, 15, 15)
+        main.setSpacing(12)
+
+        # Filter card
+        card_f = QFrame(); card_f.setStyleSheet(_CARD_STYLE)
+        fl = QHBoxLayout(card_f); fl.setContentsMargins(16, 12, 16, 12); fl.setSpacing(10)
+
+        fl.addWidget(self._flabel("Shop"))
+        self.combo_prod_section = QComboBox()
+        self.combo_prod_section.setMinimumHeight(30)
+        self.combo_prod_section.setMinimumWidth(155)
+        self.combo_prod_section.setStyleSheet(_COMBO_STYLE)
+        self.combo_prod_section.addItem("Semua", None)
+        fl.addWidget(self.combo_prod_section)
+
+        fl.addWidget(self._flabel("Bulan"))
+        self.combo_prod_bulan = QComboBox()
+        self.combo_prod_bulan.setMinimumHeight(30)
+        self.combo_prod_bulan.setMinimumWidth(115)
+        self.combo_prod_bulan.setStyleSheet(_COMBO_STYLE)
+        for i, name in enumerate(
+            ["Januari","Februari","Maret","April","Mei","Juni",
+             "Juli","Agustus","September","Oktober","November","Desember"], 1
+        ):
+            self.combo_prod_bulan.addItem(name, i)
+        self.combo_prod_bulan.setCurrentIndex(QDate.currentDate().month() - 1)
+        fl.addWidget(self.combo_prod_bulan)
+
+        fl.addWidget(self._flabel("Tahun"))
+        self.input_prod_tahun = QLineEdit()
+        self.input_prod_tahun.setMinimumHeight(30)
+        self.input_prod_tahun.setFixedWidth(70)
+        self.input_prod_tahun.setStyleSheet(_INPUT_STYLE)
+        self.input_prod_tahun.setText(str(QDate.currentDate().year()))
+        fl.addWidget(self.input_prod_tahun)
+
+        fl.addStretch()
+        btn_tampil = QPushButton("Tampilkan")
+        btn_tampil.setMinimumSize(90, 32)
+        btn_tampil.setStyleSheet(_BTN_CARI)
+        btn_tampil.clicked.connect(self.load_produktivitas)
+        fl.addWidget(btn_tampil)
+        main.addWidget(card_f)
+
+        # Content row
+        content = QHBoxLayout(); content.setSpacing(12)
+
+        # Left: breakdown table
+        card_left = QFrame(); card_left.setStyleSheet(_CARD_STYLE)
+        ll = QVBoxLayout(card_left); ll.setContentsMargins(16, 14, 16, 16); ll.setSpacing(8)
+        lbl_bkdn = QLabel("Breakdown Jam Kerja")
+        lbl_bkdn.setStyleSheet(
+            "color: #ffffff; font-size: 12px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
+        ll.addWidget(lbl_bkdn)
+
+        self.tabel_prod_bkdn = QTableWidget()
+        self.tabel_prod_bkdn.setColumnCount(2)
+        self.tabel_prod_bkdn.setHorizontalHeaderLabels(["Kategori", "Jam (H)"])
+        self.tabel_prod_bkdn.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tabel_prod_bkdn.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
+        self.tabel_prod_bkdn.setColumnWidth(1, 90)
+        self.tabel_prod_bkdn.verticalHeader().setVisible(False)
+        self.tabel_prod_bkdn.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tabel_prod_bkdn.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_prod_bkdn.setMinimumHeight(300)
+        self.tabel_prod_bkdn.setStyleSheet(_TABLE_STYLE)
+        ll.addWidget(self.tabel_prod_bkdn)
+        content.addWidget(card_left, 3)
+
+        # Right: ratio + summary
+        card_right = QFrame(); card_right.setStyleSheet(_CARD_STYLE)
+        rl = QVBoxLayout(card_right); rl.setContentsMargins(16, 14, 16, 16); rl.setSpacing(12)
+
+        lbl_rt = QLabel("Ratio Produktivitas")
+        lbl_rt.setStyleSheet("color: #969696; font-size: 11px; font-weight: bold;")
+        lbl_rt.setAlignment(Qt.AlignCenter)
+        rl.addWidget(lbl_rt)
+
+        ratio_frame = QFrame()
+        ratio_frame.setObjectName("ratioFrame")
+        ratio_frame.setStyleSheet(
+            "#ratioFrame { background-color: #1e1e1e; border: 2px solid #303030; }"
+        )
+        rfl = QVBoxLayout(ratio_frame); rfl.setContentsMargins(16, 24, 16, 24)
+        self._lbl_ratio_big = QLabel("—")
+        self._lbl_ratio_big.setStyleSheet(
+            "color: #27ae60; font-size: 40px; font-weight: bold;"
+        )
+        self._lbl_ratio_big.setAlignment(Qt.AlignCenter)
+        rfl.addWidget(self._lbl_ratio_big)
+        rl.addWidget(ratio_frame)
+
+        sum_frame = QFrame()
+        sum_frame.setStyleSheet(
+            "QFrame { background-color: #1e1e1e; border: 1px solid #303030; }"
+        )
+        sg = QGridLayout(sum_frame); sg.setContentsMargins(12, 10, 12, 10); sg.setSpacing(6)
+        sg.setColumnStretch(1, 1)
+
+        def _srow(row, label, attr):
+            l = QLabel(label); l.setStyleSheet("color: #969696; font-size: 11px;")
+            v = QLabel("—")
+            v.setStyleSheet("color: #ffffff; font-size: 11px; font-weight: bold;")
+            v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            sg.addWidget(l, row, 0); sg.addWidget(v, row, 1)
+            setattr(self, attr, v)
+
+        _srow(0, "Total Hour",  "_lbl_prod_total")
+        _srow(1, "Used Hour",   "_lbl_prod_used")
+        _srow(2, "Balance",     "_lbl_prod_bal")
+        _srow(3, "Laporan",     "_lbl_prod_count")
+        rl.addWidget(sum_frame)
+        rl.addStretch()
+        content.addWidget(card_right, 2)
+
+        main.addLayout(content)
+        main.addStretch()
+        scroll.setWidget(container)
+        outer.addWidget(scroll)
+        return tab
+
+    def load_produktivitas(self):
+        section_id = self.combo_prod_section.currentData()
+        bulan = self.combo_prod_bulan.currentData()
+        try:
+            tahun = int(self.input_prod_tahun.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Peringatan", "Tahun tidak valid.")
+            return
+
+        try:
+            data = get_monthly_productivity(section_id, bulan, tahun)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat data: {e}")
+            return
+
+        tbl = self.tabel_prod_bkdn
+        tbl.setRowCount(0)
+
+        def _grp_row(text):
+            r = tbl.rowCount()
+            tbl.insertRow(r)
+            it = QTableWidgetItem(text)
+            it.setFlags(Qt.ItemIsEnabled)
+            it.setBackground(QColor("#111111"))
+            it.setForeground(QColor("#da291c"))
+            f = it.font(); f.setBold(True); it.setFont(f)
+            tbl.setItem(r, 0, it)
+            it2 = QTableWidgetItem("")
+            it2.setFlags(Qt.ItemIsEnabled)
+            it2.setBackground(QColor("#111111"))
+            tbl.setItem(r, 1, it2)
+            tbl.setRowHeight(r, 26)
+
+        def _subgrp_row(text):
+            r = tbl.rowCount()
+            tbl.insertRow(r)
+            it = QTableWidgetItem(f"  {text}")
+            it.setFlags(Qt.ItemIsEnabled)
+            it.setForeground(QColor("#606060"))
+            f = it.font(); f.setItalic(True); it.setFont(f)
+            tbl.setItem(r, 0, it)
+            it2 = QTableWidgetItem("")
+            it2.setFlags(Qt.ItemIsEnabled)
+            tbl.setItem(r, 1, it2)
+            tbl.setRowHeight(r, 20)
+
+        def _data_row(name, hours, fg=None):
+            r = tbl.rowCount()
+            tbl.insertRow(r)
+            it_n = QTableWidgetItem(f"    {name}")
+            it_n.setFlags(Qt.ItemIsEnabled)
+            it_h = QTableWidgetItem(f"{hours:.4f}")
+            it_h.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            it_h.setFlags(Qt.ItemIsEnabled)
+            if fg:
+                it_n.setForeground(QColor(fg))
+                it_h.setForeground(QColor(fg))
+            tbl.setItem(r, 0, it_n)
+            tbl.setItem(r, 1, it_h)
+            tbl.setRowHeight(r, 28)
+
+        # ── Produktif ──────────────────────────────────────────────────────
+        _grp_row("PRODUKTIF")
+        _data_row("Process", data["process_hour"], "#80c880")
+
+        # ── Non-Produktif (line stop by category/group) ────────────────────
+        groups: dict[str, list] = {}
+        for cat in data["categories"]:
+            groups.setdefault(cat["group"], []).append(cat)
+
+        if groups:
+            _grp_row("NON-PRODUKTIF (Line Stop)")
+            for grp_name, cats in groups.items():
+                _subgrp_row(grp_name)
+                for cat in cats:
+                    _data_row(cat["name"], cat["hours"])
+
+        # ── Waktu Tetap ────────────────────────────────────────────────────
+        _grp_row("WAKTU TETAP")
+        _data_row("Preparation", data["prep_hour"])
+        _data_row("Sholat",      data["sholat_hour"])
+
+        # ── Ketidakhadiran ─────────────────────────────────────────────────
+        _grp_row("KETIDAKHADIRAN")
+        _data_row("Absence", data["absence_hour"])
+
+        # ── Divider + TOTAL ────────────────────────────────────────────────
+        r = tbl.rowCount()
+        tbl.insertRow(r)
+        for c in range(2):
+            it = QTableWidgetItem()
+            it.setFlags(Qt.ItemIsEnabled)
+            it.setBackground(QColor("#404040"))
+            tbl.setItem(r, c, it)
+        tbl.setRowHeight(r, 2)
+
+        used_hour = (
+            data["process_hour"] + data["prep_hour"] + data["sholat_hour"] +
+            sum(c["hours"] for c in data["categories"]) + data["absence_hour"]
+        )
+        total_hour = data["total_hour"]
+
+        r = tbl.rowCount()
+        tbl.insertRow(r)
+        it_n = QTableWidgetItem("TOTAL")
+        it_n.setFlags(Qt.ItemIsEnabled)
+        fn = it_n.font(); fn.setBold(True); it_n.setFont(fn)
+        it_n.setForeground(QColor("#ffffff"))
+        it_h = QTableWidgetItem(f"{used_hour:.4f}")
+        it_h.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_h.setFlags(Qt.ItemIsEnabled)
+        fh = it_h.font(); fh.setBold(True); it_h.setFont(fh)
+        it_h.setForeground(QColor("#ffffff"))
+        tbl.setItem(r, 0, it_n)
+        tbl.setItem(r, 1, it_h)
+        tbl.setRowHeight(r, 30)
+
+        # ── Summary ────────────────────────────────────────────────────────
+        balance = total_hour - used_hour
+        ratio = (data["process_hour"] / total_hour * 100) if total_hour > 0 else 0.0
+        ratio_color = (
+            "#27ae60" if ratio >= 80
+            else "#f39c12" if ratio >= 60
+            else "#da291c"
+        )
+        self._lbl_ratio_big.setText(f"{ratio:.1f}%")
+        self._lbl_ratio_big.setStyleSheet(
+            f"color: {ratio_color}; font-size: 40px; font-weight: bold;"
+        )
+        self._lbl_prod_total.setText(f"{total_hour:.2f} H")
+        self._lbl_prod_used.setText(f"{used_hour:.2f} H")
+
+        bal_color = "#27ae60" if abs(balance) < 0.01 else "#f39c12"
+        self._lbl_prod_bal.setText(f"{balance:.4f}")
+        self._lbl_prod_bal.setStyleSheet(
+            f"color: {bal_color}; font-size: 11px; font-weight: bold;"
+        )
+        self._lbl_prod_count.setText(f"{data['report_count']} laporan")
 
     @staticmethod
     def _flabel(text):

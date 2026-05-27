@@ -3,10 +3,12 @@ import pyqtgraph as pg
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QTableWidget,
-    QTableWidgetItem, QHeaderView, QSizePolicy
+    QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
+
+from modules.db_laporan import get_dashboard_data
 
 
 class StatCard(QFrame):
@@ -57,7 +59,6 @@ class DashboardWidget(QWidget):
         header.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; padding: 4px 0;")
         main_layout.addWidget(header)
 
-        # Row 1: Stat Cards
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(12)
 
@@ -66,20 +67,19 @@ class DashboardWidget(QWidget):
             "laporan harian", "#da291c"
         )
         self.card_losstime = StatCard(
-            "Total Loss Time", "0.00 H",
+            "Total Loss Time Hari Ini", "0.00 H",
             "jam terbuang", "#f39c12"
         )
-        self.card_produktivitas = StatCard(
-            "Produktivitas", "0%",
-            "dari target 87%", "#27ae60"
+        self.card_bulan = StatCard(
+            "Loss Time Bulan Ini", "0.00 H",
+            "akumulasi bulanan", "#27ae60"
         )
 
         cards_layout.addWidget(self.card_laporan)
         cards_layout.addWidget(self.card_losstime)
-        cards_layout.addWidget(self.card_produktivitas)
+        cards_layout.addWidget(self.card_bulan)
         main_layout.addLayout(cards_layout)
 
-        # Row 2: Chart + Tabel
         content_layout = QHBoxLayout()
         content_layout.setSpacing(12)
 
@@ -88,11 +88,11 @@ class DashboardWidget(QWidget):
         chart_layout = QVBoxLayout(chart_frame)
         chart_layout.setContentsMargins(12, 12, 12, 12)
 
-        chart_title = QLabel("Loss Time per Kategori (Bulan Ini)")
+        chart_title = QLabel("Loss Time per Grup (Bulan Ini)")
         chart_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         chart_layout.addWidget(chart_title)
 
-        self.chart = self.create_chart()
+        self.chart = self._create_chart([])
         chart_layout.addWidget(self.chart)
 
         table_frame = QFrame()
@@ -138,14 +138,32 @@ class DashboardWidget(QWidget):
                 font-size: 10px;
             }
         """)
-        self.load_table_data()
         table_layout.addWidget(self.table)
 
         content_layout.addWidget(chart_frame, stretch=3)
         content_layout.addWidget(table_frame, stretch=2)
         main_layout.addLayout(content_layout)
 
-    def create_chart(self):
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.load_data()
+
+    def load_data(self):
+        try:
+            data = get_dashboard_data()
+        except Exception:
+            return
+
+        self.card_laporan.update_value(str(data["report_count"]))
+        self.card_losstime.update_value(f"{data['loss_today']:.2f} H")
+
+        monthly_total = sum(c["hours"] for c in data["categories"])
+        self.card_bulan.update_value(f"{monthly_total:.2f} H")
+
+        self._update_chart(data["categories"])
+        self._update_table(data["recent"])
+
+    def _create_chart(self, categories: list):
         pg.setConfigOption('background', (37, 37, 37))
         pg.setConfigOption('foreground', (150, 150, 150))
 
@@ -157,50 +175,67 @@ class DashboardWidget(QWidget):
         plot.getPlotItem().hideButtons()
         plot.setMouseEnabled(x=False, y=False)
         plot.setMenuEnabled(False)
+        plot.setLabel('left', 'Loss Time (H)')
 
-        kategori = ["Repair", "Machine", "Setting", "Quality", "Supply", "Man", "Trial"]
-        values = [2.5, 1.8, 1.2, 0.9, 0.7, 0.5, 0.3]
-        colors = [
-            (230, 50, 50),
-            (200, 80, 50),
+        _CHART_COLORS = [
+            (230, 50,  50),
+            (200, 80,  50),
             (180, 100, 50),
             (160, 120, 50),
             (140, 140, 50),
-            (100, 160, 50),
-            (70, 180, 50),
         ]
 
-        for i, (val, color) in enumerate(zip(values, colors)):
-            bar = pg.BarGraphItem(
-                x=[i], height=[val], width=0.6,
-                brush=pg.mkBrush(*color, 200),
-                pen=pg.mkPen(*color, width=1)
-            )
-            plot.addItem(bar)
-
-        ticks = [(i, kategori[i]) for i in range(len(kategori))]
-        plot.getAxis('bottom').setTicks([ticks])
-        plot.setLabel('left', 'Loss Time (H)')
+        if categories:
+            for i, cat in enumerate(categories):
+                color = _CHART_COLORS[i % len(_CHART_COLORS)]
+                bar = pg.BarGraphItem(
+                    x=[i], height=[cat["hours"]], width=0.6,
+                    brush=pg.mkBrush(*color, 200),
+                    pen=pg.mkPen(*color, width=1)
+                )
+                plot.addItem(bar)
+            ticks = [(i, c["group"]) for i, c in enumerate(categories)]
+            plot.getAxis('bottom').setTicks([ticks])
 
         return plot
 
-    def load_table_data(self):
-        dummy_data = [
-            ("18 Mei 2026", "Rear Axle", "2.24 H", "Draft"),
-            ("17 Mei 2026", "Welding CO2", "1.50 H", "Approved"),
-            ("16 Mei 2026", "Machining", "0.75 H", "Approved"),
-            ("15 Mei 2026", "Rear Axle", "3.10 H", "Draft"),
-            ("14 Mei 2026", "Welding CO2", "1.20 H", "Approved"),
+    def _update_chart(self, categories: list):
+        _CHART_COLORS = [
+            (230, 50,  50),
+            (200, 80,  50),
+            (180, 100, 50),
+            (160, 120, 50),
+            (140, 140, 50),
         ]
 
-        self.table.setRowCount(len(dummy_data))
-        for row, (tanggal, shop, loss, status) in enumerate(dummy_data):
-            self.table.setItem(row, 0, QTableWidgetItem(tanggal))
-            self.table.setItem(row, 1, QTableWidgetItem(shop))
-            self.table.setItem(row, 2, QTableWidgetItem(loss))
+        self.chart.clear()
+        if not categories:
+            self.chart.getAxis('bottom').setTicks([[]])
+            return
 
-            status_item = QTableWidgetItem(status)
-            if status == "Approved":
+        for i, cat in enumerate(categories):
+            color = _CHART_COLORS[i % len(_CHART_COLORS)]
+            bar = pg.BarGraphItem(
+                x=[i], height=[cat["hours"]], width=0.6,
+                brush=pg.mkBrush(*color, 200),
+                pen=pg.mkPen(*color, width=1)
+            )
+            self.chart.addItem(bar)
+
+        ticks = [(i, c["group"]) for i, c in enumerate(categories)]
+        self.chart.getAxis('bottom').setTicks([ticks])
+
+    def _update_table(self, recent: list):
+        self.table.setRowCount(len(recent))
+        for row, r in enumerate(recent):
+            date_str = r["date"].strftime("%d %b %Y") if hasattr(r["date"], "strftime") else str(r["date"])
+            self.table.setItem(row, 0, QTableWidgetItem(date_str))
+            self.table.setItem(row, 1, QTableWidgetItem(r["shop"]))
+            self.table.setItem(row, 2, QTableWidgetItem(f"{r['loss']:.2f} H"))
+
+            status = r.get("status", "")
+            status_item = QTableWidgetItem(status or "-")
+            if status == "approved":
                 status_item.setForeground(QColor("#27ae60"))
             else:
                 status_item.setForeground(QColor("#f39c12"))
@@ -209,4 +244,4 @@ class DashboardWidget(QWidget):
     def refresh_data(self, laporan_count=0, loss_time=0.0, produktivitas=0.0):
         self.card_laporan.update_value(str(laporan_count))
         self.card_losstime.update_value(f"{loss_time:.2f} H")
-        self.card_produktivitas.update_value(f"{produktivitas:.1f}%")
+        self.card_bulan.update_value(f"{produktivitas:.1f}%")

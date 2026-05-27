@@ -1,13 +1,15 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame, QLineEdit, QComboBox, QPushButton,
+    QLabel, QFrame, QComboBox, QPushButton,
     QDateEdit, QScrollArea, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QAbstractItemView, QCheckBox,
 )
 from PySide6.QtCore import Qt, QDate
+from PySide6.QtGui import QColor
 
 from modules.db_laporan import (
     simpan_laporan_harian, get_all_sections, get_all_shifts, get_models_by_section,
+    get_all_category_names,
 )
 
 # ── Style constants ────────────────────────────────────────────────────────────
@@ -84,8 +86,10 @@ class InputLaporanWidget(QWidget):
         self._shift_hours  = 0.0
         self._prep_h       = 15.0 / 60
         self._sholat_h     = 10.0 / 60
-        self._shop_models: list[str] = []         # model names for currently selected shop
-        self._shop_model_hours: dict[str, float] = {}  # model → H/unit
+        self._shop_models: list[str] = []
+        self._shop_model_hours: dict[str, float] = {}   # model → H/unit (MHU)
+        self._shop_model_cycle: dict[str, float] = {}   # model → cycle time (s)
+        self._factors: list[str] = _FACTORS[:]
         self._setup_ui()
 
     # ── lifecycle ──────────────────────────────────────────────────────────────
@@ -94,6 +98,12 @@ class InputLaporanWidget(QWidget):
         super().showEvent(event)
         self._reload_sections()
         self._reload_shifts()
+        self._reload_factors()
+
+    def _reload_factors(self):
+        names = get_all_category_names()
+        if names:
+            self._factors = names
 
     def _reload_sections(self):
         try:
@@ -119,11 +129,14 @@ class InputLaporanWidget(QWidget):
             return
         try:
             rows = get_models_by_section(section_id)
-            self._shop_models = [r["model_name"] for r in rows]
-            self._shop_model_hours = {r["model_name"]: r["working_hour"] for r in rows}
-        except Exception:
-            self._shop_models = []
+            self._shop_models      = [r["model_name"] for r in rows]
+            self._shop_model_hours = {r["model_name"]: r["working_hour"]  for r in rows}
+            self._shop_model_cycle = {r["model_name"]: r["cycle_time"]    for r in rows}
+        except Exception as e:
+            self._shop_models      = []
             self._shop_model_hours = {}
+            self._shop_model_cycle = {}
+            QMessageBox.warning(self, "Gagal Memuat Model", str(e))
 
     def _reload_shifts(self):
         try:
@@ -187,6 +200,9 @@ class InputLaporanWidget(QWidget):
         main.addWidget(self._build_line_stop())
         main.addLayout(self._build_footer())
         main.addStretch()
+
+        # Build material panel without adding to layout — initializes self.tbl_mat
+        self._mat_card = self._build_material_panel()
 
         scroll.setWidget(container)
         outer.addWidget(scroll)
@@ -334,14 +350,19 @@ class InputLaporanWidget(QWidget):
         hdr.addWidget(ba); hdr.addWidget(bd)
         lay.addLayout(hdr)
 
-        self.tbl_prod = QTableWidget(0, 3)
-        self.tbl_prod.setHorizontalHeaderLabels(["Model", "Qty", "Hour"])
+        self.tbl_prod = QTableWidget(0, 6)
+        self.tbl_prod.setHorizontalHeaderLabels(
+            ["Model", "Plan Qty", "Act Qty", "MHU", "Plan H", "Act H"]
+        )
         h = self.tbl_prod.horizontalHeader()
         h.setSectionResizeMode(0, QHeaderView.Stretch)
-        h.setSectionResizeMode(1, QHeaderView.Fixed)
-        h.setSectionResizeMode(2, QHeaderView.Fixed)
+        for c in [1, 2, 3, 4, 5]:
+            h.setSectionResizeMode(c, QHeaderView.Fixed)
         self.tbl_prod.setColumnWidth(1, 60)
-        self.tbl_prod.setColumnWidth(2, 75)
+        self.tbl_prod.setColumnWidth(2, 60)
+        self.tbl_prod.setColumnWidth(3, 60)
+        self.tbl_prod.setColumnWidth(4, 62)
+        self.tbl_prod.setColumnWidth(5, 62)
         self.tbl_prod.verticalHeader().setVisible(False)
         self.tbl_prod.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_prod.setStyleSheet(_TBL)
@@ -562,16 +583,6 @@ class InputLaporanWidget(QWidget):
     def _build_footer(self) -> QHBoxLayout:
         lay = QHBoxLayout(); lay.setSpacing(10)
 
-        lay.addWidget(QLabel("Jml M/Pwr (direct) :", styleSheet=_FLD_LBL))
-        self.input_manpower = QLineEdit("0")
-        self.input_manpower.setFixedSize(60, 30)
-        self.input_manpower.setAlignment(Qt.AlignCenter)
-        self.input_manpower.setStyleSheet(
-            "QLineEdit { background:#1e1e1e; border:1px solid #303030; border-radius:2px;"
-            " padding-left:8px; color:#ffffff; font-size:11px; }"
-            "QLineEdit:focus { border:1px solid #da291c; }"
-        )
-        lay.addWidget(self.input_manpower)
         lay.addStretch()
 
         btn_reset = QPushButton("Reset")
@@ -604,10 +615,21 @@ class InputLaporanWidget(QWidget):
         models = self._shop_models or _MODELS
         combo = _mk_combo(models)
         self.tbl_prod.setCellWidget(r, 0, combo)
-        for col in [1, 2]:
-            self.tbl_prod.setItem(r, col, _item("", Qt.AlignCenter))
+        self.tbl_prod.setItem(r, 1, _item("", Qt.AlignCenter))  # Plan Qty
+        self.tbl_prod.setItem(r, 2, _item("", Qt.AlignCenter))  # Act Qty
+        mhu_it = _item("", Qt.AlignCenter)
+        mhu_it.setFlags(Qt.ItemIsEnabled)
+        mhu_it.setBackground(QColor("#1a1a1a"))
+        mhu_it.setForeground(QColor("#606060"))
+        self.tbl_prod.setItem(r, 3, mhu_it)                     # MHU (readonly)
+        plh_it = _item("", Qt.AlignCenter)
+        plh_it.setFlags(Qt.ItemIsEnabled)
+        plh_it.setBackground(QColor("#1a1a1a"))
+        plh_it.setForeground(QColor("#606060"))
+        self.tbl_prod.setItem(r, 4, plh_it)                     # Plan H (readonly)
+        self.tbl_prod.setItem(r, 5, _item("", Qt.AlignCenter))  # Act H
         self.tbl_prod.blockSignals(False)
-        combo.currentTextChanged.connect(lambda _, cb=combo: self._autofill_hour_by_model(cb))
+        combo.currentTextChanged.connect(lambda _, cb=combo: self._autofill_mhu_by_model(cb))
 
     def _hapus_produksi(self):
         r = self.tbl_prod.currentRow()
@@ -650,7 +672,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setCellWidget(r, 6, _mk_combo(_SATUAN, popup_w=70))
         self.tbl_claim.setItem(r, 7, _item(""))
         self.tbl_claim.setItem(r, 8, _item(""))
-        self.tbl_claim.setCellWidget(r, 9, _mk_combo(_FACTORS, popup_w=100))
+        self.tbl_claim.setCellWidget(r, 9, _mk_combo(self._factors, popup_w=100))
         self.tbl_claim.setItem(r, 10, _item("0", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 11, _item("0", Qt.AlignCenter))
 
@@ -678,7 +700,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_ls.setItem(r, 3, _item(""))
         self.tbl_ls.setItem(r, 4, _item(""))
         self.tbl_ls.setItem(r, 5, _item(""))
-        self.tbl_ls.setCellWidget(r, 6, _mk_combo(_FACTORS, popup_w=100))
+        self.tbl_ls.setCellWidget(r, 6, _mk_combo(self._factors, popup_w=100))
 
         chk_w, _ = _chk_widget()
         self.tbl_ls.setCellWidget(r, 7, chk_w)
@@ -700,7 +722,8 @@ class InputLaporanWidget(QWidget):
     # ── Auto-fill Hour dari MHU ────────────────────────────────────────────────
 
     def _on_prod_item_changed(self, item):
-        if item.column() == 1:   # Qty berubah → isi Hour otomatis jika MHU ada
+        col = item.column()
+        if col in (1, 2):  # Plan Qty or Act Qty changed
             r = item.row()
             cb = self.tbl_prod.cellWidget(r, 0)
             model = cb.currentText() if cb else ""
@@ -710,37 +733,122 @@ class InputLaporanWidget(QWidget):
                     qty = float(item.text())
                 except Exception:
                     qty = 0.0
-                if qty > 0:
-                    self.tbl_prod.blockSignals(True)
-                    hour_it = self.tbl_prod.item(r, 2)
-                    if not hour_it:
-                        hour_it = _item("", Qt.AlignCenter)
-                        self.tbl_prod.setItem(r, 2, hour_it)
-                    hour_it.setText(f"{qty * mhu:.4f}")
-                    self.tbl_prod.blockSignals(False)
+                self.tbl_prod.blockSignals(True)
+                if col == 1:  # Plan Qty → Plan H
+                    plh_it = self.tbl_prod.item(r, 4)
+                    if not plh_it:
+                        plh_it = _item("", Qt.AlignCenter)
+                        plh_it.setFlags(Qt.ItemIsEnabled)
+                        plh_it.setBackground(QColor("#1a1a1a"))
+                        plh_it.setForeground(QColor("#606060"))
+                        self.tbl_prod.setItem(r, 4, plh_it)
+                    plh_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                else:  # col == 2, Act Qty → Act H
+                    ach_it = self.tbl_prod.item(r, 5)
+                    if not ach_it:
+                        ach_it = _item("", Qt.AlignCenter)
+                        self.tbl_prod.setItem(r, 5, ach_it)
+                    ach_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                self.tbl_prod.blockSignals(False)
         self._hitung_calc_hour()
 
-    def _autofill_hour_by_model(self, combo_widget):
+    def _autofill_mhu_by_model(self, combo_widget):
         for r in range(self.tbl_prod.rowCount()):
             if self.tbl_prod.cellWidget(r, 0) is combo_widget:
                 model = combo_widget.currentText()
                 mhu = self._shop_model_hours.get(model, 0.0)
+                self.tbl_prod.blockSignals(True)
+                mhu_it = self.tbl_prod.item(r, 3)
+                if not mhu_it:
+                    mhu_it = _item("", Qt.AlignCenter)
+                    mhu_it.setFlags(Qt.ItemIsEnabled)
+                    mhu_it.setBackground(QColor("#1a1a1a"))
+                    mhu_it.setForeground(QColor("#606060"))
+                    self.tbl_prod.setItem(r, 3, mhu_it)
+                mhu_it.setText(f"{mhu:.4f}" if mhu > 0 else "")
                 if mhu > 0:
-                    qty_it = self.tbl_prod.item(r, 1)
-                    try:
-                        qty = float(qty_it.text()) if qty_it and qty_it.text() else 0.0
-                    except Exception:
-                        qty = 0.0
-                    if qty > 0:
-                        self.tbl_prod.blockSignals(True)
-                        hour_it = self.tbl_prod.item(r, 2)
-                        if not hour_it:
-                            hour_it = _item("", Qt.AlignCenter)
-                            self.tbl_prod.setItem(r, 2, hour_it)
-                        hour_it.setText(f"{qty * mhu:.4f}")
-                        self.tbl_prod.blockSignals(False)
+                    def _qty(col):
+                        it = self.tbl_prod.item(r, col)
+                        try:
+                            return float(it.text()) if it and it.text() else 0.0
+                        except Exception:
+                            return 0.0
+                    plh_it = self.tbl_prod.item(r, 4)
+                    if not plh_it:
+                        plh_it = _item("", Qt.AlignCenter)
+                        plh_it.setFlags(Qt.ItemIsEnabled)
+                        plh_it.setBackground(QColor("#1a1a1a"))
+                        plh_it.setForeground(QColor("#606060"))
+                        self.tbl_prod.setItem(r, 4, plh_it)
+                    pq = _qty(1)
+                    plh_it.setText(f"{pq * mhu:.4f}" if pq > 0 else "")
+                    ach_it = self.tbl_prod.item(r, 5)
+                    if not ach_it:
+                        ach_it = _item("", Qt.AlignCenter)
+                        self.tbl_prod.setItem(r, 5, ach_it)
+                    aq = _qty(2)
+                    ach_it.setText(f"{aq * mhu:.4f}" if aq > 0 else "")
+                self.tbl_prod.blockSignals(False)
                 self._hitung_calc_hour()
                 break
+
+    # ── Material Used ──────────────────────────────────────────────────────────
+
+    def _build_material_panel(self) -> QFrame:
+        card = QFrame(); card.setStyleSheet(_CARD)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(10, 10, 10, 10); lay.setSpacing(6)
+
+        hdr = QHBoxLayout()
+        hdr.addWidget(QLabel("Material Used", styleSheet=_HDR_LBL))
+        hdr.addStretch()
+        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba.clicked.connect(self._tambah_material)
+        bd.clicked.connect(self._hapus_material)
+        hdr.addWidget(ba); hdr.addWidget(bd)
+        lay.addLayout(hdr)
+
+        self.tbl_mat = QTableWidget(0, 6)
+        self.tbl_mat.setHorizontalHeaderLabels(
+            ["No", "Material Name", "Mat. No", "Qty", "Satuan", "Keterangan"]
+        )
+        h = self.tbl_mat.horizontalHeader()
+        h.setSectionResizeMode(QHeaderView.Fixed)
+        h.setSectionResizeMode(1, QHeaderView.Stretch)
+        h.setSectionResizeMode(5, QHeaderView.Stretch)
+        self.tbl_mat.setColumnWidth(0, 28)
+        self.tbl_mat.setColumnWidth(2, 90)
+        self.tbl_mat.setColumnWidth(3, 55)
+        self.tbl_mat.setColumnWidth(4, 65)
+        self.tbl_mat.verticalHeader().setVisible(False)
+        self.tbl_mat.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_mat.setStyleSheet(_TBL)
+        self.tbl_mat.setMinimumHeight(120)
+        lay.addWidget(self.tbl_mat)
+        return card
+
+    def _tambah_material(self):
+        r = self.tbl_mat.rowCount()
+        self.tbl_mat.insertRow(r)
+        self.tbl_mat.setRowHeight(r, 28)
+        no_it = _item(str(r + 1), Qt.AlignCenter)
+        no_it.setFlags(Qt.ItemIsEnabled)
+        self.tbl_mat.setItem(r, 0, no_it)
+        self.tbl_mat.setItem(r, 1, _item(""))
+        self.tbl_mat.setItem(r, 2, _item(""))
+        self.tbl_mat.setItem(r, 3, _item("0", Qt.AlignCenter))
+        self.tbl_mat.setCellWidget(r, 4, _mk_combo(_SATUAN, popup_w=70))
+        self.tbl_mat.setItem(r, 5, _item(""))
+
+    def _hapus_material(self):
+        r = self.tbl_mat.currentRow()
+        if r >= 0:
+            self.tbl_mat.removeRow(r)
+            for i in range(self.tbl_mat.rowCount()):
+                it = self.tbl_mat.item(i, 0)
+                if it:
+                    it.setText(str(i + 1))
 
     # ── Calculation Hour ───────────────────────────────────────────────────────
 
@@ -758,7 +866,7 @@ class InputLaporanWidget(QWidget):
                     pass
             return 0.0
 
-        process  = sum(_fval(self.tbl_prod,  r, 2) for r in range(self.tbl_prod.rowCount()))
+        process  = sum(_fval(self.tbl_prod,  r, 5) for r in range(self.tbl_prod.rowCount()))
         absence  = sum(_fval(self.tbl_absen, r, 3) for r in range(self.tbl_absen.rowCount()))
         linestop = sum(_fval(self.tbl_ls,    r, 9) for r in range(self.tbl_ls.rowCount()))
         quality  = 0.0
@@ -773,7 +881,7 @@ class InputLaporanWidget(QWidget):
 
         ok = abs(balance) < 0.001
         clr = "rgb(80,200,100)" if ok else "rgb(220,80,80)"
-        self._lbl_balance.setText(f"{balance:+.4f}")
+        self._lbl_balance.setText(f"{balance:.4f}")
         self._lbl_balance.setStyleSheet(
             f"color: {clr}; font-size:13px; font-weight:bold;"
         )
@@ -790,7 +898,8 @@ class InputLaporanWidget(QWidget):
         self.tbl_absen.setRowCount(0)
         self.tbl_claim.setRowCount(0)
         self.tbl_ls.setRowCount(0)
-        self.input_manpower.setText("0")
+        self.tbl_mat.setRowCount(0)
+
         self._hitung_calc_hour()
 
     # ── Save ───────────────────────────────────────────────────────────────────
@@ -831,12 +940,12 @@ class InputLaporanWidget(QWidget):
             model = cb.currentText() if cb else ""
             if not model:
                 continue
-            qty  = _fv(self.tbl_prod, r, 1)
-            hour = _fv(self.tbl_prod, r, 2)
             produksi.append({
-                "model": model,
-                "plan_unit": qty, "actual_unit": qty,
-                "plan_whour": hour, "actual_whour": hour,
+                "model":        model,
+                "plan_unit":    _fv(self.tbl_prod, r, 1),
+                "actual_unit":  _fv(self.tbl_prod, r, 2),
+                "plan_whour":   _fv(self.tbl_prod, r, 4),
+                "actual_whour": _fv(self.tbl_prod, r, 5),
                 "ot_2h": 0, "ot_3h": 0, "ot_11h": 0,
             })
 
@@ -913,11 +1022,25 @@ class InputLaporanWidget(QWidget):
                 "status":   "NG",
             })
 
-        try:
-            mp = int(self.input_manpower.text())
-        except Exception:
-            mp = 0
-        manpower_data = [{"role": "Direct Worker", "plan": mp, "act": mp}]
+        manpower_data = []
+
+        # Material Used
+        material_data = []
+        for r in range(self.tbl_mat.rowCount()):
+            name_it = self.tbl_mat.item(r, 1)
+            name = name_it.text().strip() if name_it else ""
+            if not name:
+                continue
+            matno_it = self.tbl_mat.item(r, 2)
+            sat_cb   = self.tbl_mat.cellWidget(r, 4)
+            ket_it   = self.tbl_mat.item(r, 5)
+            material_data.append({
+                "material_name": name,
+                "material_no":   matno_it.text().strip() if matno_it else "",
+                "qty":           _fv(self.tbl_mat, r, 3),
+                "satuan":        sat_cb.currentText() if sat_cb else "",
+                "keterangan":    ket_it.text().strip() if ket_it else "",
+            })
 
         header = {
             "tanggal":     self.input_tanggal.date().toString("yyyy-MM-dd"),
@@ -938,6 +1061,7 @@ class InputLaporanWidget(QWidget):
             inhouse_claim=claim_data,
             manpower=manpower_data,
             absen=absen_data,
+            material_usage=material_data,
         )
         if ok:
             self.reset_form()

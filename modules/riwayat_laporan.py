@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor
 
 from modules.db_auth import get_connection
 from modules.db_laporan import (
-    get_all_sections, get_riwayat_laporan,
+    get_all_sections, get_all_shifts, get_riwayat_laporan,
     get_detail_laporan, hapus_laporan,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
@@ -229,9 +229,19 @@ class RiwayatLaporanWidget(QWidget):
                 for sid, sname in sections:
                     combo.addItem(sname, sid)
                 combo.blockSignals(False)
-            self._sections_loaded = True
         except Exception as e:
-            QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar section: {e}")
+            QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar shop: {e}")
+        try:
+            shifts = get_all_shifts()
+            self.combo_shift.blockSignals(True)
+            self.combo_shift.clear()
+            self.combo_shift.addItem("Semua", None)
+            for s in shifts:
+                self.combo_shift.addItem(s["name"])
+            self.combo_shift.blockSignals(False)
+        except Exception:
+            pass
+        self._sections_loaded = True
 
     def _on_tab_changed(self, idx):
         if idx == 1 and not self._tab2_loaded:
@@ -276,7 +286,7 @@ class RiwayatLaporanWidget(QWidget):
         fl.setContentsMargins(16, 12, 16, 12)
         fl.setSpacing(10)
 
-        fl.addWidget(self._flabel("Section"))
+        fl.addWidget(self._flabel("Shop"))
         self.combo_section = QComboBox()
         self.combo_section.setMinimumHeight(30)
         self.combo_section.setMinimumWidth(155)
@@ -289,7 +299,7 @@ class RiwayatLaporanWidget(QWidget):
         self.combo_shift.setMinimumHeight(30)
         self.combo_shift.setMinimumWidth(110)
         self.combo_shift.setStyleSheet(_COMBO_STYLE)
-        self.combo_shift.addItems(["Semua", "Day Shift", "Night Shift"])
+        self.combo_shift.addItem("Semua", None)
         fl.addWidget(self.combo_shift)
 
         fl.addWidget(self._flabel("Dari"))
@@ -346,7 +356,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabel_harian = QTableWidget()
         self.tabel_harian.setColumnCount(7)
         self.tabel_harian.setHorizontalHeaderLabels([
-            "No", "Tanggal", "Section", "Shift", "Koordinator", "Jml Masalah", "Aksi",
+            "No", "Tanggal", "Shop", "Shift", "Koordinator", "Jml Masalah", "Aksi",
         ])
         self.tabel_harian.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tabel_harian.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
@@ -520,7 +530,7 @@ class RiwayatLaporanWidget(QWidget):
         pairs = [
             ("Tanggal",       header.get("date", "")),
             ("Shift",         header.get("shift", "")),
-            ("Section",       header.get("section", "")),
+            ("Shop",          header.get("section", "")),
             ("Koordinator",   header.get("coordinator", "")),
             ("Disetujui",     header.get("approved_by", "")),
             ("Diperiksa",     header.get("checked_by", "")),
@@ -765,7 +775,7 @@ class RiwayatLaporanWidget(QWidget):
         hdr_fill = PatternFill("solid", fgColor="1C2028")
         hdr_font = Font(color="9696A0", bold=True, size=10)
 
-        col_headers = ["No", "Tanggal", "Section", "Shift", "Koordinator", "Jml Masalah"]
+        col_headers = ["No", "Tanggal", "Shop", "Shift", "Koordinator", "Jml Masalah"]
         for ci, h in enumerate(col_headers, 1):
             cell = ws.cell(row=1, column=ci, value=h)
             cell.fill = hdr_fill
@@ -821,7 +831,7 @@ class RiwayatLaporanWidget(QWidget):
         fl.setContentsMargins(16, 12, 16, 12)
         fl.setSpacing(10)
 
-        fl.addWidget(self._flabel("Section"))
+        fl.addWidget(self._flabel("Shop"))
         self.combo_section_rekap = QComboBox()
         self.combo_section_rekap.setMinimumHeight(30)
         self.combo_section_rekap.setMinimumWidth(155)
@@ -1063,7 +1073,7 @@ class RiwayatLaporanWidget(QWidget):
         fl.setContentsMargins(16, 12, 16, 12)
         fl.setSpacing(10)
 
-        fl.addWidget(self._flabel("Section"))
+        fl.addWidget(self._flabel("Shop"))
         self.combo_section_ng = QComboBox()
         self.combo_section_ng.setMinimumHeight(30)
         self.combo_section_ng.setMinimumWidth(155)
@@ -1112,7 +1122,10 @@ class RiwayatLaporanWidget(QWidget):
 
         ic_hdr = QHBoxLayout()
         lbl_ic = QLabel("Inhouse Claim (NG)")
-        lbl_ic.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        lbl_ic.setStyleSheet(
+            "color: #ffffff; font-size: 12px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
         self.lbl_info_ic = QLabel("")
         self.lbl_info_ic.setStyleSheet("color: #969696; font-size: 10px;")
         ic_hdr.addWidget(lbl_ic)
@@ -1149,7 +1162,10 @@ class RiwayatLaporanWidget(QWidget):
 
         pp_hdr = QHBoxLayout()
         lbl_pp = QLabel("Part Pending")
-        lbl_pp.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        lbl_pp.setStyleSheet(
+            "color: #ffffff; font-size: 12px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
         self.lbl_info_pp = QLabel("")
         self.lbl_info_pp.setStyleSheet("color: #969696; font-size: 10px;")
         pp_hdr.addWidget(lbl_pp)

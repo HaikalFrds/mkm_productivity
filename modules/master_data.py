@@ -13,7 +13,8 @@ from modules.db_laporan import (
     get_all_users, tambah_user, reset_password_user, hapus_user,
     get_all_groups, get_all_kategori, tambah_kategori, edit_kategori, hapus_kategori,
     get_all_shifts, tambah_shift, edit_shift, hapus_shift,
-    update_shift_working_hour,
+    update_shift_working_hour, ensure_shift_columns,
+    get_models_by_section, tambah_shop_model, edit_shop_model, hapus_shop_model,
 )
 
 
@@ -110,6 +111,8 @@ _COMBO = """
 """
 _DLG_BG    = "background-color: #252525; color: #ffffff;"
 _LBL_FIELD = "color: #969696; font-size: 11px;"
+_CARD_HDR  = ("color: #ffffff; font-size: 12px; font-weight: bold;"
+              " border-left: 3px solid #da291c; padding-left: 8px;")
 _TIME_EDIT_STYLE = """
     QTimeEdit {
         background-color: #1e1e1e; border: 1px solid #303030;
@@ -125,13 +128,13 @@ _TIME_EDIT_STYLE = """
 class _SectionDialog(QDialog):
     def __init__(self, parent, nama: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("Tambah Section" if not nama else "Edit Section")
+        self.setWindowTitle("Tambah Shop" if not nama else "Edit Shop")
         self.setFixedWidth(340)
         self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
-        lbl = QLabel("Nama Section"); lbl.setStyleSheet(_LBL_FIELD)
+        lbl = QLabel("Nama Shop"); lbl.setStyleSheet(_LBL_FIELD)
         lay.addWidget(lbl)
         self.input_nama = QLineEdit(nama)
         self.input_nama.setPlaceholderText("Contoh: CAM SHAFT")
@@ -249,11 +252,60 @@ class _KategoriDialog(QDialog):
         return self.input_name.text().strip(), self.combo_group.currentData()
 
 
+class _ModelDialog(QDialog):
+    """Dialog untuk tambah/edit model dan working hour-nya."""
+    def __init__(self, parent, nama: str = "", working_hour: float = 0.0):
+        super().__init__(parent)
+        is_edit = bool(nama)
+        self.setWindowTitle("Edit Model" if is_edit else "Tambah Model")
+        self.setFixedWidth(340)
+        self.setStyleSheet(_DLG_BG)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 20, 20, 16)
+        lay.setSpacing(10)
+
+        def _f(label, widget):
+            l = QLabel(label); l.setStyleSheet(_LBL_FIELD)
+            lay.addWidget(l); lay.addWidget(widget)
+
+        self.input_nama = QLineEdit(nama)
+        self.input_nama.setPlaceholderText("Contoh: 4G15")
+        self.input_nama.setStyleSheet(_INPUT)
+        _f("Nama Model", self.input_nama)
+
+        self.input_wh = QDoubleSpinBox()
+        self.input_wh.setRange(0.0, 100.0)
+        self.input_wh.setDecimals(6)
+        self.input_wh.setSingleStep(0.001)
+        self.input_wh.setValue(working_hour)
+        self.input_wh.setSuffix(" H/unit")
+        self.input_wh.setMinimumHeight(32)
+        self.input_wh.setStyleSheet(_TIME_EDIT_STYLE)
+        _f("Working Hour (H/unit)", self.input_wh)
+
+        lbl_hint = QLabel("Contoh: Qty 10 unit × 0.5 H/unit = 5.0 H")
+        lbl_hint.setStyleSheet("color: #555555; font-size: 10px;")
+        lay.addWidget(lbl_hint)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.button(QDialogButtonBox.Ok).setText("Simpan")
+        btns.button(QDialogButtonBox.Cancel).setText("Batal")
+        btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
+
+    def get_data(self) -> dict:
+        return {
+            "nama":         self.input_nama.text().strip(),
+            "working_hour": self.input_wh.value(),
+        }
+
+
 class _ShiftDialog(QDialog):
-    def __init__(self, parent, name="", start="07:00", end="15:00", total=8.0):
+    def __init__(self, parent, name="", start="07:00", end="15:00", total=8.0,
+                 preparation_min=15.0, sholat_min=10.0):
         super().__init__(parent)
         self.setWindowTitle("Tambah Shift" if not name else "Edit Shift")
-        self.setFixedWidth(360)
+        self.setFixedWidth(380)
         self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
@@ -267,12 +319,15 @@ class _ShiftDialog(QDialog):
         self.input_name.setPlaceholderText("Nama shift")
         self.input_name.setStyleSheet(_INPUT)
         _f("Nama Shift", self.input_name)
+
         self.time_start = QTimeEdit(QTime.fromString(start, "HH:mm"))
         self.time_start.setDisplayFormat("HH:mm"); self.time_start.setStyleSheet(_TIME_EDIT_STYLE)
         _f("Jam Mulai", self.time_start)
+
         self.time_end = QTimeEdit(QTime.fromString(end, "HH:mm"))
         self.time_end.setDisplayFormat("HH:mm"); self.time_end.setStyleSheet(_TIME_EDIT_STYLE)
         _f("Jam Selesai", self.time_end)
+
         self.input_total = QDoubleSpinBox()
         self.input_total.setRange(0.0, 24.0)
         self.input_total.setSingleStep(0.25)
@@ -282,18 +337,67 @@ class _ShiftDialog(QDialog):
         self.input_total.setStyleSheet(_TIME_EDIT_STYLE)
         _f("Working Hour (H)", self.input_total)
 
+        # ── Waktu non-produktif ──────────────────────────────────────────────
+        lbl_sep = QLabel("─── Waktu Non-Produktif (menit) ───")
+        lbl_sep.setStyleSheet("color: #666666; font-size: 10px;")
+        lay.addWidget(lbl_sep)
+
+        row_prep = QHBoxLayout()
+        lbl_prep = QLabel("Preparation (Meeting + Prep + Cleaning)")
+        lbl_prep.setStyleSheet(_LBL_FIELD)
+        self.input_prep = QDoubleSpinBox()
+        self.input_prep.setRange(0.0, 60.0)
+        self.input_prep.setSingleStep(1.0)
+        self.input_prep.setDecimals(1)
+        self.input_prep.setValue(preparation_min)
+        self.input_prep.setSuffix(" menit")
+        self.input_prep.setMinimumHeight(32)
+        self.input_prep.setStyleSheet(_TIME_EDIT_STYLE)
+        lay.addWidget(lbl_prep)
+        lay.addWidget(self.input_prep)
+
+        lbl_sholat = QLabel("Sholat / Istirahat Ibadah")
+        lbl_sholat.setStyleSheet(_LBL_FIELD)
+        self.input_sholat = QDoubleSpinBox()
+        self.input_sholat.setRange(0.0, 60.0)
+        self.input_sholat.setSingleStep(1.0)
+        self.input_sholat.setDecimals(1)
+        self.input_sholat.setValue(sholat_min)
+        self.input_sholat.setSuffix(" menit")
+        self.input_sholat.setMinimumHeight(32)
+        self.input_sholat.setStyleSheet(_TIME_EDIT_STYLE)
+        lay.addWidget(lbl_sholat)
+        lay.addWidget(self.input_sholat)
+
+        # preview
+        self._lbl_preview = QLabel()
+        self._lbl_preview.setStyleSheet("color: #666666; font-size: 10px;")
+        lay.addWidget(self._lbl_preview)
+        self.input_prep.valueChanged.connect(self._update_preview)
+        self.input_sholat.valueChanged.connect(self._update_preview)
+        self._update_preview()
+
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Simpan")
         btns.button(QDialogButtonBox.Cancel).setText("Batal")
         btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
         lay.addWidget(btns)
 
+    def _update_preview(self):
+        p = self.input_prep.value()
+        s = self.input_sholat.value()
+        self._lbl_preview.setText(
+            f"Preparation = {p/60:.4f} H  |  Sholat = {s/60:.4f} H"
+        )
+
     def get_data(self) -> dict:
         return {
-            "name":        self.input_name.text().strip(),
-            "start_time":  self.time_start.time().toString("HH:mm"),
-            "end_time":    self.time_end.time().toString("HH:mm"),
-            "total_hours": self.input_total.value(),
+            "name":            self.input_name.text().strip(),
+            "start_time":      self.time_start.time().toString("HH:mm"),
+            "end_time":        self.time_end.time().toString("HH:mm"),
+            "total_hours":     self.input_total.value(),
+            "preparation_min": self.input_prep.value(),
+            "sholat_min":      self.input_sholat.value(),
         }
 
 
@@ -308,6 +412,7 @@ class MasterDataWidget(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._load_sections()
+        self._load_shop_model_sections()
         self._load_users()
         self._load_kategori()
         self._load_shifts()
@@ -343,6 +448,8 @@ class MasterDataWidget(QWidget):
 
         lay.addWidget(self._build_section_card())
         lay.addWidget(_divider())
+        lay.addWidget(self._build_shop_model_card())
+        lay.addWidget(_divider())
         lay.addWidget(self._build_kategori_card())
         lay.addWidget(_divider())
         lay.addWidget(self._build_shift_card())
@@ -359,18 +466,18 @@ class MasterDataWidget(QWidget):
         lay.setSpacing(10)
 
         hdr = QHBoxLayout()
-        lbl = QLabel("Section")
-        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        lbl = QLabel("Shop")
+        lbl.setStyleSheet(_CARD_HDR)
         hdr.addWidget(lbl); hdr.addStretch()
-        btn = QPushButton("+ Tambah Section")
-        btn.setMinimumSize(140, 30); btn.setStyleSheet(_BTN_ADD)
+        btn = QPushButton("+ Tambah Shop")
+        btn.setMinimumSize(130, 30); btn.setStyleSheet(_BTN_ADD)
         btn.clicked.connect(self._tambah_section)
         hdr.addWidget(btn)
         lay.addLayout(hdr)
 
         self.tabel_section = QTableWidget()
         self.tabel_section.setColumnCount(3)
-        self.tabel_section.setHorizontalHeaderLabels(["No", "Nama Section", "Aksi"])
+        self.tabel_section.setHorizontalHeaderLabels(["No", "Nama Shop", "Aksi"])
         hh = self.tabel_section.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.Interactive)
         hh.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -384,6 +491,54 @@ class MasterDataWidget(QWidget):
         lay.addWidget(self.tabel_section)
         return card
 
+    def _build_shop_model_card(self) -> QFrame:
+        card = QFrame(); card.setStyleSheet(_CARD)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(10)
+
+        # ── Header ──────────────────────────────────────────────────────────────
+        hdr = QHBoxLayout()
+        lbl = QLabel("Model per Shop")
+        lbl.setStyleSheet(_CARD_HDR)
+        hdr.addWidget(lbl)
+        hdr.addStretch()
+        btn_add = QPushButton("+ Tambah Model")
+        btn_add.setMinimumSize(130, 30); btn_add.setStyleSheet(_BTN_ADD)
+        btn_add.clicked.connect(self._tambah_shop_model)
+        hdr.addWidget(btn_add)
+        lay.addLayout(hdr)
+
+        # ── Shop selector ────────────────────────────────────────────────────────
+        sel_row = QHBoxLayout()
+        lbl_shop = QLabel("Shop :"); lbl_shop.setStyleSheet(_LBL_FIELD)
+        self._combo_shop_model = QComboBox()
+        self._combo_shop_model.setMinimumHeight(30)
+        self._combo_shop_model.setStyleSheet(_COMBO)
+        self._combo_shop_model.currentIndexChanged.connect(self._on_shop_model_changed)
+        sel_row.addWidget(lbl_shop)
+        sel_row.addWidget(self._combo_shop_model, 1)
+        sel_row.addStretch()
+        lay.addLayout(sel_row)
+
+        # ── Tabel model ──────────────────────────────────────────────────────────
+        self.tabel_model = QTableWidget()
+        self.tabel_model.setColumnCount(4)
+        self.tabel_model.setHorizontalHeaderLabels(["No", "Model", "H/unit", "Aksi"])
+        hh = self.tabel_model.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Interactive)
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tabel_model.verticalHeader().setVisible(False)
+        self.tabel_model.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tabel_model.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_model.setStyleSheet(_TABLE)
+        self.tabel_model.setColumnWidth(0, 45)
+        self.tabel_model.setColumnWidth(2, 90)
+        self.tabel_model.setColumnWidth(3, 145)
+        self.tabel_model.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        lay.addWidget(self.tabel_model)
+        return card
+
     def _build_kategori_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
@@ -392,7 +547,7 @@ class MasterDataWidget(QWidget):
 
         hdr = QHBoxLayout()
         lbl = QLabel("Kategori Masalah")
-        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        lbl.setStyleSheet(_CARD_HDR)
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Kategori")
         btn.setMinimumSize(145, 30); btn.setStyleSheet(_BTN_ADD)
@@ -425,7 +580,7 @@ class MasterDataWidget(QWidget):
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shift")
-        lbl.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        lbl.setStyleSheet(_CARD_HDR)
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Shift")
         btn.setMinimumSize(120, 30); btn.setStyleSheet(_BTN_ADD)
@@ -434,9 +589,10 @@ class MasterDataWidget(QWidget):
         lay.addLayout(hdr)
 
         self.tabel_shift = QTableWidget()
-        self.tabel_shift.setColumnCount(6)
+        self.tabel_shift.setColumnCount(8)
         self.tabel_shift.setHorizontalHeaderLabels(
-            ["No", "Nama Shift", "Mulai", "Selesai", "Working Hour (H)", "Aksi"]
+            ["No", "Nama Shift", "Mulai", "Selesai", "Working Hour (H)",
+             "Preparation (mnt)", "Sholat (mnt)", "Aksi"]
         )
         hh = self.tabel_shift.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.Interactive)
@@ -445,11 +601,13 @@ class MasterDataWidget(QWidget):
         self.tabel_shift.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_shift.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_shift.setStyleSheet(_TABLE)
-        self.tabel_shift.setColumnWidth(0, 45)
-        self.tabel_shift.setColumnWidth(2, 80)
-        self.tabel_shift.setColumnWidth(3, 80)
-        self.tabel_shift.setColumnWidth(4, 80)
-        self.tabel_shift.setColumnWidth(5, 145)
+        self.tabel_shift.setColumnWidth(0, 40)
+        self.tabel_shift.setColumnWidth(2, 70)
+        self.tabel_shift.setColumnWidth(3, 70)
+        self.tabel_shift.setColumnWidth(4, 90)
+        self.tabel_shift.setColumnWidth(5, 100)
+        self.tabel_shift.setColumnWidth(6, 85)
+        self.tabel_shift.setColumnWidth(7, 145)
         self.tabel_shift.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_shift)
         return card
@@ -466,7 +624,7 @@ class MasterDataWidget(QWidget):
         card_a = QFrame(); card_a.setStyleSheet(_CARD)
         al = QHBoxLayout(card_a); al.setContentsMargins(16, 12, 16, 12)
         lbl_h = QLabel("Daftar User")
-        lbl_h.setStyleSheet("color: white; font-size: 12px; font-weight: bold;")
+        lbl_h.setStyleSheet(_CARD_HDR)
         al.addWidget(lbl_h); al.addStretch()
         btn_add = QPushButton("+ Tambah User")
         btn_add.setMinimumSize(120, 32); btn_add.setStyleSheet(_BTN_ADD)
@@ -527,7 +685,7 @@ class MasterDataWidget(QWidget):
             return
         nama = dlg.get_nama()
         if not nama:
-            QMessageBox.warning(self, "Validasi", "Nama section tidak boleh kosong.")
+            QMessageBox.warning(self, "Validasi", "Nama shop tidak boleh kosong.")
             return
         ok, msg = tambah_section(nama)
         if ok:
@@ -542,7 +700,7 @@ class MasterDataWidget(QWidget):
             return
         nama = dlg.get_nama()
         if not nama:
-            QMessageBox.warning(self, "Validasi", "Nama section tidak boleh kosong.")
+            QMessageBox.warning(self, "Validasi", "Nama shop tidak boleh kosong.")
             return
         ok, msg = edit_section(sid, nama)
         if ok:
@@ -553,7 +711,7 @@ class MasterDataWidget(QWidget):
 
     def _hapus_section(self, sid: int, nama: str):
         ans = QMessageBox.question(
-            self, "Konfirmasi Hapus", f"Hapus section '{nama}'?",
+            self, "Konfirmasi Hapus", f"Hapus shop '{nama}'?",
             QMessageBox.Yes | QMessageBox.No,
         )
         if ans != QMessageBox.Yes:
@@ -562,6 +720,102 @@ class MasterDataWidget(QWidget):
         if ok:
             self._load_sections()
             QMessageBox.information(self, "Berhasil", msg)
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    # ── Shop Model CRUD ───────────────────────────────────────────────────────
+
+    def _load_shop_model_sections(self):
+        try:
+            rows = get_all_sections()
+        except Exception:
+            return
+        prev = self._combo_shop_model.currentData()
+        self._combo_shop_model.blockSignals(True)
+        self._combo_shop_model.clear()
+        for sid, sname in rows:
+            self._combo_shop_model.addItem(sname, sid)
+        if prev is not None:
+            idx = self._combo_shop_model.findData(prev)
+            if idx >= 0:
+                self._combo_shop_model.setCurrentIndex(idx)
+        self._combo_shop_model.blockSignals(False)
+        self._on_shop_model_changed()
+
+    def _on_shop_model_changed(self):
+        section_id = self._combo_shop_model.currentData()
+        if section_id is None:
+            self.tabel_model.setRowCount(0)
+            _fit_table(self.tabel_model)
+            return
+        try:
+            models = get_models_by_section(section_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat model: {e}")
+            return
+        self.tabel_model.setRowCount(0)
+        for i, m in enumerate(models):
+            self.tabel_model.insertRow(i)
+            self.tabel_model.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
+            self.tabel_model.setItem(i, 1, _item(m["model_name"]))
+            self.tabel_model.setItem(i, 2, _item(f"{m['working_hour']:.6f}", Qt.AlignCenter))
+            self.tabel_model.setCellWidget(i, 3, self._aksi_model(m))
+            self.tabel_model.setRowHeight(i, 38)
+        _fit_table(self.tabel_model)
+
+    def _aksi_model(self, m: dict) -> QWidget:
+        w = QWidget(); w.setStyleSheet("background: transparent;")
+        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
+        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e.clicked.connect(lambda _, mm=m: self._edit_shop_model(mm))
+        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d.clicked.connect(lambda _, mm=m: self._hapus_shop_model(mm["id"], mm["model_name"]))
+        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        return w
+
+    def _tambah_shop_model(self):
+        section_id = self._combo_shop_model.currentData()
+        if section_id is None:
+            QMessageBox.warning(self, "Pilih Shop", "Pilih shop terlebih dahulu.")
+            return
+        dlg = _ModelDialog(self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        d = dlg.get_data()
+        if not d["nama"]:
+            QMessageBox.warning(self, "Validasi", "Nama model tidak boleh kosong.")
+            return
+        ok, msg = tambah_shop_model(section_id, d["nama"], d["working_hour"])
+        if ok:
+            self._on_shop_model_changed()
+            QMessageBox.information(self, "Berhasil", msg)
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    def _edit_shop_model(self, m: dict):
+        dlg = _ModelDialog(self, m["model_name"], m["working_hour"])
+        if dlg.exec() != QDialog.Accepted:
+            return
+        d = dlg.get_data()
+        if not d["nama"]:
+            QMessageBox.warning(self, "Validasi", "Nama model tidak boleh kosong.")
+            return
+        ok, msg = edit_shop_model(m["id"], d["nama"], d["working_hour"])
+        if ok:
+            self._on_shop_model_changed()
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    def _hapus_shop_model(self, model_id: int, model_name: str):
+        ans = QMessageBox.question(
+            self, "Konfirmasi Hapus", f"Hapus model '{model_name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ans != QMessageBox.Yes:
+            return
+        ok, msg = hapus_shop_model(model_id)
+        if ok:
+            self._on_shop_model_changed()
         else:
             QMessageBox.warning(self, "Gagal", msg)
 
@@ -741,7 +995,9 @@ class MasterDataWidget(QWidget):
             self.tabel_shift.setItem(i, 2, _item(s["start_time"], Qt.AlignCenter))
             self.tabel_shift.setItem(i, 3, _item(s["end_time"],   Qt.AlignCenter))
             self.tabel_shift.setItem(i, 4, _item(f"{s['total_hours']:.1f}", Qt.AlignCenter))
-            self.tabel_shift.setCellWidget(i, 5, self._aksi_shift(s))
+            self.tabel_shift.setItem(i, 5, _item(f"{s['preparation_min']:.0f}", Qt.AlignCenter))
+            self.tabel_shift.setItem(i, 6, _item(f"{s['sholat_min']:.0f}", Qt.AlignCenter))
+            self.tabel_shift.setCellWidget(i, 7, self._aksi_shift(s))
             self.tabel_shift.setRowHeight(i, 38)
         _fit_table(self.tabel_shift)
 
@@ -763,7 +1019,10 @@ class MasterDataWidget(QWidget):
         if not d["name"]:
             QMessageBox.warning(self, "Validasi", "Nama shift tidak boleh kosong.")
             return
-        ok, msg = tambah_shift(d["name"], d["start_time"], d["end_time"], d["total_hours"])
+        ok, msg = tambah_shift(
+            d["name"], d["start_time"], d["end_time"], d["total_hours"],
+            d["preparation_min"], d["sholat_min"],
+        )
         if ok:
             self._load_shifts()
             QMessageBox.information(self, "Berhasil", msg)
@@ -771,14 +1030,20 @@ class MasterDataWidget(QWidget):
             QMessageBox.warning(self, "Gagal", msg)
 
     def _edit_shift(self, s: dict):
-        dlg = _ShiftDialog(self, s["name"], s["start_time"], s["end_time"], s["total_hours"])
+        dlg = _ShiftDialog(
+            self, s["name"], s["start_time"], s["end_time"], s["total_hours"],
+            s.get("preparation_min", 15.0), s.get("sholat_min", 10.0),
+        )
         if dlg.exec() != QDialog.Accepted:
             return
         d = dlg.get_data()
         if not d["name"]:
             QMessageBox.warning(self, "Validasi", "Nama shift tidak boleh kosong.")
             return
-        ok, msg = edit_shift(s["id"], d["name"], d["start_time"], d["end_time"], d["total_hours"])
+        ok, msg = edit_shift(
+            s["id"], d["name"], d["start_time"], d["end_time"], d["total_hours"],
+            d["preparation_min"], d["sholat_min"],
+        )
         if ok:
             self._load_shifts()
             QMessageBox.information(self, "Berhasil", msg)

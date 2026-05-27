@@ -305,7 +305,7 @@ def simpan_laporan_harian(
         cur.execute("SELECT id FROM section WHERE name = %s LIMIT 1", (header["section"],))
         section_row = cur.fetchone()
         if not section_row:
-            return False, f"Section '{header['section']}' tidak ditemukan di database"
+            return False, f"Shop '{header['section']}' tidak ditemukan di database"
         section_id = section_row[0]
 
 
@@ -447,14 +447,14 @@ def tambah_section(nama: str) -> tuple[bool, str]:
         cur = conn.cursor()
         cur.execute("SELECT id FROM section WHERE LOWER(name) = LOWER(%s) LIMIT 1", (nama,))
         if cur.fetchone():
-            return False, f"Section '{nama}' sudah ada."
+            return False, f"Shop '{nama}' sudah ada."
         cur.execute("INSERT INTO section (name) VALUES (%s)", (nama,))
         conn.commit()
         cur.close()
-        return True, f"Section '{nama}' berhasil ditambahkan."
+        return True, f"Shop '{nama}' berhasil ditambahkan."
     except Exception as e:
         conn.rollback()
-        return False, f"Gagal menambah section: {e}"
+        return False, f"Gagal menambah shop: {e}"
     finally:
         conn.close()
 
@@ -468,14 +468,14 @@ def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
             (nama, section_id),
         )
         if cur.fetchone():
-            return False, f"Section '{nama}' sudah ada."
+            return False, f"Shop '{nama}' sudah ada."
         cur.execute("UPDATE section SET name = %s WHERE id = %s", (nama, section_id))
         conn.commit()
         cur.close()
-        return True, f"Section berhasil diubah menjadi '{nama}'."
+        return True, f"Shop berhasil diubah menjadi '{nama}'."
     except Exception as e:
         conn.rollback()
-        return False, f"Gagal mengubah section: {e}"
+        return False, f"Gagal mengubah shop: {e}"
     finally:
         conn.close()
 
@@ -487,14 +487,14 @@ def hapus_section(section_id: int) -> tuple[bool, str]:
         cur.execute("SELECT COUNT(*) FROM daily_report WHERE section_id = %s", (section_id,))
         count = cur.fetchone()[0]
         if count > 0:
-            return False, f"Section tidak bisa dihapus — digunakan oleh {count} laporan."
+            return False, f"Shop tidak bisa dihapus — digunakan oleh {count} laporan."
         cur.execute("DELETE FROM section WHERE id = %s", (section_id,))
         conn.commit()
         cur.close()
-        return True, "Section berhasil dihapus."
+        return True, "Shop berhasil dihapus."
     except Exception as e:
         conn.rollback()
-        return False, f"Gagal menghapus section: {e}"
+        return False, f"Gagal menghapus shop: {e}"
     finally:
         conn.close()
 
@@ -687,18 +687,46 @@ def hapus_kategori(cat_id: int) -> tuple[bool, str]:
 # MASTER DATA — SHIFT
 # =============================================================================
 
-def get_all_shifts() -> list:
+def ensure_shift_columns():
+    """Tambah kolom baru ke tabel shift jika belum ada."""
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, name, start_time, end_time, total_hours FROM shift ORDER BY id")
+        cur.execute("""
+            ALTER TABLE shift
+                ADD COLUMN IF NOT EXISTS preparation_min FLOAT DEFAULT 15,
+                ADD COLUMN IF NOT EXISTS sholat_min      FLOAT DEFAULT 10
+        """)
+        conn.commit()
+        cur.close()
+    except Exception:
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def get_all_shifts() -> list:
+    ensure_shift_columns()
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, name, start_time, end_time, total_hours,
+                   COALESCE(preparation_min, 15), COALESCE(sholat_min, 10)
+            FROM shift ORDER BY id
+        """)
         rows = cur.fetchall()
         cur.close()
         return [
-            {"id": r[0], "name": r[1],
-             "start_time": str(r[2])[:5] if r[2] else "",
-             "end_time":   str(r[3])[:5] if r[3] else "",
-             "total_hours": float(r[4]) if r[4] is not None else 0.0}
+            {
+                "id":              r[0],
+                "name":            r[1],
+                "start_time":      str(r[2])[:5] if r[2] else "",
+                "end_time":        str(r[3])[:5] if r[3] else "",
+                "total_hours":     float(r[4]) if r[4] is not None else 0.0,
+                "preparation_min": float(r[5]) if r[5] is not None else 15.0,
+                "sholat_min":      float(r[6]) if r[6] is not None else 10.0,
+            }
             for r in rows
         ]
     except Exception:
@@ -722,7 +750,11 @@ def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool,
         conn.close()
 
 
-def tambah_shift(name: str, start_time: str, end_time: str, total_hours: float) -> tuple[bool, str]:
+def tambah_shift(
+    name: str, start_time: str, end_time: str,
+    total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
+) -> tuple[bool, str]:
+    ensure_shift_columns()
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -730,8 +762,9 @@ def tambah_shift(name: str, start_time: str, end_time: str, total_hours: float) 
         if cur.fetchone():
             return False, f"Shift '{name}' sudah ada."
         cur.execute(
-            "INSERT INTO shift (name, start_time, end_time, total_hours) VALUES (%s, %s, %s, %s)",
-            (name, start_time, end_time, total_hours),
+            """INSERT INTO shift (name, start_time, end_time, total_hours, preparation_min, sholat_min)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (name, start_time, end_time, total_hours, preparation_min, sholat_min),
         )
         conn.commit()
         cur.close()
@@ -743,7 +776,11 @@ def tambah_shift(name: str, start_time: str, end_time: str, total_hours: float) 
         conn.close()
 
 
-def edit_shift(shift_id: int, name: str, start_time: str, end_time: str, total_hours: float) -> tuple[bool, str]:
+def edit_shift(
+    shift_id: int, name: str, start_time: str, end_time: str,
+    total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
+) -> tuple[bool, str]:
+    ensure_shift_columns()
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -754,8 +791,9 @@ def edit_shift(shift_id: int, name: str, start_time: str, end_time: str, total_h
         if cur.fetchone():
             return False, f"Shift '{name}' sudah ada."
         cur.execute(
-            "UPDATE shift SET name=%s, start_time=%s, end_time=%s, total_hours=%s WHERE id=%s",
-            (name, start_time, end_time, total_hours, shift_id),
+            """UPDATE shift SET name=%s, start_time=%s, end_time=%s,
+               total_hours=%s, preparation_min=%s, sholat_min=%s WHERE id=%s""",
+            (name, start_time, end_time, total_hours, preparation_min, sholat_min, shift_id),
         )
         conn.commit()
         cur.close()
@@ -782,5 +820,102 @@ def hapus_shift(shift_id: int) -> tuple[bool, str]:
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menghapus shift: {e}"
+    finally:
+        conn.close()
+
+
+# =============================================================================
+# MASTER DATA — SHOP MODEL
+# =============================================================================
+
+def _ensure_shop_model_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS shop_model (
+            id           SERIAL PRIMARY KEY,
+            section_id   INTEGER NOT NULL REFERENCES section(id) ON DELETE CASCADE,
+            model_name   VARCHAR(100) NOT NULL,
+            working_hour FLOAT DEFAULT 0,
+            UNIQUE(section_id, model_name)
+        )
+    """)
+    cur.execute("""
+        ALTER TABLE shop_model
+            ADD COLUMN IF NOT EXISTS working_hour FLOAT DEFAULT 0
+    """)
+
+
+def get_models_by_section(section_id: int) -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_shop_model_table(cur)
+        conn.commit()
+        cur.execute(
+            "SELECT id, model_name, working_hour FROM shop_model WHERE section_id = %s ORDER BY model_name",
+            (section_id,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        return [{"id": r[0], "model_name": r[1], "working_hour": float(r[2] or 0)} for r in rows]
+    except Exception:
+        raise
+    finally:
+        conn.close()
+
+
+def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.0) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_shop_model_table(cur)
+        cur.execute(
+            "SELECT id FROM shop_model WHERE section_id = %s AND LOWER(model_name) = LOWER(%s) LIMIT 1",
+            (section_id, model_name),
+        )
+        if cur.fetchone():
+            return False, f"Model '{model_name}' sudah ada di shop ini."
+        cur.execute(
+            "INSERT INTO shop_model (section_id, model_name, working_hour) VALUES (%s, %s, %s)",
+            (section_id, model_name, working_hour),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Model '{model_name}' berhasil ditambahkan."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menambah model: {e}"
+    finally:
+        conn.close()
+
+
+def edit_shop_model(model_id: int, model_name: str, working_hour: float) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE shop_model SET model_name = %s, working_hour = %s WHERE id = %s",
+            (model_name, working_hour, model_id),
+        )
+        conn.commit()
+        cur.close()
+        return True, f"Model '{model_name}' berhasil diubah."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal mengubah model: {e}"
+    finally:
+        conn.close()
+
+
+def hapus_shop_model(model_id: int) -> tuple[bool, str]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM shop_model WHERE id = %s", (model_id,))
+        conn.commit()
+        cur.close()
+        return True, "Model berhasil dihapus."
+    except Exception as e:
+        conn.rollback()
+        return False, f"Gagal menghapus model: {e}"
     finally:
         conn.close()

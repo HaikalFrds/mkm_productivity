@@ -10,14 +10,14 @@ from PySide6.QtGui import QColor, QFont
 
 
 class StatCard(QFrame):
-    def __init__(self, title, value, subtitle="", color="#E60012"):
+    def __init__(self, title, value, subtitle="", color="#da291c"):
         super().__init__()
         self.setObjectName("statCard")
         self.setMinimumHeight(100)
         self.setStyleSheet(f"""
             #statCard {{
-                background-color: rgb(40, 44, 52);
-                border-radius: 10px;
+                background-color: #252525;
+                border-radius: 0px;
                 border-left: 4px solid {color};
             }}
         """)
@@ -27,13 +27,13 @@ class StatCard(QFrame):
         layout.setSpacing(4)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: rgb(150, 150, 150); font-size: 11px;")
+        title_label.setStyleSheet("color: #969696; font-size: 11px;")
 
         self.value_label = QLabel(str(value))
-        self.value_label.setStyleSheet("color: #ffffff; font-size: 24px; font-weight: bold;")
+        self.value_label.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: bold;")
 
         subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: rgb(130, 130, 130); font-size: 10px;")
+        subtitle_label.setStyleSheet("color: #666666; font-size: 10px;")
 
         layout.addWidget(title_label)
         layout.addWidget(self.value_label)
@@ -54,7 +54,7 @@ class DashboardWidget(QWidget):
         main_layout.setSpacing(15)
 
         header = QLabel("Dashboard Produktivitas")
-        header.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: bold;")
+        header.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; padding: 4px 0;")
         main_layout.addWidget(header)
 
         # Row 1: Stat Cards
@@ -63,7 +63,7 @@ class DashboardWidget(QWidget):
 
         self.card_laporan = StatCard(
             "Total Laporan Hari Ini", "0",
-            "laporan harian", "#E60012"
+            "laporan harian", "#da291c"
         )
         self.card_losstime = StatCard(
             "Total Loss Time", "0.00 H",
@@ -84,65 +84,58 @@ class DashboardWidget(QWidget):
         content_layout.setSpacing(12)
 
         chart_frame = QFrame()
-        chart_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgb(40, 44, 52);
-                border-radius: 10px;
-            }
-        """)
+        chart_frame.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         chart_layout = QVBoxLayout(chart_frame)
         chart_layout.setContentsMargins(12, 12, 12, 12)
 
         chart_title = QLabel("Loss Time per Kategori (Bulan Ini)")
-        chart_title.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: bold;")
+        chart_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
         chart_layout.addWidget(chart_title)
 
         self.chart = self.create_chart()
         chart_layout.addWidget(self.chart)
 
         table_frame = QFrame()
-        table_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgb(40, 44, 52);
-                border-radius: 10px;
-            }
-        """)
+        table_frame.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
         table_layout = QVBoxLayout(table_frame)
         table_layout.setContentsMargins(12, 12, 12, 12)
 
         table_title = QLabel("Laporan Terbaru")
-        table_title.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 8px;")
+        table_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold; margin-bottom: 4px;")
         table_layout.addWidget(table_title)
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Tanggal", "Section", "Loss Time", "Status"])
+        self.table.setHorizontalHeaderLabels(["Tanggal", "Shop", "Loss Time", "Status"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setStyleSheet("""
             QTableWidget {
-                background-color: transparent;
-                border: none;
-                gridline-color: rgb(55, 60, 70);
+                background-color: #1e1e1e;
+                border: 1px solid #303030;
+                gridline-color: #303030;
             }
             QTableWidget::item {
-                color: rgb(200, 200, 200);
-                padding: 6px;
-                background-color: rgb(45, 49, 58);
+                color: #ffffff;
+                padding: 4px 8px;
+                background-color: #252525;
+                border-bottom: 1px solid #303030;
             }
             QTableWidget::item:selected {
-                background-color: rgb(100, 110, 125);
-                color: white;
+                background-color: #303030;
+                color: #ffffff;
             }
             QHeaderView::section {
-                background-color: rgb(33, 37, 43);
-                color: rgb(150, 150, 150);
+                background-color: #111111;
+                color: #969696;
                 border: none;
-                border-bottom: 1px solid rgb(55, 60, 70);
-                padding: 6px;
+                border-bottom: 1px solid #303030;
+                border-right: 1px solid #303030;
+                padding: 5px;
                 font-weight: bold;
+                font-size: 10px;
             }
         """)
         self.load_table_data()
@@ -153,8 +146,8 @@ class DashboardWidget(QWidget):
         main_layout.addLayout(content_layout)
 
     def create_chart(self):
-        pg.setConfigOption('background', (40, 44, 52))
-        pg.setConfigOption('foreground', (200, 200, 200))
+        pg.setConfigOption('background', (37, 37, 37))
+        pg.setConfigOption('foreground', (150, 150, 150))
 
         plot = pg.PlotWidget()
         plot.setMinimumHeight(280)
@@ -201,9 +194,9 @@ class DashboardWidget(QWidget):
         ]
 
         self.table.setRowCount(len(dummy_data))
-        for row, (tanggal, section, loss, status) in enumerate(dummy_data):
+        for row, (tanggal, shop, loss, status) in enumerate(dummy_data):
             self.table.setItem(row, 0, QTableWidgetItem(tanggal))
-            self.table.setItem(row, 1, QTableWidgetItem(section))
+            self.table.setItem(row, 1, QTableWidgetItem(shop))
             self.table.setItem(row, 2, QTableWidgetItem(loss))
 
             status_item = QTableWidgetItem(status)

@@ -7,12 +7,12 @@ from PySide6.QtWidgets import (
     QMessageBox, QDialog, QDialogButtonBox, QAbstractItemView,
     QTabWidget, QLineEdit,
 )
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QColor
 
 from modules.db_auth import get_connection
 from modules.db_laporan import (
-    get_all_sections, get_all_shifts, get_riwayat_laporan,
+    get_all_sections, get_all_shifts,
     get_detail_laporan, hapus_laporan, get_monthly_productivity,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
@@ -20,12 +20,14 @@ from modules.export_excel import export_loss_time_record, export_inhouse_ng_pend
 
 # ── Shared styles ─────────────────────────────────────────────────────────────
 
+# (prev: #1e1e1e bg, #303030 border, #252525 card, #969696 text-sec)
+
 _DATE_STYLE = """
     QDateEdit {
-        background-color: #1e1e1e;
-        border: 1px solid #303030;
-        border-radius: 2px; padding-left: 8px;
-        color: #ffffff; font-size: 11px;
+        background-color: #2a2a2a;
+        border: 1px solid #2e2e2e;
+        border-radius: 0px; padding-left: 8px;
+        color: #f0f0f0; font-size: 11px;
     }
     QDateEdit:focus { border: 1px solid #da291c; }
     QDateEdit::drop-down {
@@ -36,90 +38,93 @@ _DATE_STYLE = """
 
 _COMBO_STYLE = """
     QComboBox {
-        background-color: #1e1e1e;
-        border: 1px solid #303030;
-        border-radius: 2px; padding-left: 8px;
-        color: #ffffff; font-size: 11px;
+        background-color: #2a2a2a;
+        border: 1px solid #2e2e2e;
+        border-radius: 0px; padding-left: 8px;
+        color: #f0f0f0; font-size: 11px;
     }
     QComboBox:focus { border: 1px solid #da291c; }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: #252525; color: #ffffff;
-        selection-background-color: #303030;
-        border: 1px solid #303030;
+        background-color: #1a1a1a; color: #f0f0f0;
+        selection-background-color: #2a2a2a;
+        border: 1px solid #2e2e2e;
     }
 """
 
 _TABLE_STYLE = """
     QTableWidget {
-        background-color: #1e1e1e;
-        border: 1px solid #303030; border-radius: 0px;
-        gridline-color: #303030;
+        background-color: #1a1a1a;
+        border: 1px solid #2e2e2e; border-radius: 0px;
+        gridline-color: #2e2e2e;
     }
     QTableWidget::item {
-        color: #ffffff; padding: 4px 8px;
-        background-color: #252525;
-        border-bottom: 1px solid #303030;
+        color: #f0f0f0; padding: 4px 8px;
+        background-color: #222222;
+        border-bottom: 1px solid #2e2e2e;
     }
-    QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
+    QTableWidget::item:alternate { background-color: #1e1e1e; }
+    QTableWidget::item:selected { background-color: #2a2a2a; color: #ffffff; }
     QHeaderView::section {
-        background-color: #111111; color: #969696;
-        border: none; border-bottom: 1px solid #303030;
-        border-right: 1px solid #303030;
-        padding: 6px; font-weight: bold; font-size: 10px;
+        background-color: #111111; color: #888888;
+        border: none; border-bottom: 1px solid #2e2e2e;
+        border-right: 1px solid #2e2e2e;
+        padding: 5px 8px; font-weight: bold; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 1px;
     }
 """
 
 _TAB_STYLE = """
     QTabWidget::pane { background-color: transparent; border: none; }
     QTabBar::tab {
-        background-color: #252525; color: #969696;
-        padding: 8px 22px; margin-right: 3px;
-        border-top-left-radius: 0px; border-top-right-radius: 0px;
-        font-size: 11px; font-weight: bold;
+        background-color: #1a1a1a; color: #555555;
+        padding: 8px 22px; margin-right: 2px;
+        border-radius: 0px; font-size: 10px; font-weight: bold;
+        letter-spacing: 1px; text-transform: uppercase;
     }
     QTabBar::tab:selected {
-        background-color: #2e2e2e; color: #ffffff;
+        background-color: #222222; color: #f0f0f0;
         border-bottom: 2px solid #da291c;
     }
     QTabBar::tab:hover:!selected {
-        background-color: #2e2e2e; color: #ffffff;
+        background-color: #222222; color: #f0f0f0;
     }
 """
 
 _INPUT_STYLE = """
     QLineEdit {
-        background-color: #1e1e1e;
-        border: 1px solid #303030; border-radius: 2px;
-        padding-left: 8px; color: #ffffff; font-size: 11px;
+        background-color: #2a2a2a;
+        border: 1px solid #2e2e2e; border-radius: 0px;
+        padding-left: 8px; color: #f0f0f0; font-size: 11px;
     }
     QLineEdit:focus { border: 1px solid #da291c; }
 """
 
-_CARD_STYLE = "QFrame { background-color: #252525; border-radius: 0px; }"
+_CARD_STYLE = "QFrame { background-color: #222222; border-radius: 0px; }"
 
 _BTN_CARI = """
     QPushButton {
         background-color: #da291c; color: #ffffff;
         border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
+        text-transform: uppercase; letter-spacing: 1px;
     }
     QPushButton:hover { background-color: #b01e0a; }
 """
 
 _BTN_RESET = """
     QPushButton {
-        background-color: #252525; color: #969696;
-        border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
+        background-color: #2a2a2a; color: #888888;
+        border: 1px solid #3a3a3a; border-radius: 0px; font-size: 11px; padding: 0 12px;
     }
-    QPushButton:hover { background-color: #303030; color: #ffffff; }
+    QPushButton:hover { background-color: #333333; color: #f0f0f0; }
 """
 
 _BTN_EXPORT = """
     QPushButton {
-        background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
-        border: none; border-radius: 0px; font-size: 11px; padding: 0 12px;
+        background-color: #1a2a1a; color: #22863a;
+        border: 1px solid #1a4a1a; border-radius: 0px; font-size: 11px; padding: 0 12px;
     }
-    QPushButton:hover { background-color: rgb(35, 110, 65); }
+    QPushButton:hover { background-color: #1e341e; }
 """
 
 
@@ -195,6 +200,33 @@ def _db_ng_pending(section_id, date_from, date_to):
         raise
     finally:
         conn.close()
+
+
+# ── Background worker ─────────────────────────────────────────────────────────
+
+class _RiwayatWorker(QThread):
+    finished = Signal(list)
+    error    = Signal(str)
+
+    def __init__(self, section_id, shift_name, date_from, date_to):
+        super().__init__()
+        self.section_id = section_id
+        self.shift_name = shift_name
+        self.date_from  = date_from
+        self.date_to    = date_to
+
+    def run(self):
+        try:
+            from modules.db_laporan import get_riwayat_laporan
+            rows = get_riwayat_laporan(
+                section_id=self.section_id,
+                shift_name=self.shift_name,
+                date_from=self.date_from,
+                date_to=self.date_to,
+            )
+            self.finished.emit(rows)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 # ── Widget ────────────────────────────────────────────────────────────────────
@@ -359,6 +391,7 @@ class RiwayatLaporanWidget(QWidget):
         ])
         self.tabel_harian.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.tabel_harian.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.tabel_harian.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
         self.tabel_harian.horizontalHeader().setStretchLastSection(False)
         self.tabel_harian.verticalHeader().setVisible(False)
         self.tabel_harian.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -370,7 +403,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabel_harian.setColumnWidth(3, 92)
         self.tabel_harian.setColumnWidth(4, 135)
         self.tabel_harian.setColumnWidth(5, 90)
-        self.tabel_harian.setColumnWidth(6, 240)
+        self.tabel_harian.setColumnWidth(6, 290)
         tl.addWidget(self.tabel_harian)
 
         main.addWidget(card_t)
@@ -383,21 +416,18 @@ class RiwayatLaporanWidget(QWidget):
         section_id = self.combo_section.currentData()
         shift_text = self.combo_shift.currentText()
         shift_name = None if shift_text == "Semua" else shift_text
-        date_from = self.date_from.date().toString("yyyy-MM-dd")
-        date_to = self.date_to.date().toString("yyyy-MM-dd")
+        date_from  = self.date_from.date().toString("yyyy-MM-dd")
+        date_to    = self.date_to.date().toString("yyyy-MM-dd")
 
-        try:
-            rows = get_riwayat_laporan(
-                section_id=section_id,
-                shift_name=shift_name,
-                date_from=date_from,
-                date_to=date_to,
-            )
-        except Exception as e:
-            self.lbl_info_h.setText(f"Gagal memuat data: {e}")
-            self.tabel_harian.setRowCount(0)
-            return
+        self.lbl_info_h.setText("Memuat data...")
+        self.tabel_harian.setRowCount(0)
 
+        self._worker = _RiwayatWorker(section_id, shift_name, date_from, date_to)
+        self._worker.finished.connect(self._on_harian_loaded)
+        self._worker.error.connect(lambda e: self.lbl_info_h.setText(f"Gagal: {e}"))
+        self._worker.start()
+
+    def _on_harian_loaded(self, rows: list):
         self.tabel_harian.setRowCount(0)
         self.lbl_info_h.setText(f"{len(rows)} data ditemukan")
 
@@ -419,52 +449,52 @@ class RiwayatLaporanWidget(QWidget):
             aksi_w = QWidget()
             aksi_w.setStyleSheet("background-color: #252525;")
             al = QHBoxLayout(aksi_w)
-            al.setContentsMargins(4, 3, 4, 3)
-            al.setSpacing(4)
+            al.setContentsMargins(8, 0, 8, 0)
+            al.setSpacing(8)
+            al.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
 
             btn_lihat = QPushButton("Lihat")
-            btn_lihat.setFixedSize(52, 26)
-            btn_lihat.setStyleSheet("""
-                QPushButton { background-color: rgb(30, 75, 145); color: rgb(130, 185, 255);
-                    border: none; border-radius: 0px; font-size: 10px; }
-                QPushButton:hover { background-color: rgb(45, 95, 170); }
-            """)
+            btn_lihat.setMinimumWidth(52); btn_lihat.setFixedHeight(26)
+            btn_lihat.setStyleSheet(
+                "QPushButton { background-color: #1a2a3a; color: #4a9fd4;"
+                " border: 1px solid #1a4a6a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
+                "QPushButton:hover { background-color: #1e344a; }"
+            )
             btn_lihat.clicked.connect(lambda _, rid=report_id: self._lihat(rid))
 
             btn_edit = QPushButton("Edit")
-            btn_edit.setFixedSize(44, 26)
-            btn_edit.setStyleSheet("""
-                QPushButton { background-color: rgb(75, 60, 20); color: rgb(220, 195, 90);
-                    border: none; border-radius: 0px; font-size: 10px; }
-                QPushButton:hover { background-color: rgb(95, 80, 30); }
-            """)
+            btn_edit.setMinimumWidth(44); btn_edit.setFixedHeight(26)
+            btn_edit.setStyleSheet(
+                "QPushButton { background-color: #2a2a1a; color: #b08800;"
+                " border: 1px solid #4a4a1a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
+                "QPushButton:hover { background-color: #34341e; }"
+            )
             btn_edit.clicked.connect(lambda _, rid=report_id: self._edit(rid))
 
             btn_hapus = QPushButton("Hapus")
-            btn_hapus.setFixedSize(52, 26)
-            btn_hapus.setStyleSheet("""
-                QPushButton { background-color: rgb(100, 30, 30); color: rgb(220, 120, 120);
-                    border: none; border-radius: 0px; font-size: 10px; }
-                QPushButton:hover { background-color: rgb(130, 40, 40); }
-            """)
+            btn_hapus.setMinimumWidth(52); btn_hapus.setFixedHeight(26)
+            btn_hapus.setStyleSheet(
+                "QPushButton { background-color: #2a1a1a; color: #da291c;"
+                " border: 1px solid #4a1a1a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
+                "QPushButton:hover { background-color: #341e1e; }"
+            )
             btn_hapus.clicked.connect(lambda _, rid=report_id: self._hapus(rid))
 
             btn_export_row = QPushButton("Export")
-            btn_export_row.setFixedSize(60, 26)
-            btn_export_row.setStyleSheet("""
-                QPushButton { background-color: rgb(25, 90, 50); color: rgb(130, 220, 140);
-                    border: none; border-radius: 0px; font-size: 10px; }
-                QPushButton:hover { background-color: rgb(35, 110, 65); }
-            """)
+            btn_export_row.setMinimumWidth(60); btn_export_row.setFixedHeight(26)
+            btn_export_row.setStyleSheet(
+                "QPushButton { background-color: #1a2a1a; color: #22863a;"
+                " border: 1px solid #1a4a1a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
+                "QPushButton:hover { background-color: #1e341e; }"
+            )
             btn_export_row.clicked.connect(lambda _, rid=report_id: self._export_laporan(rid))
 
             al.addWidget(btn_lihat)
             al.addWidget(btn_edit)
             al.addWidget(btn_hapus)
             al.addWidget(btn_export_row)
-            al.addStretch()
             self.tabel_harian.setCellWidget(i, 6, aksi_w)
-            self.tabel_harian.setRowHeight(i, 36)
+            self.tabel_harian.setRowHeight(i, 40)
 
     def _reset_filter_harian(self):
         self.combo_section.setCurrentIndex(0)
@@ -1448,9 +1478,9 @@ class RiwayatLaporanWidget(QWidget):
             sg.addWidget(l, row, 0); sg.addWidget(v, row, 1)
             setattr(self, attr, v)
 
-        _srow(0, "Total Hour",  "_lbl_prod_total")
-        _srow(1, "Used Hour",   "_lbl_prod_used")
-        _srow(2, "Balance",     "_lbl_prod_bal")
+        _srow(0, "Working Hour", "_lbl_prod_total")
+        _srow(1, "Total Jam",   "_lbl_prod_used")
+        _srow(2, "Total Loss",  "_lbl_prod_bal")
         _srow(3, "Laporan",     "_lbl_prod_count")
         rl.addWidget(sum_frame)
         rl.addStretch()
@@ -1558,10 +1588,8 @@ class RiwayatLaporanWidget(QWidget):
             tbl.setItem(r, c, it)
         tbl.setRowHeight(r, 2)
 
-        used_hour = (
-            data["process_hour"] + data["prep_hour"] + data["sholat_hour"] +
-            sum(c["hours"] for c in data["categories"]) + data["absence_hour"]
-        )
+        loss_hour  = sum(c["hours"] for c in data["categories"])
+        used_hour  = loss_hour + data["prep_hour"] + data["sholat_hour"] + data["absence_hour"]
         total_hour = data["total_hour"]
 
         r = tbl.rowCount()
@@ -1580,8 +1608,11 @@ class RiwayatLaporanWidget(QWidget):
         tbl.setRowHeight(r, 30)
 
         # ── Summary ────────────────────────────────────────────────────────
-        balance = total_hour - used_hour
-        ratio = (data["process_hour"] / total_hour * 100) if total_hour > 0 else 0.0
+        working_hour = total_hour - data["prep_hour"] - data["sholat_hour"]
+        balance      = loss_hour
+        used_hour    = working_hour
+
+        ratio = (data["process_hour"] / working_hour * 100) if working_hour > 0 else 0.0
         ratio_color = (
             "#27ae60" if ratio >= 80
             else "#f39c12" if ratio >= 60
@@ -1591,10 +1622,10 @@ class RiwayatLaporanWidget(QWidget):
         self._lbl_ratio_big.setStyleSheet(
             f"color: {ratio_color}; font-size: 40px; font-weight: bold;"
         )
-        self._lbl_prod_total.setText(f"{total_hour:.2f} H")
+        self._lbl_prod_total.setText(f"{working_hour:.2f} H")
         self._lbl_prod_used.setText(f"{used_hour:.2f} H")
 
-        bal_color = "#27ae60" if abs(balance) < 0.01 else "#f39c12"
+        bal_color = "#27ae60" if balance < 0.01 else "#da291c"
         self._lbl_prod_bal.setText(f"{balance:.4f}")
         self._lbl_prod_bal.setStyleSheet(
             f"color: {bal_color}; font-size: 11px; font-weight: bold;"

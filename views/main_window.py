@@ -157,47 +157,48 @@ class MainWindow(QMainWindow):
         self.nav_buttons[page_id] = btn
 
     def load_pages(self):
-        """Load semua halaman ke stack"""
-        from views.dashboard import DashboardWidget
-        from modules.input_laporan import InputLaporanWidget
-        from modules.riwayat_laporan import RiwayatLaporanWidget
-        from modules.visualisasi import VisualisasiWidget
-
         self.pages = {}
+        self._page_loaded: set = set()
+        for page_id in ["dashboard", "input_laporan", "riwayat", "visualisasi", "master_data"]:
+            placeholder = QWidget()
+            self.stack.addWidget(placeholder)
+            self.pages[page_id] = placeholder
 
-        # Dashboard
-        dashboard = DashboardWidget()
-        self.stack.addWidget(dashboard)
-        self.pages["dashboard"] = dashboard
-
-        # Input Laporan
-        input_lap = InputLaporanWidget(self.user)
-        self.stack.addWidget(input_lap)
-        self.pages["input_laporan"] = input_lap
-
-        # Riwayat
-        riwayat = RiwayatLaporanWidget()
-        self.stack.addWidget(riwayat)
-        self.pages["riwayat"] = riwayat
-
-        # Visualisasi
-        vis = VisualisasiWidget()
-        self.stack.addWidget(vis)
-        self.pages["visualisasi"] = vis
-
-        # Master Data — hanya admin
-        if self.user.get("role") == "admin":
-            from modules.master_data import MasterDataWidget
-            master = MasterDataWidget(self.user)
+    def _ensure_page_loaded(self, page_id: str):
+        if page_id in self._page_loaded:
+            return
+        if page_id == "dashboard":
+            from views.dashboard import DashboardWidget
+            widget = DashboardWidget()
+        elif page_id == "input_laporan":
+            from modules.input_laporan import InputLaporanWidget
+            widget = InputLaporanWidget(self.user)
+        elif page_id == "riwayat":
+            from modules.riwayat_laporan import RiwayatLaporanWidget
+            widget = RiwayatLaporanWidget()
+        elif page_id == "visualisasi":
+            from modules.visualisasi import VisualisasiWidget
+            widget = VisualisasiWidget()
+        elif page_id == "master_data":
+            if self.user.get("role") == "admin":
+                from modules.master_data import MasterDataWidget
+                widget = MasterDataWidget(self.user)
+            else:
+                widget = QWidget()
+                lbl = QLabel("Akses ditolak — halaman ini hanya untuk admin.")
+                lbl.setAlignment(Qt.AlignCenter)
+                lbl.setStyleSheet("color: #666666; font-size: 13pt;")
+                QVBoxLayout(widget).addWidget(lbl)
+                self.nav_buttons["master_data"].setVisible(False)
         else:
-            master = QWidget()
-            lbl_deny = QLabel("Akses ditolak — halaman ini hanya untuk admin.")
-            lbl_deny.setAlignment(Qt.AlignCenter)
-            lbl_deny.setStyleSheet("color: #666666; font-size: 13pt;")
-            QVBoxLayout(master).addWidget(lbl_deny)
-            self.nav_buttons["master_data"].setVisible(False)
-        self.stack.addWidget(master)
-        self.pages["master_data"] = master
+            return
+        old = self.pages[page_id]
+        idx = self.stack.indexOf(old)
+        self.stack.removeWidget(old)
+        old.deleteLater()
+        self.stack.insertWidget(idx, widget)
+        self.pages[page_id] = widget
+        self._page_loaded.add(page_id)
 
     def navigate_to(self, page_id: str):
         page_names = {
@@ -207,7 +208,7 @@ class MainWindow(QMainWindow):
             "visualisasi": "Visualisasi",
             "master_data": "Master Data",
         }
-
+        self._ensure_page_loaded(page_id)
         if page_id in self.pages:
             self.stack.setCurrentWidget(self.pages[page_id])
             self.lbl_page.setText(page_names.get(page_id, page_id))

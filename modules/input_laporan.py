@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QFrame, QComboBox, QPushButton,
-    QDateEdit, QScrollArea, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QAbstractItemView, QCheckBox,
+    QDateEdit, QTimeEdit, QScrollArea, QTableWidget, QTableWidgetItem,
+    QHeaderView, QMessageBox, QAbstractItemView,
 )
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QTime
 from PySide6.QtGui import QColor
 
 from modules.db_laporan import (
@@ -12,33 +12,37 @@ from modules.db_laporan import (
     get_all_category_names,
 )
 
-# ── Style constants ────────────────────────────────────────────────────────────
-_CARD  = "QFrame { background-color: #252525; border-radius: 0px; }"
+# ── Style constants ─────────────────────────────────────────────────────────────
+# (prev: #252525 card, #1e1e1e tbl, #303030 border, rgb(40,80,50) btn-add)
+_CARD  = "QFrame { background-color: #222222; border-radius: 0px; }"
 _TBL   = """
-    QTableWidget { background-color: #1e1e1e; border: 1px solid #303030; gridline-color: #303030; }
-    QTableWidget::item { color: #ffffff; padding: 3px 4px; background-color: #252525;
-        border-bottom: 1px solid #303030; }
-    QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
-    QHeaderView::section { background-color: #111111; color: #969696; border: none;
-        border-bottom: 1px solid #303030; border-right: 1px solid #303030;
-        padding: 4px; font-weight: bold; font-size: 10px; }
+    QTableWidget { background-color: #1a1a1a; border: 1px solid #2e2e2e; gridline-color: #2e2e2e; }
+    QTableWidget::item { color: #f0f0f0; padding: 3px 6px; background-color: #222222;
+        border-bottom: 1px solid #2e2e2e; }
+    QTableWidget::item:alternate { background-color: #1e1e1e; }
+    QTableWidget::item:selected { background-color: #2a2a2a; color: #ffffff; }
+    QHeaderView::section { background-color: #111111; color: #888888; border: none;
+        border-bottom: 1px solid #2e2e2e; border-right: 1px solid #2e2e2e;
+        padding: 4px 6px; font-weight: bold; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 1px; }
 """
 _COMBO_CELL = """
-    QComboBox { background-color: transparent; color: #ffffff; border: none;
+    QComboBox { background-color: transparent; color: #f0f0f0; border: none;
         padding: 1px 4px; font-size: 11px; }
     QComboBox::drop-down { border: none; width: 18px; }
-    QComboBox QAbstractItemView { background-color: #252525; color: #ffffff;
-        selection-background-color: #303030; border: 1px solid #303030; }
+    QComboBox QAbstractItemView { background-color: #1a1a1a; color: #f0f0f0;
+        selection-background-color: #2a2a2a; border: 1px solid #2e2e2e; }
 """
-_BTN_ADD = ("QPushButton { background-color: rgb(40,80,50); color: rgb(150,210,160);"
-            " border: none; padding: 0 10px; font-size: 11px; }"
-            "QPushButton:hover { background-color: rgb(50,100,65); }")
-_BTN_DEL = ("QPushButton { background-color: rgb(80,40,40); color: rgb(200,150,150);"
-            " border: none; padding: 0 10px; font-size: 11px; }"
-            "QPushButton:hover { background-color: rgb(100,50,50); }")
-_HDR_LBL = ("color: #ffffff; font-size: 12px; font-weight: bold;"
-            " border-left: 3px solid #da291c; padding-left: 8px;")
-_FLD_LBL = "color: #969696; font-size: 11px;"
+_BTN_ADD = ("QPushButton { background-color: #1a2a1a; color: #22863a;"
+            " border: 1px solid #22863a; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
+            "QPushButton:hover { background-color: #1e341e; }")
+_BTN_DEL = ("QPushButton { background-color: #2a1a1a; color: #da291c;"
+            " border: 1px solid #da291c; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
+            "QPushButton:hover { background-color: #341e1e; }")
+_HDR_LBL = ("color: #f0f0f0; font-size: 11px; font-weight: bold;"
+            " border-left: 2px solid #da291c; padding-left: 8px;"
+            " letter-spacing: 1px; text-transform: uppercase;")
+_FLD_LBL = "color: #888888; font-size: 10px; letter-spacing: 1px;"
 
 # Model & operation codes — bisa diperluas dari master data nanti
 _MODELS  = ["4G15", "4G63", "4M40", "6D16", "6D16E", "6D16T",
@@ -58,16 +62,6 @@ def _mk_combo(items, popup_w=120) -> QComboBox:
     c.view().setMinimumWidth(popup_w)
     return c
 
-
-def _chk_widget() -> tuple[QWidget, QCheckBox]:
-    chk = QCheckBox()
-    w = QWidget()
-    w.setStyleSheet("background: transparent;")
-    h = QHBoxLayout(w)
-    h.setAlignment(Qt.AlignCenter)
-    h.setContentsMargins(0, 0, 0, 0)
-    h.addWidget(chk)
-    return w, chk
 
 
 def _item(text="", align=Qt.AlignLeft | Qt.AlignVCenter) -> QTableWidgetItem:
@@ -165,11 +159,13 @@ class InputLaporanWidget(QWidget):
 
     def _on_shift_changed(self):
         data = self._shift_map.get(self.combo_shift.currentText(), {})
-        self._shift_hours = data.get("total_hours", 0.0)
+        base_hours        = data.get("total_hours", 0.0)
         self._prep_h      = data.get("preparation_min", 15.0) / 60
         self._sholat_h    = data.get("sholat_min", 10.0) / 60
+        # Jumat: potong 30 menit (0.5 jam)
+        is_friday = self.input_tanggal.date().dayOfWeek() == 5
+        self._shift_hours = base_hours - 0.5 if (is_friday and base_hours > 0) else base_hours
         self._lbl_hour.setText(f"{self._shift_hours:.2f}")
-        # update fixed labels
         self._lbl_prep_val.setText(f"{self._prep_h:.4f}")
         self._lbl_sholat_val.setText(f"{self._sholat_h:.4f}")
         self._hitung_calc_hour()
@@ -177,6 +173,10 @@ class InputLaporanWidget(QWidget):
     def _update_day(self, date: QDate):
         days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
         self._lbl_day.setText(days[date.dayOfWeek() - 1])
+        # Recalculate effective hours karena Jumat ada potongan 30 menit
+        # Guard: combo_shift belum ada saat _build_header() pertama kali dipanggil
+        if hasattr(self, "combo_shift"):
+            self._on_shift_changed()
 
     # ── UI builder ─────────────────────────────────────────────────────────────
 
@@ -501,26 +501,25 @@ class InputLaporanWidget(QWidget):
         hdr.addWidget(ba); hdr.addWidget(bd)
         lay.addLayout(hdr)
 
-        # No | G | Model | OP/ST | Item | Qty | Satuan | Cause/Penyebab | Action/Perbaikan | Factor | Hour | Lost
-        self.tbl_claim = QTableWidget(0, 12)
+        # No | Model | OP/ST | Item | Qty | Satuan | Cause/Penyebab | Action/Perbaikan | Factor | Hour | Lost
+        self.tbl_claim = QTableWidget(0, 11)
         self.tbl_claim.setHorizontalHeaderLabels([
-            "No", "G", "Model", "OP/ST", "Item", "Qty", "Satuan",
+            "No", "Model", "OP/ST", "Item", "Qty", "Satuan",
             "Cause / Penyebab", "Action / Perbaikan", "Factor", "Hour", "Lost",
         ])
         h = self.tbl_claim.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Fixed)
-        h.setSectionResizeMode(4, QHeaderView.Stretch)
+        h.setSectionResizeMode(3, QHeaderView.Stretch)
+        h.setSectionResizeMode(6, QHeaderView.Stretch)
         h.setSectionResizeMode(7, QHeaderView.Stretch)
-        h.setSectionResizeMode(8, QHeaderView.Stretch)
         self.tbl_claim.setColumnWidth(0,  28)
-        self.tbl_claim.setColumnWidth(1,  28)
+        self.tbl_claim.setColumnWidth(1,  60)
         self.tbl_claim.setColumnWidth(2,  60)
-        self.tbl_claim.setColumnWidth(3,  60)
-        self.tbl_claim.setColumnWidth(5,  42)
-        self.tbl_claim.setColumnWidth(6,  55)
-        self.tbl_claim.setColumnWidth(9,  75)
+        self.tbl_claim.setColumnWidth(4,  42)
+        self.tbl_claim.setColumnWidth(5,  55)
+        self.tbl_claim.setColumnWidth(8,  75)
+        self.tbl_claim.setColumnWidth(9,  50)
         self.tbl_claim.setColumnWidth(10, 50)
-        self.tbl_claim.setColumnWidth(11, 50)
         self.tbl_claim.verticalHeader().setVisible(False)
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_claim.setStyleSheet(_TBL)
@@ -551,25 +550,26 @@ class InputLaporanWidget(QWidget):
         hdr.addWidget(ba); hdr.addWidget(bd)
         lay.addLayout(hdr)
 
-        # No | Model | OP/ST | Problem / Masalah | Cause / Penyebab | Action / Perbaikan | Factor | ✓ | Stop | Lost
-        self.tbl_ls = QTableWidget(0, 10)
+        # No | Model | OP/ST | Problem / Masalah | Cause / Penyebab | Action / Perbaikan | Factor | Start | End | Stop | Lost
+        self.tbl_ls = QTableWidget(0, 11)
         self.tbl_ls.setHorizontalHeaderLabels([
             "No", "Model", "OP/ST",
             "Problem / Masalah", "Cause / Penyebab", "Action / Perbaikan",
-            "Factor", "✓", "Stop", "Lost",
+            "Factor", "Start", "End", "Stop", "Lost",
         ])
         h = self.tbl_ls.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Fixed)
         h.setSectionResizeMode(3, QHeaderView.Stretch)
         h.setSectionResizeMode(4, QHeaderView.Stretch)
         h.setSectionResizeMode(5, QHeaderView.Stretch)
-        self.tbl_ls.setColumnWidth(0, 28)
-        self.tbl_ls.setColumnWidth(1, 60)
-        self.tbl_ls.setColumnWidth(2, 60)
-        self.tbl_ls.setColumnWidth(6, 80)
-        self.tbl_ls.setColumnWidth(7, 26)
-        self.tbl_ls.setColumnWidth(8, 58)
-        self.tbl_ls.setColumnWidth(9, 58)
+        self.tbl_ls.setColumnWidth(0,  28)
+        self.tbl_ls.setColumnWidth(1,  60)
+        self.tbl_ls.setColumnWidth(2,  60)
+        self.tbl_ls.setColumnWidth(6,  80)
+        self.tbl_ls.setColumnWidth(7,  54)
+        self.tbl_ls.setColumnWidth(8,  54)
+        self.tbl_ls.setColumnWidth(9,  52)
+        self.tbl_ls.setColumnWidth(10, 52)
         self.tbl_ls.verticalHeader().setVisible(False)
         self.tbl_ls.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_ls.setStyleSheet(_TBL)
@@ -663,18 +663,16 @@ class InputLaporanWidget(QWidget):
         no_it.setFlags(Qt.ItemIsEnabled)
         self.tbl_claim.setItem(r, 0, no_it)
 
-        chk_w, _ = _chk_widget()
-        self.tbl_claim.setCellWidget(r, 1, chk_w)
-        self.tbl_claim.setCellWidget(r, 2, _mk_combo(self._shop_models or _MODELS))
-        self.tbl_claim.setCellWidget(r, 3, _mk_combo(_OP_ST, popup_w=80))
-        self.tbl_claim.setItem(r, 4, _item(""))
-        self.tbl_claim.setItem(r, 5, _item("", Qt.AlignCenter))
-        self.tbl_claim.setCellWidget(r, 6, _mk_combo(_SATUAN, popup_w=70))
+        self.tbl_claim.setCellWidget(r, 1, _mk_combo(self._shop_models or _MODELS))
+        self.tbl_claim.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
+        self.tbl_claim.setItem(r, 3, _item(""))
+        self.tbl_claim.setItem(r, 4, _item("", Qt.AlignCenter))
+        self.tbl_claim.setCellWidget(r, 5, _mk_combo(_SATUAN, popup_w=70))
+        self.tbl_claim.setItem(r, 6, _item(""))
         self.tbl_claim.setItem(r, 7, _item(""))
-        self.tbl_claim.setItem(r, 8, _item(""))
-        self.tbl_claim.setCellWidget(r, 9, _mk_combo(self._factors, popup_w=100))
+        self.tbl_claim.setCellWidget(r, 8, _mk_combo(self._factors, popup_w=100))
+        self.tbl_claim.setItem(r, 9,  _item("0", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 10, _item("0", Qt.AlignCenter))
-        self.tbl_claim.setItem(r, 11, _item("0", Qt.AlignCenter))
 
     def _hapus_claim(self):
         r = self.tbl_claim.currentRow()
@@ -702,11 +700,19 @@ class InputLaporanWidget(QWidget):
         self.tbl_ls.setItem(r, 5, _item(""))
         self.tbl_ls.setCellWidget(r, 6, _mk_combo(self._factors, popup_w=100))
 
-        chk_w, _ = _chk_widget()
-        self.tbl_ls.setCellWidget(r, 7, chk_w)
+        for col in (7, 8):
+            te = QTimeEdit(QTime(0, 0))
+            te.setDisplayFormat("HH:mm")
+            te.setStyleSheet(
+                "QTimeEdit { background: transparent; color: #ffffff; border: none;"
+                " font-size: 11px; padding: 1px 4px; }"
+                "QTimeEdit::up-button, QTimeEdit::down-button { width: 0; }"
+            )
+            te.timeChanged.connect(self._on_ls_time_changed)
+            self.tbl_ls.setCellWidget(r, col, te)
 
-        self.tbl_ls.setItem(r, 8, _item("0", Qt.AlignCenter))
-        self.tbl_ls.setItem(r, 9, _item("0", Qt.AlignCenter))
+        self.tbl_ls.setItem(r, 9,  _item("0", Qt.AlignCenter))
+        self.tbl_ls.setItem(r, 10, _item("0", Qt.AlignCenter))
         self.tbl_ls.blockSignals(False)
 
     def _hapus_linestop(self):
@@ -718,6 +724,37 @@ class InputLaporanWidget(QWidget):
                 if it:
                     it.setText(str(i + 1))
             self._hitung_calc_hour()
+
+    # ── Auto-kalkulasi Stop/Lost dari Start-End time ──────────────────────────
+
+    def _on_ls_time_changed(self):
+        sender = self.sender()
+        for r in range(self.tbl_ls.rowCount()):
+            for col in (7, 8):
+                if self.tbl_ls.cellWidget(r, col) is sender:
+                    self._calc_ls_time(r)
+                    self._hitung_calc_hour()
+                    return
+
+    def _calc_ls_time(self, r: int):
+        start_te = self.tbl_ls.cellWidget(r, 7)
+        end_te   = self.tbl_ls.cellWidget(r, 8)
+        if not (start_te and end_te):
+            return
+        s = start_te.time()
+        e = end_te.time()
+        diff_min = (e.hour() * 60 + e.minute()) - (s.hour() * 60 + s.minute())
+        if diff_min < 0:
+            diff_min += 1440
+        h = round(diff_min / 60, 4)
+        self.tbl_ls.blockSignals(True)
+        for col in (9, 10):
+            it = self.tbl_ls.item(r, col)
+            if not it:
+                it = _item("0", Qt.AlignCenter)
+                self.tbl_ls.setItem(r, col, it)
+            it.setText(f"{h:.4f}")
+        self.tbl_ls.blockSignals(False)
 
     # ── Auto-fill Hour dari MHU ────────────────────────────────────────────────
 
@@ -868,7 +905,7 @@ class InputLaporanWidget(QWidget):
 
         process  = sum(_fval(self.tbl_prod,  r, 5) for r in range(self.tbl_prod.rowCount()))
         absence  = sum(_fval(self.tbl_absen, r, 3) for r in range(self.tbl_absen.rowCount()))
-        linestop = sum(_fval(self.tbl_ls,    r, 9) for r in range(self.tbl_ls.rowCount()))
+        linestop = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
         quality  = 0.0
         total    = self._shift_hours
         balance  = total - process - self._prep_h - quality - linestop - absence - self._sholat_h
@@ -955,6 +992,8 @@ class InputLaporanWidget(QWidget):
             cb_model  = self.tbl_ls.cellWidget(r, 1)
             cb_opst   = self.tbl_ls.cellWidget(r, 2)
             cb_factor = self.tbl_ls.cellWidget(r, 6)
+            start_te  = self.tbl_ls.cellWidget(r, 7)
+            end_te    = self.tbl_ls.cellWidget(r, 8)
             prob_it   = self.tbl_ls.item(r, 3)
             cause_it  = self.tbl_ls.item(r, 4)
             act_it    = self.tbl_ls.item(r, 5)
@@ -965,15 +1004,16 @@ class InputLaporanWidget(QWidget):
             opst_v   = cb_opst.currentText()   if cb_opst   else ""
             factor_v = cb_factor.currentText() if cb_factor else ""
             catatan.append({
-                "nomor_ra":  opst_v,
-                "kategori":  factor_v,
-                "deskripsi": f"[{model_v}] {prob}" if model_v else prob,
-                "penyebab":  cause_it.text().strip() if cause_it else "",
-                "tindakan":  act_it.text().strip()   if act_it   else "",
-                "pic":       "",
-                "down_time": _fv(self.tbl_ls, r, 8),
-                "loss_time": _fv(self.tbl_ls, r, 9),
-                "start_time": None, "end_time": None,
+                "nomor_ra":   opst_v,
+                "kategori":   factor_v,
+                "deskripsi":  f"[{model_v}] {prob}" if model_v else prob,
+                "penyebab":   cause_it.text().strip() if cause_it else "",
+                "tindakan":   act_it.text().strip()   if act_it   else "",
+                "pic":        "",
+                "down_time":  _fv(self.tbl_ls, r, 9),
+                "loss_time":  _fv(self.tbl_ls, r, 10),
+                "start_time": start_te.time().toString("HH:mm") if start_te else None,
+                "end_time":   end_te.time().toString("HH:mm")   if end_te   else None,
             })
 
         # Absence
@@ -997,28 +1037,28 @@ class InputLaporanWidget(QWidget):
         # Inhouse Claim
         claim_data = []
         for r in range(self.tbl_claim.rowCount()):
-            item_it = self.tbl_claim.item(r, 4)
+            item_it = self.tbl_claim.item(r, 3)
             item_v  = item_it.text().strip() if item_it else ""
             if not item_v:
                 continue
-            cb_model  = self.tbl_claim.cellWidget(r, 2)
-            cb_opst   = self.tbl_claim.cellWidget(r, 3)
-            cb_sat    = self.tbl_claim.cellWidget(r, 6)
-            cb_factor = self.tbl_claim.cellWidget(r, 9)
-            cause_it  = self.tbl_claim.item(r, 7)
-            act_it    = self.tbl_claim.item(r, 8)
+            cb_model  = self.tbl_claim.cellWidget(r, 1)
+            cb_opst   = self.tbl_claim.cellWidget(r, 2)
+            cb_sat    = self.tbl_claim.cellWidget(r, 5)
+            cb_factor = self.tbl_claim.cellWidget(r, 8)
+            cause_it  = self.tbl_claim.item(r, 6)
+            act_it    = self.tbl_claim.item(r, 7)
             claim_data.append({
                 "tanggal":  self.input_tanggal.date().toString("yyyy-MM-dd"),
                 "model":    cb_model.currentText()  if cb_model  else "",
                 "op_no_st": cb_opst.currentText()   if cb_opst   else "",
                 "item":     item_v,
-                "qty":      _fv(self.tbl_claim, r, 5),
+                "qty":      _fv(self.tbl_claim, r, 4),
                 "satuan":   cb_sat.currentText()    if cb_sat    else "",
                 "penyebab": cause_it.text().strip() if cause_it  else "",
                 "tindakan": act_it.text().strip()   if act_it    else "",
                 "faktor":   cb_factor.currentText() if cb_factor else "",
-                "stop_hr":  _fv(self.tbl_claim, r, 10),
-                "lost_hr":  _fv(self.tbl_claim, r, 11),
+                "stop_hr":  _fv(self.tbl_claim, r, 9),
+                "lost_hr":  _fv(self.tbl_claim, r, 10),
                 "status":   "NG",
             })
 

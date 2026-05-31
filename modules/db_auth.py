@@ -1,23 +1,52 @@
 import os
 import hashlib
+import threading
 import psycopg2
+from psycopg2 import pool as pg_pool
 from dotenv import load_dotenv
 
 load_dotenv()
 
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool() -> pg_pool.ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = pg_pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=5,
+                    host=os.getenv("DB_HOST"),
+                    port=int(os.getenv("DB_PORT", 5432)),
+                    dbname=os.getenv("DB_NAME"),
+                    user=os.getenv("DB_USER"),
+                    password=os.getenv("DB_PASSWORD"),
+                    sslmode="require",
+                    connect_timeout=10,
+                )
+    return _pool
+
+
 def get_connection():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT", 5432),
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        sslmode="require",
-        connect_timeout=10,
-    )
+    return _get_pool().getconn()
+
+
+def release_connection(conn):
+    try:
+        _get_pool().putconn(conn)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def verify_login(nik: str, password: str) -> dict | None:
     conn = None
@@ -40,4 +69,4 @@ def verify_login(nik: str, password: str) -> dict | None:
         raise ConnectionError(f"Tidak dapat terhubung ke database: {e}") from e
     finally:
         if conn:
-            conn.close()
+            release_connection(conn)

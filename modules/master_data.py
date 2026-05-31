@@ -19,106 +19,92 @@ from modules.db_laporan import (
 )
 
 
-# ── Styles ────────────────────────────────────────────────────────────────────
+# ── Styles ──────────────────────────────────────────────────────────────────────
+# (prev: #252525 card, #1e1e1e tbl, #303030 border, #969696 text-sec)
 
-_CARD = "QFrame { background-color: #252525; border-radius: 0px; }"
+_CARD = "QFrame { background-color: #222222; border-radius: 0px; }"
 
 _TABLE = """
     QTableWidget {
-        background-color: #1e1e1e;
-        border: 1px solid #303030; border-radius: 0px;
-        gridline-color: #303030;
+        background-color: #1a1a1a;
+        border: 1px solid #2e2e2e; border-radius: 0px;
+        gridline-color: #2e2e2e;
     }
     QTableWidget::item {
-        color: #ffffff; padding: 4px 8px;
-        background-color: #252525;
-        border-bottom: 1px solid #303030;
+        color: #f0f0f0; padding: 4px 8px;
+        background-color: #222222;
+        border-bottom: 1px solid #2e2e2e;
     }
-    QTableWidget::item:selected { background-color: #303030; color: #ffffff; }
+    QTableWidget::item:alternate { background-color: #1e1e1e; }
+    QTableWidget::item:selected { background-color: #2a2a2a; color: #ffffff; }
     QHeaderView::section {
-        background-color: #111111; color: #969696;
-        border: none; border-bottom: 1px solid #303030;
-        border-right: 1px solid #303030;
-        padding: 6px; font-weight: bold; font-size: 10px;
+        background-color: #111111; color: #888888;
+        border: none; border-bottom: 1px solid #2e2e2e;
+        border-right: 1px solid #2e2e2e;
+        padding: 5px 8px; font-weight: bold; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 1px;
     }
 """
 
 _TAB = """
     QTabWidget::pane { background-color: transparent; border: none; }
     QTabBar::tab {
-        background-color: #252525; color: #969696;
-        padding: 8px 22px; margin-right: 3px;
-        border-top-left-radius: 0px; border-top-right-radius: 0px;
-        font-size: 11px; font-weight: bold;
+        background-color: #1a1a1a; color: #555555;
+        padding: 8px 22px; margin-right: 2px;
+        border-radius: 0px; font-size: 10px; font-weight: bold;
+        letter-spacing: 1px; text-transform: uppercase;
     }
     QTabBar::tab:selected {
-        background-color: #2e2e2e; color: #ffffff;
+        background-color: #222222; color: #f0f0f0;
         border-bottom: 2px solid #da291c;
     }
     QTabBar::tab:hover:!selected {
-        background-color: #2e2e2e; color: #ffffff;
+        background-color: #222222; color: #f0f0f0;
     }
 """
 
 _BTN_ADD = """
     QPushButton {
-        background-color: #da291c; color: #ffffff;
-        border: none; border-radius: 0px; font-size: 11px; padding: 0 14px;
+        background-color: #1a2a1a; color: #22863a;
+        border: 1px solid #22863a; border-radius: 0px; font-size: 11px; padding: 0 14px;
     }
-    QPushButton:hover { background-color: #b01e0a; }
+    QPushButton:hover { background-color: #1e341e; }
 """
-_BTN_EDIT = """
-    QPushButton {
-        background-color: rgb(60, 100, 160); color: rgb(180, 210, 255);
-        border: none; border-radius: 0px; font-size: 10px;
-    }
-    QPushButton:hover { background-color: rgb(75, 120, 185); }
-"""
-_BTN_DEL = """
-    QPushButton {
-        background-color: rgb(140, 40, 40); color: rgb(255, 180, 180);
-        border: none; border-radius: 0px; font-size: 10px;
-    }
-    QPushButton:hover { background-color: rgb(170, 55, 55); }
-"""
-_BTN_RESET_PW = """
-    QPushButton {
-        background-color: rgb(100, 60, 160); color: rgb(220, 200, 255);
-        border: none; border-radius: 0px; font-size: 10px;
-    }
-    QPushButton:hover { background-color: rgb(120, 75, 185); }
-"""
+_BTN_EDIT     = "QPushButton { background-color: #1a2a3a; color: #4a9fd4; border: 1px solid #1a4a6a; border-radius: 0px; padding: 0 8px; } QPushButton:hover { background-color: #1e344a; }"
+_BTN_DEL      = "QPushButton { background-color: #2a1a1a; color: #da291c; border: 1px solid #4a1a1a; border-radius: 0px; padding: 0 8px; } QPushButton:hover { background-color: #341e1e; }"
+_BTN_RESET_PW = "QPushButton { background-color: #2a1a3a; color: #9a5fd4; border: 1px solid #4a1a6a; border-radius: 0px; padding: 0 10px; } QPushButton:hover { background-color: #34204a; }"
 _INPUT = """
     QLineEdit {
-        background-color: #1e1e1e;
-        border: 1px solid #303030; border-radius: 2px;
-        padding: 6px 10px; color: #ffffff; font-size: 11px;
+        background-color: #2a2a2a;
+        border: 1px solid #2e2e2e; border-radius: 0px;
+        padding: 6px 10px; color: #f0f0f0; font-size: 11px;
         min-height: 30px;
     }
     QLineEdit:focus { border: 1px solid #da291c; }
 """
 _COMBO = """
     QComboBox {
-        background-color: #1e1e1e; border: 1px solid #303030;
-        border-radius: 2px; padding-left: 8px;
-        color: #ffffff; font-size: 11px; min-height: 30px;
+        background-color: #2a2a2a; border: 1px solid #2e2e2e;
+        border-radius: 0px; padding-left: 8px;
+        color: #f0f0f0; font-size: 11px; min-height: 30px;
     }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: #252525; color: #ffffff;
-        selection-background-color: #303030;
-        border: 1px solid #303030;
+        background-color: #1a1a1a; color: #f0f0f0;
+        selection-background-color: #2a2a2a;
+        border: 1px solid #2e2e2e;
     }
 """
-_DLG_BG    = "background-color: #252525; color: #ffffff;"
-_LBL_FIELD = "color: #969696; font-size: 11px;"
-_CARD_HDR  = ("color: #ffffff; font-size: 12px; font-weight: bold;"
-              " border-left: 3px solid #da291c; padding-left: 8px;")
+_DLG_BG    = "background-color: #1a1a1a; color: #f0f0f0;"
+_LBL_FIELD = "color: #888888; font-size: 10px; letter-spacing: 1px;"
+_CARD_HDR  = ("color: #f0f0f0; font-size: 10px; font-weight: bold;"
+              " border-left: 2px solid #da291c; padding-left: 8px;"
+              " letter-spacing: 1px; text-transform: uppercase;")
 _TIME_EDIT_STYLE = """
     QTimeEdit {
-        background-color: #1e1e1e; border: 1px solid #303030;
-        border-radius: 2px; padding: 4px 8px;
-        color: #ffffff; font-size: 11px; min-height: 30px;
+        background-color: #2a2a2a; border: 1px solid #2e2e2e;
+        border-radius: 0px; padding: 4px 8px;
+        color: #f0f0f0; font-size: 11px; min-height: 30px;
     }
     QTimeEdit:focus { border: 1px solid #da291c; }
 """
@@ -275,14 +261,14 @@ class _ModelDialog(QDialog):
         _f("Nama Model", self.input_nama)
 
         self.input_wh = QDoubleSpinBox()
-        self.input_wh.setRange(0.0, 100.0)
-        self.input_wh.setDecimals(6)
-        self.input_wh.setSingleStep(0.001)
-        self.input_wh.setValue(working_hour)
-        self.input_wh.setSuffix(" H/unit")
+        self.input_wh.setRange(0.0, 6000.0)
+        self.input_wh.setDecimals(2)
+        self.input_wh.setSingleStep(0.1)
+        self.input_wh.setValue(round(working_hour * 60, 2))
+        self.input_wh.setSuffix(" mnt/unit")
         self.input_wh.setMinimumHeight(32)
         self.input_wh.setStyleSheet(_TIME_EDIT_STYLE)
-        _f("Working Hour / MHU (H/unit)", self.input_wh)
+        _f("Working Hour / MHU (mnt/unit)", self.input_wh)
 
         self.input_ct = QDoubleSpinBox()
         self.input_ct.setRange(0.0, 9999.0)
@@ -294,9 +280,11 @@ class _ModelDialog(QDialog):
         self.input_ct.setStyleSheet(_TIME_EDIT_STYLE)
         _f("Cycle Time (s/unit)", self.input_ct)
 
-        lbl_hint = QLabel("MHU: Qty 10 unit × 0.5 H/unit = 5.0 H")
-        lbl_hint.setStyleSheet("color: #555555; font-size: 10px;")
-        lay.addWidget(lbl_hint)
+        self._lbl_hint = QLabel()
+        self._lbl_hint.setStyleSheet("color: #555555; font-size: 10px;")
+        lay.addWidget(self._lbl_hint)
+        self.input_wh.valueChanged.connect(self._update_hint)
+        self._update_hint()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Simpan")
@@ -304,10 +292,17 @@ class _ModelDialog(QDialog):
         btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
         lay.addWidget(btns)
 
+    def _update_hint(self):
+        mnt = self.input_wh.value()
+        h   = mnt / 60
+        self._lbl_hint.setText(
+            f"= {h:.6f} H/unit  |  Contoh: 10 unit × {mnt:.2f} mnt = {10*mnt:.1f} mnt"
+        )
+
     def get_data(self) -> dict:
         return {
             "nama":         self.input_nama.text().strip(),
-            "working_hour": self.input_wh.value(),
+            "working_hour": self.input_wh.value() / 60,  # simpan dalam H/unit
             "cycle_time":   self.input_ct.value(),
         }
 
@@ -481,15 +476,19 @@ class MasterDataWidget(QWidget):
         container.setStyleSheet("background: transparent;")
         lay = QVBoxLayout(container)
         lay.setContentsMargins(15, 15, 15, 15)
-        lay.setSpacing(16)
+        lay.setSpacing(14)
 
-        lay.addWidget(self._build_section_card())
+        # Row 1: Section dan Shift sejajar
+        top_row = QHBoxLayout()
+        top_row.setSpacing(14)
+        top_row.addWidget(self._build_section_card(), 1)
+        top_row.addWidget(self._build_shift_card(), 2)
+        lay.addLayout(top_row)
+
         lay.addWidget(_divider())
         lay.addWidget(self._build_shop_model_card())
         lay.addWidget(_divider())
         lay.addWidget(self._build_kategori_card())
-        lay.addWidget(_divider())
-        lay.addWidget(self._build_shift_card())
         lay.addStretch()
 
         scroll.setWidget(container)
@@ -499,8 +498,8 @@ class MasterDataWidget(QWidget):
     def _build_section_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shop")
@@ -516,14 +515,15 @@ class MasterDataWidget(QWidget):
         self.tabel_section.setColumnCount(3)
         self.tabel_section.setHorizontalHeaderLabels(["No", "Nama Shop", "Aksi"])
         hh = self.tabel_section.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.Fixed)
         self.tabel_section.verticalHeader().setVisible(False)
         self.tabel_section.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_section.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_section.setStyleSheet(_TABLE)
         self.tabel_section.setColumnWidth(0, 45)
-        self.tabel_section.setColumnWidth(2, 145)
+        self.tabel_section.setColumnWidth(2, 150)
         self.tabel_section.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_section)
         return card
@@ -531,8 +531,8 @@ class MasterDataWidget(QWidget):
     def _build_shop_model_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
 
         # ── Header ──────────────────────────────────────────────────────────────
         hdr = QHBoxLayout()
@@ -551,11 +551,12 @@ class MasterDataWidget(QWidget):
         lbl_shop = QLabel("Shop :"); lbl_shop.setStyleSheet(_LBL_FIELD)
         self._combo_shop_model = QComboBox()
         self._combo_shop_model.setMinimumHeight(30)
+        self._combo_shop_model.setMinimumWidth(200)
         self._combo_shop_model.setStyleSheet(_COMBO)
         self._combo_shop_model.currentIndexChanged.connect(self._on_shop_model_changed)
         sel_row.addWidget(lbl_shop)
-        sel_row.addWidget(self._combo_shop_model, 1)
-        sel_row.addStretch()
+        sel_row.addWidget(self._combo_shop_model)
+        sel_row.addStretch(1)
         lay.addLayout(sel_row)
 
         # ── Tabel model ──────────────────────────────────────────────────────────
@@ -563,15 +564,17 @@ class MasterDataWidget(QWidget):
         self.tabel_model.setColumnCount(4)
         self.tabel_model.setHorizontalHeaderLabels(["No", "Model", "H/unit", "Aksi"])
         hh = self.tabel_model.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.Interactive)
+        hh.setSectionResizeMode(3, QHeaderView.Fixed)
         self.tabel_model.verticalHeader().setVisible(False)
         self.tabel_model.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_model.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_model.setStyleSheet(_TABLE)
         self.tabel_model.setColumnWidth(0, 45)
         self.tabel_model.setColumnWidth(2, 90)
-        self.tabel_model.setColumnWidth(3, 145)
+        self.tabel_model.setColumnWidth(3, 150)
         self.tabel_model.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_model)
         return card
@@ -579,8 +582,8 @@ class MasterDataWidget(QWidget):
     def _build_kategori_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Kategori Masalah")
@@ -596,15 +599,17 @@ class MasterDataWidget(QWidget):
         self.tabel_kategori.setColumnCount(4)
         self.tabel_kategori.setHorizontalHeaderLabels(["No", "Group", "Nama Kategori", "Aksi"])
         hh = self.tabel_kategori.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(2, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(1, QHeaderView.Interactive)
+        hh.setSectionResizeMode(3, QHeaderView.Fixed)
         self.tabel_kategori.verticalHeader().setVisible(False)
         self.tabel_kategori.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_kategori.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_kategori.setStyleSheet(_TABLE)
         self.tabel_kategori.setColumnWidth(0, 45)
         self.tabel_kategori.setColumnWidth(1, 130)
-        self.tabel_kategori.setColumnWidth(3, 145)
+        self.tabel_kategori.setColumnWidth(3, 150)
         self.tabel_kategori.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_kategori)
         return card
@@ -612,8 +617,8 @@ class MasterDataWidget(QWidget):
     def _build_shift_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shift")
@@ -632,8 +637,14 @@ class MasterDataWidget(QWidget):
              "Preparation (mnt)", "Sholat (mnt)", "Aksi"]
         )
         hh = self.tabel_shift.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.Interactive)
+        hh.setSectionResizeMode(3, QHeaderView.Interactive)
+        hh.setSectionResizeMode(4, QHeaderView.Interactive)
+        hh.setSectionResizeMode(5, QHeaderView.Interactive)
+        hh.setSectionResizeMode(6, QHeaderView.Interactive)
+        hh.setSectionResizeMode(7, QHeaderView.Fixed)
         self.tabel_shift.verticalHeader().setVisible(False)
         self.tabel_shift.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_shift.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -644,7 +655,7 @@ class MasterDataWidget(QWidget):
         self.tabel_shift.setColumnWidth(4, 90)
         self.tabel_shift.setColumnWidth(5, 100)
         self.tabel_shift.setColumnWidth(6, 85)
-        self.tabel_shift.setColumnWidth(7, 145)
+        self.tabel_shift.setColumnWidth(7, 150)
         self.tabel_shift.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_shift)
         return card
@@ -675,8 +686,11 @@ class MasterDataWidget(QWidget):
         self.tabel_user.setColumnCount(5)
         self.tabel_user.setHorizontalHeaderLabels(["No", "NIK", "Nama", "Role", "Aksi"])
         hh = self.tabel_user.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(2, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(1, QHeaderView.Interactive)
+        hh.setSectionResizeMode(3, QHeaderView.Interactive)
+        hh.setSectionResizeMode(4, QHeaderView.Fixed)
         self.tabel_user.verticalHeader().setVisible(False)
         self.tabel_user.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_user.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -684,7 +698,7 @@ class MasterDataWidget(QWidget):
         self.tabel_user.setColumnWidth(0, 45)
         self.tabel_user.setColumnWidth(1, 110)
         self.tabel_user.setColumnWidth(3, 80)
-        self.tabel_user.setColumnWidth(4, 205)
+        self.tabel_user.setColumnWidth(4, 175)
         tl.addWidget(self.tabel_user)
         lay.addWidget(card_t, 1)
         return tab
@@ -703,17 +717,18 @@ class MasterDataWidget(QWidget):
             self.tabel_section.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
             self.tabel_section.setItem(i, 1, _item(sname))
             self.tabel_section.setCellWidget(i, 2, self._aksi_section(sid, sname))
-            self.tabel_section.setRowHeight(i, 38)
+            self.tabel_section.setRowHeight(i, 40)
         _fit_table(self.tabel_section)
 
     def _aksi_section(self, sid: int, sname: str) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
         btn_e.clicked.connect(lambda _, s=sid, n=sname: self._edit_section(s, n))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         btn_d.clicked.connect(lambda _, s=sid, n=sname: self._hapus_section(s, n))
-        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
 
     def _tambah_section(self):
@@ -797,17 +812,18 @@ class MasterDataWidget(QWidget):
             self.tabel_model.setItem(i, 1, _item(m["model_name"]))
             self.tabel_model.setItem(i, 2, _item(f"{m['working_hour']:.6f}", Qt.AlignCenter))
             self.tabel_model.setCellWidget(i, 3, self._aksi_model(m))
-            self.tabel_model.setRowHeight(i, 38)
+            self.tabel_model.setRowHeight(i, 40)
         _fit_table(self.tabel_model)
 
     def _aksi_model(self, m: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
         btn_e.clicked.connect(lambda _, mm=m: self._edit_shop_model(mm))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         btn_d.clicked.connect(lambda _, mm=m: self._hapus_shop_model(mm["id"], mm["model_name"]))
-        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
 
     def _tambah_shop_model(self):
@@ -861,8 +877,8 @@ class MasterDataWidget(QWidget):
     def _build_work_center_card(self) -> QFrame:
         card = QFrame(); card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Work Center per Shop")
@@ -890,14 +906,15 @@ class MasterDataWidget(QWidget):
         self.tabel_wc.setColumnCount(3)
         self.tabel_wc.setHorizontalHeaderLabels(["No", "Work Center", "Aksi"])
         hh = self.tabel_wc.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
-        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.Fixed)
         self.tabel_wc.verticalHeader().setVisible(False)
         self.tabel_wc.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_wc.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_wc.setStyleSheet(_TABLE)
         self.tabel_wc.setColumnWidth(0, 45)
-        self.tabel_wc.setColumnWidth(2, 145)
+        self.tabel_wc.setColumnWidth(2, 150)
         self.tabel_wc.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_wc)
         return card
@@ -936,17 +953,18 @@ class MasterDataWidget(QWidget):
             self.tabel_wc.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
             self.tabel_wc.setItem(i, 1, _item(wc["name"]))
             self.tabel_wc.setCellWidget(i, 2, self._aksi_wc(wc))
-            self.tabel_wc.setRowHeight(i, 38)
+            self.tabel_wc.setRowHeight(i, 40)
         _fit_table(self.tabel_wc)
 
     def _aksi_wc(self, wc: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
         btn_e.clicked.connect(lambda _, x=wc: self._edit_work_center(x))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         btn_d.clicked.connect(lambda _, x=wc: self._hapus_work_center(x))
-        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
 
     def _tambah_work_center(self):
@@ -1011,21 +1029,22 @@ class MasterDataWidget(QWidget):
             self.tabel_user.setItem(i, 2, _item(u["name"]))
             self.tabel_user.setItem(i, 3, _item(u["role"], Qt.AlignCenter))
             self.tabel_user.setCellWidget(i, 4, self._aksi_user(u))
-            self.tabel_user.setRowHeight(i, 38)
+            self.tabel_user.setRowHeight(i, 40)
 
     def _aksi_user(self, u: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_pw = QPushButton("Reset PW"); btn_pw.setFixedSize(70, 26)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_pw = QPushButton("Reset PW"); btn_pw.setMinimumWidth(70); btn_pw.setFixedHeight(26)
         btn_pw.setStyleSheet(_BTN_RESET_PW)
         btn_pw.clicked.connect(lambda _, uid=u["id"], un=u["name"]: self._reset_pw(uid, un))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         is_self = u["id"] == self.user.get("id")
         btn_d.setEnabled(not is_self)
         if is_self:
             btn_d.setToolTip("Tidak bisa hapus akun sendiri")
         btn_d.clicked.connect(lambda _, uid=u["id"], un=u["name"]: self._hapus_user(uid, un))
-        hl.addWidget(btn_pw); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_pw); hl.addWidget(btn_d)
         return w
 
     def _tambah_user(self):
@@ -1093,7 +1112,7 @@ class MasterDataWidget(QWidget):
                 self.tabel_kategori.setItem(i, 1, _item(str(k.get("group_name") or "")))
                 self.tabel_kategori.setItem(i, 2, _item(str(k.get("name") or "")))
                 self.tabel_kategori.setCellWidget(i, 3, self._aksi_kategori(k))
-                self.tabel_kategori.setRowHeight(i, 38)
+                self.tabel_kategori.setRowHeight(i, 40)
             _fit_table(self.tabel_kategori)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Gagal memuat kategori: {e}")
@@ -1101,12 +1120,13 @@ class MasterDataWidget(QWidget):
 
     def _aksi_kategori(self, k: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
         btn_e.clicked.connect(lambda _, kk=k: self._edit_kategori(kk))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         btn_d.clicked.connect(lambda _, kk=k: self._hapus_kategori(kk))
-        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
 
     def _tambah_kategori(self):
@@ -1174,17 +1194,18 @@ class MasterDataWidget(QWidget):
             self.tabel_shift.setItem(i, 5, _item(f"{s['preparation_min']:.0f}", Qt.AlignCenter))
             self.tabel_shift.setItem(i, 6, _item(f"{s['sholat_min']:.0f}", Qt.AlignCenter))
             self.tabel_shift.setCellWidget(i, 7, self._aksi_shift(s))
-            self.tabel_shift.setRowHeight(i, 38)
+            self.tabel_shift.setRowHeight(i, 40)
         _fit_table(self.tabel_shift)
 
     def _aksi_shift(self, s: dict) -> QWidget:
         w = QWidget(); w.setStyleSheet("background: transparent;")
-        hl = QHBoxLayout(w); hl.setContentsMargins(6, 4, 6, 4); hl.setSpacing(6)
-        btn_e = QPushButton("Edit"); btn_e.setFixedSize(55, 26); btn_e.setStyleSheet(_BTN_EDIT)
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
         btn_e.clicked.connect(lambda _, ss=s: self._edit_shift(ss))
-        btn_d = QPushButton("Hapus"); btn_d.setFixedSize(55, 26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
         btn_d.clicked.connect(lambda _, ss=s: self._hapus_shift(ss))
-        hl.addWidget(btn_e); hl.addWidget(btn_d); hl.addStretch()
+        hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
 
     def _tambah_shift(self):

@@ -1,6 +1,7 @@
-from datetime import date as _date
+﻿from datetime import date as _date
 
-from modules.db_auth import get_connection
+from modules.db_auth import get_connection, release_connection
+from modules.cache import get as _c_get, set as _c_set, invalidate as _c_inv
 
 
 def get_dashboard_data() -> dict:
@@ -55,21 +56,25 @@ def get_dashboard_data() -> dict:
     except Exception:
         return {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": []}
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_all_sections() -> list:
+    cached = _c_get("sections")
+    if cached is not None:
+        return cached
     conn = get_connection()
     try:
         cur = conn.cursor()
         cur.execute("SELECT id, name FROM section ORDER BY name")
-        rows = cur.fetchall()
+        result = list(cur.fetchall())
         cur.close()
-        return rows
+        _c_set("sections", result)
+        return result
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_riwayat_laporan(
@@ -128,7 +133,7 @@ def get_riwayat_laporan(
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_detail_laporan(report_id: int) -> tuple:
@@ -276,7 +281,7 @@ def get_detail_laporan(report_id: int) -> tuple:
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_loss_time_per_bulan(section_id, tahun) -> list:
@@ -336,7 +341,60 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
+
+
+def get_monthly_loss_by_group(year: int) -> list:
+    """
+    12-item list (Jan-Des) untuk dashboard chart:
+    {'bulan': 1-12, 'total_hour': float, 'loss_total': float,
+     'process_pct': float, 'by_group': {'Production': x, ...}}
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT EXTRACT(MONTH FROM dr.date)::int, COALESCE(SUM(s.total_hours), 0)
+            FROM daily_report dr
+            JOIN shift s ON s.id = dr.shift_id
+            WHERE EXTRACT(YEAR FROM dr.date) = %s
+            GROUP BY 1
+        """, (year,))
+        shift_hours = {r[0]: float(r[1]) for r in cur.fetchall()}
+
+        cur.execute("""
+            SELECT EXTRACT(MONTH FROM dr.date)::int,
+                   pg.name, pg.order_num, COALESCE(SUM(pr.loss_time), 0)
+            FROM problem_record pr
+            JOIN daily_report dr ON dr.id = pr.report_id
+            JOIN problem_category pc ON pc.id = pr.category_id
+            JOIN problem_group pg ON pg.id = pc.group_id
+            WHERE EXTRACT(YEAR FROM dr.date) = %s
+            GROUP BY 1, 2, 3 ORDER BY 1, 3
+        """, (year,))
+        loss_map: dict[int, dict] = {}
+        for bulan, gname, _, val in cur.fetchall():
+            loss_map.setdefault(bulan, {})[gname] = float(val)
+
+        cur.close()
+        result = []
+        for m in range(1, 13):
+            total     = shift_hours.get(m, 0.0)
+            by_group  = loss_map.get(m, {})
+            loss_total = sum(by_group.values())
+            pct = round((total - loss_total) / total * 100, 1) if total > 0 else 0.0
+            result.append({
+                "bulan":       m,
+                "total_hour":  total,
+                "loss_total":  loss_total,
+                "process_pct": pct,
+                "by_group":    by_group,
+            })
+        return result
+    except Exception:
+        raise
+    finally:
+        release_connection(conn)
 
 
 def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
@@ -361,15 +419,6 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         prep_hour   = float(r[1] or 0)
         sholat_hour = float(r[2] or 0)
         report_count = int(r[3] or 0)
-
-        cur.execute(f"""
-            SELECT COALESCE(SUM(dp.actual_whour), 0)
-            FROM daily_production dp
-            JOIN daily_report dr ON dr.id = dp.report_id
-            WHERE EXTRACT(MONTH FROM dr.date) = %s
-              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
-        """, p)
-        process_hour = float((cur.fetchone() or [0])[0] or 0)
 
         cur.execute(f"""
             SELECT COALESCE(pcg.name, 'Others') AS grp,
@@ -401,6 +450,9 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         """, p)
         absence_hour = float((cur.fetchone() or [0])[0] or 0)
 
+        loss_hour    = sum(c["hours"] for c in categories)
+        process_hour = max(total_hour - prep_hour - sholat_hour - loss_hour - absence_hour, 0.0)
+
         cur.close()
         return {
             "total_hour":   total_hour,
@@ -414,7 +466,7 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_laporan(report_id: int) -> tuple[bool, str]:
@@ -438,7 +490,7 @@ def hapus_laporan(report_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus laporan: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def simpan_laporan_harian(
@@ -607,7 +659,7 @@ def simpan_laporan_harian(
         conn.rollback()
         return False, f"Gagal menyimpan laporan: {str(e)}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -626,11 +678,12 @@ def tambah_section(nama: str) -> tuple[bool, str]:
         conn.commit()
         cur.close()
         return True, f"Shop '{nama}' berhasil ditambahkan."
+        _c_inv('sections')
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah shop: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
@@ -652,7 +705,7 @@ def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal mengubah shop: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_section(section_id: int) -> tuple[bool, str]:
@@ -671,7 +724,7 @@ def hapus_section(section_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus shop: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -679,17 +732,22 @@ def hapus_section(section_id: int) -> tuple[bool, str]:
 # =============================================================================
 
 def get_all_users() -> list:
+    cached = _c_get("users")
+    if cached is not None:
+        return cached
     conn = get_connection()
     try:
         cur = conn.cursor()
         cur.execute('SELECT id, nik, name, role FROM "user" ORDER BY name')
         rows = cur.fetchall()
         cur.close()
-        return [{"id": r[0], "nik": r[1], "name": r[2], "role": r[3]} for r in rows]
+        result = [{"id": r[0], "nik": r[1], "name": r[2], "role": r[3]} for r in rows]
+        _c_set("users", result)
+        return result
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[bool, str]:
@@ -706,11 +764,12 @@ def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[boo
         conn.commit()
         cur.close()
         return True, f"User '{nama}' berhasil ditambahkan."
+        _c_inv('users')
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah user: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def reset_password_user(user_id: int, password_hash: str) -> tuple[bool, str]:
@@ -725,7 +784,7 @@ def reset_password_user(user_id: int, password_hash: str) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal reset password: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_user(user_id: int) -> tuple[bool, str]:
@@ -740,7 +799,7 @@ def hapus_user(user_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus user: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -748,20 +807,27 @@ def hapus_user(user_id: int) -> tuple[bool, str]:
 # =============================================================================
 
 def get_all_groups() -> list:
+    cached = _c_get("groups")
+    if cached is not None:
+        return cached
     conn = get_connection()
     try:
         cur = conn.cursor()
         cur.execute("SELECT id, name FROM problem_group ORDER BY id")
-        rows = cur.fetchall()
+        result = list(cur.fetchall())
         cur.close()
-        return rows
+        _c_set("groups", result)
+        return result
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_all_kategori() -> list:
+    cached = _c_get("categories")
+    if cached is not None:
+        return cached
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -774,16 +840,18 @@ def get_all_kategori() -> list:
         """)
         rows = cur.fetchall()
         cur.close()
-        return [
+        result = [
             {"id": r[0], "group_id": r[1], "group_name": r[2],
              "code": r[3], "name": r[4], "order_num": r[5],
              "parent_id": None}
             for r in rows
         ]
+        _c_set("categories", result)
+        return result
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_all_category_names() -> list[str]:
@@ -801,7 +869,7 @@ def get_all_category_names() -> list[str]:
     except Exception:
         return []
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def tambah_kategori(name: str, group_id: int) -> tuple[bool, str]:
@@ -827,11 +895,12 @@ def tambah_kategori(name: str, group_id: int) -> tuple[bool, str]:
         conn.commit()
         cur.close()
         return True, f"Kategori '{name}' berhasil ditambahkan."
+        _c_inv('categories')
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah kategori: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def edit_kategori(cat_id: int, name: str, group_id: int) -> tuple[bool, str]:
@@ -855,7 +924,7 @@ def edit_kategori(cat_id: int, name: str, group_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal mengubah kategori: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_kategori(cat_id: int) -> tuple[bool, str]:
@@ -874,7 +943,7 @@ def hapus_kategori(cat_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus kategori: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -896,10 +965,13 @@ def ensure_shift_columns():
     except Exception:
         conn.rollback()
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def get_all_shifts() -> list:
+    cached = _c_get("shifts")
+    if cached is not None:
+        return cached
     ensure_shift_columns()
     conn = get_connection()
     try:
@@ -911,7 +983,7 @@ def get_all_shifts() -> list:
         """)
         rows = cur.fetchall()
         cur.close()
-        return [
+        result = [
             {
                 "id":              r[0],
                 "name":            r[1],
@@ -923,10 +995,12 @@ def get_all_shifts() -> list:
             }
             for r in rows
         ]
+        _c_set("shifts", result)
+        return result
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool, str]:
@@ -941,7 +1015,7 @@ def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool,
         conn.rollback()
         return False, f"Gagal memperbarui working hour: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def tambah_shift(
@@ -963,11 +1037,12 @@ def tambah_shift(
         conn.commit()
         cur.close()
         return True, f"Shift '{name}' berhasil ditambahkan."
+        _c_inv('shifts')
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah shift: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def edit_shift(
@@ -996,7 +1071,7 @@ def edit_shift(
         conn.rollback()
         return False, f"Gagal mengubah shift: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_shift(shift_id: int) -> tuple[bool, str]:
@@ -1015,7 +1090,7 @@ def hapus_shift(shift_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus shift: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -1062,7 +1137,7 @@ def get_models_by_section(section_id: int) -> list:
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.0, cycle_time: float = 0.0) -> tuple[bool, str]:
@@ -1087,7 +1162,7 @@ def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.
         conn.rollback()
         return False, f"Gagal menambah model: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def edit_shop_model(model_id: int, model_name: str, working_hour: float, cycle_time: float = 0.0) -> tuple[bool, str]:
@@ -1105,7 +1180,7 @@ def edit_shop_model(model_id: int, model_name: str, working_hour: float, cycle_t
         conn.rollback()
         return False, f"Gagal mengubah model: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_shop_model(model_id: int) -> tuple[bool, str]:
@@ -1120,7 +1195,7 @@ def hapus_shop_model(model_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus model: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # =============================================================================
@@ -1172,7 +1247,7 @@ def get_work_centers_by_section(section_id: int) -> list:
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def tambah_work_center(section_id: int, name: str) -> tuple[bool, str]:
@@ -1197,7 +1272,7 @@ def tambah_work_center(section_id: int, name: str) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menambah work center: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def edit_work_center(wc_id: int, name: str) -> tuple[bool, str]:
@@ -1215,7 +1290,7 @@ def edit_work_center(wc_id: int, name: str) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal mengubah work center: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def hapus_work_center(wc_id: int) -> tuple[bool, str]:
@@ -1230,4 +1305,5 @@ def hapus_work_center(wc_id: int) -> tuple[bool, str]:
         conn.rollback()
         return False, f"Gagal menghapus work center: {e}"
     finally:
-        conn.close()
+        release_connection(conn)
+

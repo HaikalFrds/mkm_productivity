@@ -15,20 +15,21 @@ from modules.db_laporan import get_all_sections, get_loss_time_per_bulan
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 
-_CARD_STYLE = "QFrame { background-color: #252525; border-radius: 0px; }"
+# (prev: #252525 card, #1e1e1e input, #303030 border)
+_CARD_STYLE = "QFrame { background-color: #222222; border-radius: 0px; }"
 
 _COMBO_STYLE = """
     QComboBox {
-        background-color: #1e1e1e; border: 1px solid #303030;
-        border-radius: 2px; padding-left: 8px;
-        color: #ffffff; font-size: 11px; min-height: 30px;
+        background-color: #2a2a2a; border: 1px solid #2e2e2e;
+        border-radius: 0px; padding-left: 8px;
+        color: #f0f0f0; font-size: 11px; min-height: 30px;
     }
     QComboBox:focus { border: 1px solid #da291c; }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: #252525; color: #ffffff;
-        selection-background-color: #303030;
-        border: 1px solid #303030;
+        background-color: #1a1a1a; color: #f0f0f0;
+        selection-background-color: #2a2a2a;
+        border: 1px solid #2e2e2e;
     }
 """
 
@@ -36,7 +37,7 @@ _BTN_TAMPIL = """
     QPushButton {
         background-color: #da291c; color: #ffffff;
         border: none; border-radius: 0px; font-size: 11px; padding: 0 16px;
-        min-height: 30px;
+        min-height: 30px; letter-spacing: 1px; text-transform: uppercase;
     }
     QPushButton:hover { background-color: #b01e0a; }
 """

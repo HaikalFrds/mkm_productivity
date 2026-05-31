@@ -1,247 +1,479 @@
-import pyqtgraph as pg
+﻿import matplotlib
+matplotlib.use("QtAgg")
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QFrame, QTableWidget,
-    QTableWidgetItem, QHeaderView
+    QLabel, QFrame, QTableWidget, QTableWidgetItem,
+    QHeaderView, QPushButton, QSizePolicy,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import Qt, QDate
+from PySide6.QtGui import QColor
 
-from modules.db_laporan import get_dashboard_data
+from modules.db_laporan import get_dashboard_data, get_monthly_loss_by_group
 
 
-class StatCard(QFrame):
-    def __init__(self, title, value, subtitle="", color="#da291c"):
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+_MONTHS  = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]
+_DAYS_ID = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"]
+
+# (hex_color, db_group_name) — urutan order_num
+_GROUPS = [
+    ("#cc3333", "Production"),
+    ("#2255aa", "Maintenance"),
+    ("#e67e22", "PPC"),
+    ("#27ae60", "Quality Control"),
+    ("#8e44ad", "Production Engineering"),
+]
+
+TARGET_PROCESS = 86.0
+
+# (prev: #1e1e1e tbl, #303030 border, #252525 row, #969696 header)
+_TABLE_SS = """
+    QTableWidget {
+        background-color: #1a1a1a; border: 1px solid #2e2e2e; gridline-color: #2e2e2e;
+    }
+    QTableWidget::item {
+        color: #f0f0f0; padding: 4px 8px;
+        background-color: #222222; border-bottom: 1px solid #2e2e2e;
+    }
+    QTableWidget::item:alternate { background-color: #1e1e1e; }
+    QTableWidget::item:selected { background-color: #2a2a2a; }
+    QHeaderView::section {
+        background-color: #111111; color: #888888; border: none;
+        border-bottom: 1px solid #2e2e2e; border-right: 1px solid #2e2e2e;
+        padding: 5px 8px; font-weight: bold; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 1px;
+    }
+"""
+
+
+# ── Chart helpers ─────────────────────────────────────────────────────────────
+
+def _dark_ax(fig, ax):
+    """Terapkan dark theme ke axes tunggal."""
+    fig.patch.set_facecolor("#1a1a1a")
+    ax.set_facecolor("#111111")
+    ax.tick_params(axis="both", colors="#888888", labelsize=8)
+    ax.spines["left"].set_color("#404040")
+    ax.spines["bottom"].set_color("#404040")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.yaxis.grid(True, color="#2e2e2e", linewidth=0.6)
+    ax.set_axisbelow(True)
+
+
+def _dark_twin(ax2):
+    """Terapkan dark theme ke secondary (twinx) axis."""
+    ax2.tick_params(axis="y", colors="#4fc3f7", labelsize=8)
+    ax2.spines["right"].set_color("#4fc3f7")
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["left"].set_visible(False)
+    ax2.spines["bottom"].set_visible(False)
+    ax2.set_facecolor("none")
+    ax2.yaxis.set_label_position("right")
+    ax2.yaxis.tick_right()
+
+
+# ── StatCard ──────────────────────────────────────────────────────────────────
+
+class _StatCard(QFrame):
+    def __init__(self, title: str, init_val: str, subtitle: str, accent: str):
         super().__init__()
-        self.setObjectName("statCard")
-        self.setMinimumHeight(100)
-        self.setStyleSheet(f"""
-            #statCard {{
-                background-color: #252525;
-                border-radius: 0px;
-                border-left: 4px solid {color};
-            }}
-        """)
+        self.setFixedHeight(88)
+        self.setStyleSheet(
+            "QFrame { background-color: #222222; border-left: 3px solid #da291c; border-radius: 0px; }"
+        )
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 10, 14, 10)
+        lay.setSpacing(1)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
+        lbl_t = QLabel(title)
+        lbl_t.setStyleSheet(
+            "color: #888888; font-size: 9px; letter-spacing: 1px;"
+            " text-transform: uppercase; background: transparent; border: none;"
+        )
 
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #969696; font-size: 11px;")
+        self._val = QLabel(init_val)
+        self._val.setStyleSheet(
+            "color: #ffffff; font-size: 26px; font-weight: bold;"
+            " background: transparent; border: none;"
+        )
 
-        self.value_label = QLabel(str(value))
-        self.value_label.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: bold;")
+        lbl_s = QLabel(subtitle)
+        lbl_s.setStyleSheet(
+            "color: #555555; font-size: 9px; background: transparent; border: none;"
+        )
 
-        subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: #666666; font-size: 10px;")
+        lay.addWidget(lbl_t)
+        lay.addWidget(self._val)
+        lay.addWidget(lbl_s)
+        lay.addStretch()
 
-        layout.addWidget(title_label)
-        layout.addWidget(self.value_label)
-        layout.addWidget(subtitle_label)
+    def set_value(self, v: str):
+        self._val.setText(v)
 
-    def update_value(self, value):
-        self.value_label.setText(str(value))
 
+# ── DashboardWidget ───────────────────────────────────────────────────────────
 
 class DashboardWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
+        self._setup_ui()
 
-    def setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(15)
+    # ── UI ────────────────────────────────────────────────────────────────────
 
-        header = QLabel("Dashboard Produktivitas")
-        header.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; padding: 4px 0;")
-        main_layout.addWidget(header)
+    def _setup_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(16, 10, 16, 12)
+        outer.setSpacing(10)
 
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        outer.addLayout(self._build_header())
+        outer.addLayout(self._build_stat_row())
+        outer.addWidget(self._build_main_chart_card(), stretch=3)
+        outer.addLayout(self._build_bottom_row(), stretch=2)
 
-        self.card_laporan = StatCard(
-            "Total Laporan Hari Ini", "0",
-            "laporan harian", "#da291c"
-        )
-        self.card_losstime = StatCard(
-            "Total Loss Time Hari Ini", "0.00 H",
-            "jam terbuang", "#f39c12"
-        )
-        self.card_bulan = StatCard(
-            "Loss Time Bulan Ini", "0.00 H",
-            "akumulasi bulanan", "#27ae60"
+    # ── Header bar ────────────────────────────────────────────────────────────
+
+    def _build_header(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+
+        lbl = QLabel("DASHBOARD PRODUKSI")
+        lbl.setStyleSheet(
+            "color: #f0f0f0; font-size: 12px; font-weight: bold; letter-spacing: 2px;"
         )
 
-        cards_layout.addWidget(self.card_laporan)
-        cards_layout.addWidget(self.card_losstime)
-        cards_layout.addWidget(self.card_bulan)
-        main_layout.addLayout(cards_layout)
+        self._lbl_date = QLabel()
+        self._lbl_date.setStyleSheet("color: #555555; font-size: 11px;")
+        self._refresh_date()
 
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(12)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.VLine)
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(16)
+        sep.setStyleSheet("background-color: #404040; border: none;")
 
-        chart_frame = QFrame()
-        chart_frame.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
-        chart_layout = QVBoxLayout(chart_frame)
-        chart_layout.setContentsMargins(12, 12, 12, 12)
+        btn = QPushButton("↺  Refresh")
+        btn.setFixedSize(88, 26)
+        btn.setStyleSheet(
+            "QPushButton { background-color: #2a2a2a; color: #aaaaaa;"
+            "  border: 1px solid #3a3a3a; font-size: 11px; }"
+            "QPushButton:hover { background-color: #353535; color: #ffffff; }"
+        )
+        btn.clicked.connect(self.load_data)
 
-        chart_title = QLabel("Loss Time per Grup (Bulan Ini)")
-        chart_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
-        chart_layout.addWidget(chart_title)
+        row.addWidget(lbl)
+        row.addSpacing(12)
+        row.addWidget(sep)
+        row.addSpacing(12)
+        row.addWidget(self._lbl_date)
+        row.addStretch()
+        row.addWidget(btn)
+        return row
 
-        self.chart = self._create_chart([])
-        chart_layout.addWidget(self.chart)
+    def _refresh_date(self):
+        today = QDate.currentDate()
+        self._lbl_date.setText(
+            f"{_DAYS_ID[today.dayOfWeek()-1]}, "
+            f"{today.toString('d')} {_MONTHS[today.month()-1]} {today.toString('yyyy')}"
+        )
 
-        table_frame = QFrame()
-        table_frame.setStyleSheet("QFrame { background-color: #252525; border-radius: 0px; }")
-        table_layout = QVBoxLayout(table_frame)
-        table_layout.setContentsMargins(12, 12, 12, 12)
+    # ── Stat row ──────────────────────────────────────────────────────────────
 
-        table_title = QLabel("Laporan Terbaru")
-        table_title.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold; margin-bottom: 4px;")
-        table_layout.addWidget(table_title)
+    def _build_stat_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        self._c_laporan  = _StatCard("LAPORAN HARI INI",      "0",      "laporan harian",    "#da291c")
+        self._c_loss_hr  = _StatCard("LOSS TIME HARI INI",    "0.00 H", "jam terbuang",      "#e67e22")
+        self._c_process  = _StatCard("PROCESS RATIO BLN INI", "— %",    "efisiensi produksi","#4fc3f7")
+        self._c_loss_bln = _StatCard("TOTAL LOSS BLN INI",    "0.00 H", "akumulasi bulanan", "#27ae60")
+        for c in (self._c_laporan, self._c_loss_hr, self._c_process, self._c_loss_bln):
+            row.addWidget(c)
+        return row
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Tanggal", "Shop", "Loss Time", "Status"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e1e1e;
-                border: 1px solid #303030;
-                gridline-color: #303030;
-            }
-            QTableWidget::item {
-                color: #ffffff;
-                padding: 4px 8px;
-                background-color: #252525;
-                border-bottom: 1px solid #303030;
-            }
-            QTableWidget::item:selected {
-                background-color: #303030;
-                color: #ffffff;
-            }
-            QHeaderView::section {
-                background-color: #111111;
-                color: #969696;
-                border: none;
-                border-bottom: 1px solid #303030;
-                border-right: 1px solid #303030;
-                padding: 5px;
-                font-weight: bold;
-                font-size: 10px;
-            }
-        """)
-        table_layout.addWidget(self.table)
+    # ── Main chart ────────────────────────────────────────────────────────────
 
-        content_layout.addWidget(chart_frame, stretch=3)
-        content_layout.addWidget(table_frame, stretch=2)
-        main_layout.addLayout(content_layout)
+    def _build_main_chart_card(self) -> QFrame:
+        card = QFrame()
+        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(14, 10, 14, 10)
+        lay.setSpacing(6)
+
+        hdr = QHBoxLayout()
+        lbl = QLabel("PERFORMANCE — Loss Time per Bulan + Process Ratio")
+        lbl.setStyleSheet(
+            "color: #dddddd; font-size: 11px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
+        self._lbl_year = QLabel()
+        self._lbl_year.setStyleSheet("color: #444444; font-size: 10px;")
+        hdr.addWidget(lbl); hdr.addStretch(); hdr.addWidget(self._lbl_year)
+        lay.addLayout(hdr)
+
+        self._fig = Figure(facecolor="#252525")
+        self._fig.subplots_adjust(left=0.07, right=0.93, top=0.88, bottom=0.13)
+        self._ax1 = self._fig.add_subplot(111)
+        self._ax2 = self._ax1.twinx()
+        _dark_ax(self._fig, self._ax1)
+        _dark_twin(self._ax2)
+
+        self._canvas = FigureCanvas(self._fig)
+        self._canvas.setMinimumHeight(220)
+        self._canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        lay.addWidget(self._canvas)
+        return card
+
+    # ── Bottom row ────────────────────────────────────────────────────────────
+
+    def _build_bottom_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addWidget(self._build_top3_card(), stretch=2)
+        row.addWidget(self._build_recent_card(), stretch=3)
+        return row
+
+    def _build_top3_card(self) -> QFrame:
+        card = QFrame()
+        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(14, 10, 14, 10)
+        lay.setSpacing(6)
+
+        lbl = QLabel("THE BIG THREE — Loss Bulan Ini")
+        lbl.setStyleSheet(
+            "color: #dddddd; font-size: 11px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
+        lay.addWidget(lbl)
+
+        self._fig3 = Figure(facecolor="#252525")
+        self._fig3.subplots_adjust(left=0.30, right=0.88, top=0.88, bottom=0.14)
+        self._ax3 = self._fig3.add_subplot(111)
+        _dark_ax(self._fig3, self._ax3)
+
+        self._canvas3 = FigureCanvas(self._fig3)
+        self._canvas3.setMinimumHeight(130)
+        self._canvas3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        lay.addWidget(self._canvas3)
+        return card
+
+    def _build_recent_card(self) -> QFrame:
+        card = QFrame()
+        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(14, 10, 14, 10)
+        lay.setSpacing(6)
+
+        lbl = QLabel("LAPORAN TERBARU")
+        lbl.setStyleSheet(
+            "color: #dddddd; font-size: 11px; font-weight: bold;"
+            " border-left: 3px solid #da291c; padding-left: 8px;"
+        )
+        lay.addWidget(lbl)
+
+        self._tbl = QTableWidget()
+        self._tbl.setColumnCount(4)
+        self._tbl.setHorizontalHeaderLabels(["Tanggal", "Shop", "Loss (H)", "Status"])
+        hh = self._tbl.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(2, QHeaderView.Fixed)
+        hh.setSectionResizeMode(3, QHeaderView.Fixed)
+        self._tbl.setColumnWidth(2, 80)
+        self._tbl.setColumnWidth(3, 90)
+        self._tbl.verticalHeader().setVisible(False)
+        self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._tbl.setSelectionBehavior(QTableWidget.SelectRows)
+        self._tbl.setStyleSheet(_TABLE_SS)
+        lay.addWidget(self._tbl)
+        return card
+
+    # ── Events ────────────────────────────────────────────────────────────────
 
     def showEvent(self, event):
         super().showEvent(event)
         self.load_data()
 
+    # ── Data ──────────────────────────────────────────────────────────────────
+
     def load_data(self):
+        self._refresh_date()
+        year = QDate.currentDate().year()
+        self._lbl_year.setText(f"Tahun {year}")
+
         try:
-            data = get_dashboard_data()
+            today = get_dashboard_data()
         except Exception:
-            return
+            today = {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": []}
 
-        self.card_laporan.update_value(str(data["report_count"]))
-        self.card_losstime.update_value(f"{data['loss_today']:.2f} H")
+        try:
+            monthly = get_monthly_loss_by_group(year)
+        except Exception:
+            monthly = []
 
-        monthly_total = sum(c["hours"] for c in data["categories"])
-        self.card_bulan.update_value(f"{monthly_total:.2f} H")
+        self._update_stats(today, monthly)
+        self._update_main_chart(monthly)
+        self._update_top3(today.get("categories", []))
+        self._update_recent(today.get("recent", []))
 
-        self._update_chart(data["categories"])
-        self._update_table(data["recent"])
+    def _update_stats(self, today: dict, monthly: list):
+        self._c_laporan.set_value(str(today.get("report_count", 0)))
+        self._c_loss_hr.set_value(f"{today.get('loss_today', 0.0):.2f} H")
 
-    def _create_chart(self, categories: list):
-        pg.setConfigOption('background', (37, 37, 37))
-        pg.setConfigOption('foreground', (150, 150, 150))
+        if monthly:
+            m = monthly[QDate.currentDate().month() - 1]
+            total = m.get("total_hour", 0.0)
+            loss  = m.get("loss_total", 0.0)
+            pct   = m.get("process_pct", 0.0)
+            if total > 0:
+                self._c_process.set_value(f"{pct:.1f} %")
+                self._c_loss_bln.set_value(f"{loss:.2f} H")
+                return
+        # fallback ke categories dari today
+        cats = today.get("categories", [])
+        self._c_loss_bln.set_value(f"{sum(c['hours'] for c in cats):.2f} H")
+        self._c_process.set_value("— %")
 
-        plot = pg.PlotWidget()
-        plot.setMinimumHeight(280)
-        plot.showGrid(x=False, y=True, alpha=0.2)
-        plot.getAxis('bottom').setStyle(tickFont=QFont("Segoe UI", 9))
-        plot.getAxis('left').setStyle(tickFont=QFont("Segoe UI", 9))
-        plot.getPlotItem().hideButtons()
-        plot.setMouseEnabled(x=False, y=False)
-        plot.setMenuEnabled(False)
-        plot.setLabel('left', 'Loss Time (H)')
+    def _update_main_chart(self, monthly: list):
+        ax1, ax2 = self._ax1, self._ax2
+        ax1.cla(); ax2.cla()
+        _dark_ax(self._fig, ax1)
+        _dark_twin(ax2)
 
-        _CHART_COLORS = [
-            (230, 50,  50),
-            (200, 80,  50),
-            (180, 100, 50),
-            (160, 120, 50),
-            (140, 140, 50),
-        ]
+        x = list(range(12))
+        has_data = monthly and any(
+            any(v > 0 for v in m.get("by_group", {}).values()) for m in monthly
+        )
 
-        if categories:
-            for i, cat in enumerate(categories):
-                color = _CHART_COLORS[i % len(_CHART_COLORS)]
-                bar = pg.BarGraphItem(
-                    x=[i], height=[cat["hours"]], width=0.6,
-                    brush=pg.mkBrush(*color, 200),
-                    pen=pg.mkPen(*color, width=1)
-                )
-                plot.addItem(bar)
-            ticks = [(i, c["group"]) for i, c in enumerate(categories)]
-            plot.getAxis('bottom').setTicks([ticks])
+        if has_data:
+            bottoms   = [0.0] * 12
+            max_total = 0.0
+            for color, gname in _GROUPS:
+                heights = [monthly[i]["by_group"].get(gname, 0.0) for i in range(12)]
+                ax1.bar(x, heights, bottom=bottoms, color=color,
+                        label=gname, width=0.6, alpha=0.88, zorder=3)
+                # Label dalam segmen (hanya jika tinggi cukup)
+                for i, (h, b) in enumerate(zip(heights, bottoms)):
+                    if h >= 0.3:
+                        ax1.text(i, b + h / 2, f"{h:.1f}",
+                                 ha="center", va="center",
+                                 fontsize=6, color="#ffffff", fontweight="bold", zorder=4)
+                bottoms = [b + h for b, h in zip(bottoms, heights)]
+            max_total = max(bottoms) if bottoms else 1.0
 
-        return plot
+            # Label total di atas bar
+            for i, top in enumerate(bottoms):
+                if top > 0:
+                    ax1.text(i, top + max_total * 0.02, f"{top:.1f}",
+                             ha="center", va="bottom",
+                             fontsize=7, color="#aaaaaa", zorder=5)
 
-    def _update_chart(self, categories: list):
-        _CHART_COLORS = [
-            (230, 50,  50),
-            (200, 80,  50),
-            (180, 100, 50),
-            (160, 120, 50),
-            (140, 140, 50),
-        ]
+            ax1.set_ylim(0, max_total * 1.25)
 
-        self.chart.clear()
-        if not categories:
-            self.chart.getAxis('bottom').setTicks([[]])
-            return
+            # Process % line
+            pcts  = [monthly[i]["process_pct"] for i in range(12)]
+            px    = [i for i, p in enumerate(pcts) if monthly[i]["total_hour"] > 0]
+            py    = [pcts[i] for i in px]
+            if px:
+                ax2.plot(px, py, color="#4fc3f7", linewidth=2.5,
+                         marker="o", markersize=5, zorder=6, label="Process %")
+                for xi, yi in zip(px, py):
+                    ax2.annotate(f"{yi:.1f}",
+                                 xy=(xi, yi),
+                                 xytext=(0, 7), textcoords="offset points",
+                                 ha="center", fontsize=7, color="#4fc3f7", zorder=7)
 
-        for i, cat in enumerate(categories):
-            color = _CHART_COLORS[i % len(_CHART_COLORS)]
-            bar = pg.BarGraphItem(
-                x=[i], height=[cat["hours"]], width=0.6,
-                brush=pg.mkBrush(*color, 200),
-                pen=pg.mkPen(*color, width=1)
+            # Target line
+            ax2.axhline(y=TARGET_PROCESS, color="#e74c3c", linestyle="--",
+                        linewidth=1.5, alpha=0.7, zorder=4,
+                        label=f"Target {TARGET_PROCESS:.0f}%")
+            ax2.text(11.6, TARGET_PROCESS + 2, f"{TARGET_PROCESS:.0f}",
+                     fontsize=8, color="#e74c3c", ha="left", va="bottom")
+
+        else:
+            # Empty state
+            ax1.set_ylim(0, 10)
+            ax1.text(0.5, 0.5, "Belum ada data untuk tahun ini",
+                     transform=ax1.transAxes, ha="center", va="center",
+                     color="#444444", fontsize=11)
+
+        # Axis formatting — selalu dijalankan
+        ax1.set_xlim(-0.5, 11.5)
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(_MONTHS, fontsize=8, color="#888888")
+        ax1.set_ylabel("Loss (H)", fontsize=8, color="#888888", labelpad=4)
+        ax2.set_ylim(0, 115)
+        ax2.set_ylabel("Process (%)", fontsize=8, color="#4fc3f7", labelpad=4)
+
+        if has_data:
+            h1, l1 = ax1.get_legend_handles_labels()
+            h2, l2 = ax2.get_legend_handles_labels()
+            ax1.legend(
+                h1 + h2, l1 + l2,
+                loc="upper left", fontsize=7.5, ncol=4,
+                framealpha=0.2, facecolor="#1e1e1e",
+                labelcolor="#cccccc", edgecolor="#3a3a3a",
             )
-            self.chart.addItem(bar)
 
-        ticks = [(i, c["group"]) for i, c in enumerate(categories)]
-        self.chart.getAxis('bottom').setTicks([ticks])
+        self._canvas.draw()
 
-    def _update_table(self, recent: list):
-        self.table.setRowCount(len(recent))
+    def _update_top3(self, categories: list):
+        ax = self._ax3
+        ax.cla()
+        _dark_ax(self._fig3, ax)
+
+        top3 = [c for c in sorted(categories, key=lambda c: c["hours"], reverse=True)
+                if c["hours"] > 0][:3]
+
+        if top3:
+            names  = [c["group"] for c in top3]
+            vals   = [c["hours"] for c in top3]
+            colors = [next((col for col, gn in _GROUPS if gn == n), "#888888") for n in names]
+            ypos   = list(range(len(top3)))
+            max_v  = max(vals)
+
+            ax.barh(ypos, vals, color=colors, alpha=0.88, height=0.5, zorder=3)
+            ax.set_yticks(ypos)
+            ax.set_yticklabels(names, fontsize=8.5, color="#cccccc")
+            for i, v in enumerate(vals):
+                ax.text(v + max_v * 0.04, i, f"{v:.2f} H",
+                        va="center", fontsize=8.5, color="#aaaaaa")
+            ax.set_xlim(0, max_v * 1.45)
+            ax.set_ylim(-0.5, len(top3) - 0.5)
+            ax.xaxis.grid(True, color="#2e2e2e", linewidth=0.5)
+            ax.set_axisbelow(True)
+        else:
+            ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+            ax.set_xticks([]); ax.set_yticks([])
+            ax.text(0.5, 0.5, "Tidak ada data",
+                    transform=ax.transAxes, ha="center", va="center",
+                    color="#444444", fontsize=10)
+
+        ax.set_title("Top 3 Groups (Bln Ini)", fontsize=9, color="#888888", pad=5)
+        ax.spines["bottom"].set_color("#404040")
+        self._canvas3.draw()
+
+    def _update_recent(self, recent: list):
+        tbl = self._tbl
+        tbl.setRowCount(len(recent))
         for row, r in enumerate(recent):
-            date_str = r["date"].strftime("%d %b %Y") if hasattr(r["date"], "strftime") else str(r["date"])
-            self.table.setItem(row, 0, QTableWidgetItem(date_str))
-            self.table.setItem(row, 1, QTableWidgetItem(r["shop"]))
-            self.table.setItem(row, 2, QTableWidgetItem(f"{r['loss']:.2f} H"))
+            date_str = (r["date"].strftime("%d %b %Y")
+                        if hasattr(r["date"], "strftime") else str(r["date"]))
+            tbl.setItem(row, 0, QTableWidgetItem(date_str))
+            tbl.setItem(row, 1, QTableWidgetItem(r["shop"]))
+            tbl.setItem(row, 2, QTableWidgetItem(f"{r['loss']:.2f}"))
+            status = r.get("status") or "draft"
+            it = QTableWidgetItem(status)
+            it.setTextAlignment(Qt.AlignCenter)
+            it.setForeground(
+                QColor("#27ae60") if status == "approved" else QColor("#e67e22")
+            )
+            tbl.setItem(row, 3, it)
+            tbl.setRowHeight(row, 30)
 
-            status = r.get("status", "")
-            status_item = QTableWidgetItem(status or "-")
-            if status == "approved":
-                status_item.setForeground(QColor("#27ae60"))
-            else:
-                status_item.setForeground(QColor("#f39c12"))
-            self.table.setItem(row, 3, status_item)
+    def refresh_data(self, *_):
+        self.load_data()
 
-    def refresh_data(self, laporan_count=0, loss_time=0.0, produktivitas=0.0):
-        self.card_laporan.update_value(str(laporan_count))
-        self.card_losstime.update_value(f"{loss_time:.2f} H")
-        self.card_bulan.update_value(f"{produktivitas:.1f}%")

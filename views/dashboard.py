@@ -54,14 +54,14 @@ _TABLE_SS = """
 
 def _dark_ax(fig, ax):
     """Terapkan dark theme ke axes tunggal."""
-    fig.patch.set_facecolor("#1a1a1a")
+    fig.patch.set_facecolor("#111111")
     ax.set_facecolor("#111111")
-    ax.tick_params(axis="both", colors="#888888", labelsize=8)
-    ax.spines["left"].set_color("#404040")
-    ax.spines["bottom"].set_color("#404040")
+    ax.tick_params(axis="both", colors="#555555", labelsize=8)
+    ax.spines["left"].set_color("#2e2e2e")
+    ax.spines["bottom"].set_color("#2e2e2e")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.yaxis.grid(True, color="#2e2e2e", linewidth=0.6)
+    ax.yaxis.grid(True, color="#1e1e1e", linewidth=0.5, linestyle="--")
     ax.set_axisbelow(True)
 
 
@@ -214,7 +214,7 @@ class DashboardWidget(QWidget):
         hdr.addWidget(lbl); hdr.addStretch(); hdr.addWidget(self._lbl_year)
         lay.addLayout(hdr)
 
-        self._fig = Figure(facecolor="#252525")
+        self._fig = Figure(facecolor="#111111")
         self._fig.subplots_adjust(left=0.07, right=0.93, top=0.88, bottom=0.13)
         self._ax1 = self._fig.add_subplot(111)
         self._ax2 = self._ax1.twinx()
@@ -250,7 +250,7 @@ class DashboardWidget(QWidget):
         )
         lay.addWidget(lbl)
 
-        self._fig3 = Figure(facecolor="#252525")
+        self._fig3 = Figure(facecolor="#111111")
         self._fig3.subplots_adjust(left=0.30, right=0.88, top=0.88, bottom=0.14)
         self._ax3 = self._fig3.add_subplot(111)
         _dark_ax(self._fig3, self._ax3)
@@ -323,19 +323,21 @@ class DashboardWidget(QWidget):
         self._c_laporan.set_value(str(today.get("report_count", 0)))
         self._c_loss_hr.set_value(f"{today.get('loss_today', 0.0):.2f} H")
 
+        process_ratio = today.get("process_ratio")
+        if process_ratio is not None:
+            self._c_process.set_value(f"{process_ratio:.1f} %")
+        else:
+            self._c_process.set_value("— %")
+
         if monthly:
             m = monthly[QDate.currentDate().month() - 1]
             total = m.get("total_hour", 0.0)
             loss  = m.get("loss_total", 0.0)
-            pct   = m.get("process_pct", 0.0)
             if total > 0:
-                self._c_process.set_value(f"{pct:.1f} %")
                 self._c_loss_bln.set_value(f"{loss:.2f} H")
                 return
-        # fallback ke categories dari today
         cats = today.get("categories", [])
         self._c_loss_bln.set_value(f"{sum(c['hours'] for c in cats):.2f} H")
-        self._c_process.set_value("— %")
 
     def _update_main_chart(self, monthly: list):
         ax1, ax2 = self._ax1, self._ax2
@@ -354,13 +356,13 @@ class DashboardWidget(QWidget):
             for color, gname in _GROUPS:
                 heights = [monthly[i]["by_group"].get(gname, 0.0) for i in range(12)]
                 ax1.bar(x, heights, bottom=bottoms, color=color,
-                        label=gname, width=0.6, alpha=0.88, zorder=3)
+                        label=gname, width=0.45, alpha=0.92, zorder=3)
                 # Label dalam segmen (hanya jika tinggi cukup)
                 for i, (h, b) in enumerate(zip(heights, bottoms)):
                     if h >= 0.3:
                         ax1.text(i, b + h / 2, f"{h:.1f}",
                                  ha="center", va="center",
-                                 fontsize=6, color="#ffffff", fontweight="bold", zorder=4)
+                                 fontsize=6, color="white", alpha=0.7, zorder=4)
                 bottoms = [b + h for b, h in zip(bottoms, heights)]
             max_total = max(bottoms) if bottoms else 1.0
 
@@ -378,20 +380,23 @@ class DashboardWidget(QWidget):
             px    = [i for i, p in enumerate(pcts) if monthly[i]["total_hour"] > 0]
             py    = [pcts[i] for i in px]
             if px:
-                ax2.plot(px, py, color="#4fc3f7", linewidth=2.5,
-                         marker="o", markersize=5, zorder=6, label="Process %")
+                ax2.plot(px, py, color="#4fc3f7", linewidth=1.8,
+                         marker="o", markersize=4, markerfacecolor="#111111",
+                         markeredgecolor="#4fc3f7", markeredgewidth=1.5,
+                         zorder=6, label="Process %")
                 for xi, yi in zip(px, py):
                     ax2.annotate(f"{yi:.1f}",
                                  xy=(xi, yi),
-                                 xytext=(0, 7), textcoords="offset points",
-                                 ha="center", fontsize=7, color="#4fc3f7", zorder=7)
+                                 xytext=(0, 6), textcoords="offset points",
+                                 ha="center", fontsize=7, color="#4fc3f7",
+                                 alpha=0.85, zorder=7)
 
             # Target line
-            ax2.axhline(y=TARGET_PROCESS, color="#e74c3c", linestyle="--",
-                        linewidth=1.5, alpha=0.7, zorder=4,
+            ax2.axhline(y=TARGET_PROCESS, color="#da291c", linestyle="--",
+                        linewidth=1.0, alpha=0.5, zorder=4,
                         label=f"Target {TARGET_PROCESS:.0f}%")
             ax2.text(11.6, TARGET_PROCESS + 2, f"{TARGET_PROCESS:.0f}",
-                     fontsize=8, color="#e74c3c", ha="left", va="bottom")
+                     fontsize=8, color="#da291c", ha="left", va="bottom")
 
         else:
             # Empty state
@@ -413,9 +418,9 @@ class DashboardWidget(QWidget):
             h2, l2 = ax2.get_legend_handles_labels()
             ax1.legend(
                 h1 + h2, l1 + l2,
-                loc="upper left", fontsize=7.5, ncol=4,
-                framealpha=0.2, facecolor="#1e1e1e",
-                labelcolor="#cccccc", edgecolor="#3a3a3a",
+                loc="upper left", fontsize=7, ncol=3,
+                framealpha=0.0, facecolor="none",
+                labelcolor="#888888", edgecolor="none",
             )
 
         self._canvas.draw()
@@ -435,12 +440,12 @@ class DashboardWidget(QWidget):
             ypos   = list(range(len(top3)))
             max_v  = max(vals)
 
-            ax.barh(ypos, vals, color=colors, alpha=0.88, height=0.5, zorder=3)
+            ax.barh(ypos, vals, color=colors, alpha=0.85, height=0.4, zorder=3)
             ax.set_yticks(ypos)
             ax.set_yticklabels(names, fontsize=8.5, color="#cccccc")
             for i, v in enumerate(vals):
-                ax.text(v + max_v * 0.04, i, f"{v:.2f} H",
-                        va="center", fontsize=8.5, color="#aaaaaa")
+                ax.text(v + max_v * 0.03, i, f"{v:.2f} H",
+                        va="center", fontsize=8, color="#888888")
             ax.set_xlim(0, max_v * 1.45)
             ax.set_ylim(-0.5, len(top3) - 0.5)
             ax.xaxis.grid(True, color="#2e2e2e", linewidth=0.5)

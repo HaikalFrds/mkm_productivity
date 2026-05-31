@@ -46,12 +46,40 @@ def get_dashboard_data() -> dict:
         recent = [{"date": r[0], "shop": r[1], "loss": float(r[2]), "status": r[3]}
                   for r in cur.fetchall()]
 
+        cur.execute("""
+            SELECT
+                COALESCE(SUM(s.total_hours), 0),
+                COALESCE(SUM(s.preparation_min / 60.0), 0),
+                COALESCE(SUM(s.sholat_min / 60.0), 0)
+            FROM daily_report dr
+            JOIN shift s ON s.id = dr.shift_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s
+        """, (today.month, today.year))
+        r = cur.fetchone()
+        total_hour_bln  = float(r[0] or 0)
+        prep_hour_bln   = float(r[1] or 0)
+        sholat_hour_bln = float(r[2] or 0)
+
+        cur.execute("""
+            SELECT COALESCE(SUM(pr.loss_time), 0)
+            FROM problem_record pr
+            JOIN daily_report dr ON dr.id = pr.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s
+        """, (today.month, today.year))
+        loss_bln = float((cur.fetchone() or [0])[0] or 0)
+
+        process_hour_bln = max(total_hour_bln - loss_bln - prep_hour_bln - sholat_hour_bln, 0.0)
+        process_ratio    = (process_hour_bln / total_hour_bln * 100) if total_hour_bln > 0 else 0.0
+
         cur.close()
         return {
-            "report_count": report_count,
-            "loss_today":   loss_today,
-            "categories":   categories,
-            "recent":       recent,
+            "report_count":  report_count,
+            "loss_today":    loss_today,
+            "categories":    categories,
+            "recent":        recent,
+            "process_ratio": process_ratio,
         }
     except Exception:
         return {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": []}
@@ -302,13 +330,21 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
 
         cur.execute(f"""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
-                   SUM(dp.actual_whour)
-            FROM daily_production dp
-            JOIN daily_report dr ON dr.id = dp.report_id
+                   SUM(s.total_hours),
+                   SUM(s.preparation_min / 60.0),
+                   SUM(s.sholat_min / 60.0)
+            FROM daily_report dr
+            JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(YEAR FROM dr.date) = %s {sec}
             GROUP BY 1
         """, p)
-        hours = {r[0]: float(r[1] or 0) for r in cur.fetchall()}
+        hours      = {}
+        prep_map   = {}
+        sholat_map = {}
+        for r in cur.fetchall():
+            hours[r[0]]      = float(r[1] or 0)
+            prep_map[r[0]]   = float(r[2] or 0)
+            sholat_map[r[0]] = float(r[3] or 0)
 
         cur.execute(f"""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
@@ -327,10 +363,12 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
         cur.close()
         result = []
         for m in range(1, 13):
-            total = hours.get(m, 0.0)
-            lbc   = loss_map.get(m, {})
+            total  = hours.get(m, 0.0)
+            lbc    = loss_map.get(m, {})
             loss_total   = sum(lbc.values())
-            process_hour = max(total - loss_total, 0.0)
+            prep   = prep_map.get(m, 0.0)
+            sholat = sholat_map.get(m, 0.0)
+            process_hour = max(total - loss_total - prep - sholat, 0.0)
             result.append({
                 "bulan":            m,
                 "total_hour":       total,
@@ -354,13 +392,22 @@ def get_monthly_loss_by_group(year: int) -> list:
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT EXTRACT(MONTH FROM dr.date)::int, COALESCE(SUM(s.total_hours), 0)
+            SELECT EXTRACT(MONTH FROM dr.date)::int,
+                   COALESCE(SUM(s.total_hours), 0),
+                   COALESCE(SUM(s.preparation_min / 60.0), 0),
+                   COALESCE(SUM(s.sholat_min / 60.0), 0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(YEAR FROM dr.date) = %s
             GROUP BY 1
         """, (year,))
-        shift_hours = {r[0]: float(r[1]) for r in cur.fetchall()}
+        shift_hours = {}
+        prep_map    = {}
+        sholat_map  = {}
+        for r in cur.fetchall():
+            shift_hours[r[0]] = float(r[1])
+            prep_map[r[0]]    = float(r[2])
+            sholat_map[r[0]]  = float(r[3])
 
         cur.execute("""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
@@ -379,10 +426,13 @@ def get_monthly_loss_by_group(year: int) -> list:
         cur.close()
         result = []
         for m in range(1, 13):
-            total     = shift_hours.get(m, 0.0)
-            by_group  = loss_map.get(m, {})
+            total      = shift_hours.get(m, 0.0)
+            by_group   = loss_map.get(m, {})
             loss_total = sum(by_group.values())
-            pct = round((total - loss_total) / total * 100, 1) if total > 0 else 0.0
+            prep       = prep_map.get(m, 0.0)
+            sholat     = sholat_map.get(m, 0.0)
+            process    = max(total - loss_total - prep - sholat, 0.0)
+            pct        = round(process / total * 100, 1) if total > 0 else 0.0
             result.append({
                 "bulan":       m,
                 "total_hour":  total,
@@ -677,8 +727,8 @@ def tambah_section(nama: str) -> tuple[bool, str]:
         cur.execute("INSERT INTO section (code, name) VALUES (%s, %s)", (code, nama))
         conn.commit()
         cur.close()
-        return True, f"Shop '{nama}' berhasil ditambahkan."
         _c_inv('sections')
+        return True, f"Shop '{nama}' berhasil ditambahkan."
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah shop: {e}"
@@ -763,8 +813,8 @@ def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[boo
         )
         conn.commit()
         cur.close()
-        return True, f"User '{nama}' berhasil ditambahkan."
         _c_inv('users')
+        return True, f"User '{nama}' berhasil ditambahkan."
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah user: {e}"
@@ -894,8 +944,8 @@ def tambah_kategori(name: str, group_id: int) -> tuple[bool, str]:
         )
         conn.commit()
         cur.close()
-        return True, f"Kategori '{name}' berhasil ditambahkan."
         _c_inv('categories')
+        return True, f"Kategori '{name}' berhasil ditambahkan."
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah kategori: {e}"
@@ -1036,8 +1086,8 @@ def tambah_shift(
         )
         conn.commit()
         cur.close()
-        return True, f"Shift '{name}' berhasil ditambahkan."
         _c_inv('shifts')
+        return True, f"Shift '{name}' berhasil ditambahkan."
     except Exception as e:
         conn.rollback()
         return False, f"Gagal menambah shift: {e}"

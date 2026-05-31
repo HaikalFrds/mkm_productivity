@@ -10,9 +10,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate, QThread, Signal
 from PySide6.QtGui import QColor
 
-from modules.db_auth import get_connection
+from modules.db_auth import get_connection, release_connection
 from modules.db_laporan import (
-    get_all_sections, get_all_shifts,
+    get_all_sections, get_all_shifts, get_all_category_names,
     get_detail_laporan, hapus_laporan, get_monthly_productivity,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
@@ -130,41 +130,52 @@ _BTN_EXPORT = """
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
-def _db_rekap_bulanan(section_id, bulan, tahun):
+def _db_display_line_stop(section_id, bulan, tahun, factor=None):
     conn = get_connection()
     try:
         cur = conn.cursor()
         sec = " AND dr.section_id = %s" if section_id is not None else ""
-        p1 = [bulan, tahun] + ([section_id] if section_id else [])
-        cur.execute(f"""
-            SELECT COALESCE(pc.name, 'Lainnya') AS kategori,
-                   COALESCE(SUM(pr.loss_time), 0) AS total_loss
-            FROM problem_record pr
-            LEFT JOIN problem_category pc ON pc.id = pr.category_id
-            JOIN daily_report dr ON dr.id = pr.report_id
-            WHERE EXTRACT(MONTH FROM dr.date) = %s
-              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
-            GROUP BY COALESCE(pc.name, 'Lainnya')
-            ORDER BY total_loss DESC
-        """, p1)
-        rows = [(r[0], float(r[1])) for r in cur.fetchall()]
+        p = [bulan, tahun] + ([section_id] if section_id else [])
 
-        p2 = [bulan, tahun] + ([section_id] if section_id else [])
         cur.execute(f"""
-            SELECT COALESCE(SUM(dp.actual_whour), 0)
-            FROM daily_production dp
-            JOIN daily_report dr ON dr.id = dp.report_id
+            SELECT COALESCE(SUM(s.total_hours), 0)
+            FROM daily_report dr
+            JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
               AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        total_hour = float((cur.fetchone() or [0])[0] or 0)
+
+        extra = ""
+        p2 = list(p)
+        if factor and factor != "Semua":
+            extra += " AND pc.name = %s"
+            p2.append(factor)
+
+        cur.execute(f"""
+            SELECT
+                dr.date,
+                pr.ra_number,
+                pr.description,
+                pr.cause,
+                pr.corrective_action,
+                COALESCE(pc.name, 'Others') AS factor,
+                COALESCE(pr.loss_time, 0),
+                COALESCE(pr.down_time, 0)
+            FROM problem_record pr
+            JOIN daily_report dr ON dr.id = pr.report_id
+            LEFT JOIN problem_category pc ON pc.id = pr.category_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec} {extra}
+            ORDER BY dr.date ASC, pr.id ASC
         """, p2)
-        row = cur.fetchone()
-        total_hour = float(row[0]) if row and row[0] else 0.0
+        rows = cur.fetchall()
         cur.close()
         return rows, total_hour
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 def _db_ng_pending(section_id, date_from, date_to):
@@ -199,7 +210,7 @@ def _db_ng_pending(section_id, date_from, date_to):
     except Exception:
         raise
     finally:
-        conn.close()
+        release_connection(conn)
 
 
 # ── Background worker ─────────────────────────────────────────────────────────
@@ -235,9 +246,6 @@ class RiwayatLaporanWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._sections_loaded = False
-        self._tab2_loaded = False
-        self._tab3_loaded = False
-        self._tab4_loaded = False
         self._setup_ui()
 
     def showEvent(self, event):
@@ -271,15 +279,12 @@ class RiwayatLaporanWidget(QWidget):
         self._sections_loaded = True
 
     def _on_tab_changed(self, idx):
-        if idx == 1 and not self._tab2_loaded:
+        if idx == 1:
             self.load_rekap_bulanan()
-            self._tab2_loaded = True
-        elif idx == 2 and not self._tab3_loaded:
+        elif idx == 2:
             self.load_ng_pending()
-            self._tab3_loaded = True
-        elif idx == 3 and not self._tab4_loaded:
+        elif idx == 3:
             self.load_produktivitas()
-            self._tab4_loaded = True
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
@@ -895,11 +900,10 @@ class RiwayatLaporanWidget(QWidget):
         self.combo_bulan.setMinimumHeight(30)
         self.combo_bulan.setMinimumWidth(115)
         self.combo_bulan.setStyleSheet(_COMBO_STYLE)
-        bulan_names = [
+        for i, name in enumerate([
             "Januari", "Februari", "Maret", "April", "Mei", "Juni",
             "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-        ]
-        for i, name in enumerate(bulan_names, 1):
+        ], 1):
             self.combo_bulan.addItem(name, i)
         self.combo_bulan.setCurrentIndex(QDate.currentDate().month() - 1)
         fl.addWidget(self.combo_bulan)
@@ -912,6 +916,19 @@ class RiwayatLaporanWidget(QWidget):
         self.input_tahun.setText(str(QDate.currentDate().year()))
         fl.addWidget(self.input_tahun)
 
+        fl.addWidget(self._flabel("Factor"))
+        self.combo_factor = QComboBox()
+        self.combo_factor.setMinimumHeight(30)
+        self.combo_factor.setMinimumWidth(140)
+        self.combo_factor.setStyleSheet(_COMBO_STYLE)
+        self.combo_factor.addItem("Semua")
+        try:
+            for name in get_all_category_names():
+                self.combo_factor.addItem(name)
+        except Exception:
+            pass
+        fl.addWidget(self.combo_factor)
+
         fl.addStretch()
 
         btn_tampil = QPushButton("Tampilkan")
@@ -919,6 +936,12 @@ class RiwayatLaporanWidget(QWidget):
         btn_tampil.setStyleSheet(_BTN_CARI)
         btn_tampil.clicked.connect(self.load_rekap_bulanan)
         fl.addWidget(btn_tampil)
+
+        btn_export_r = QPushButton("Export Excel")
+        btn_export_r.setMinimumSize(100, 32)
+        btn_export_r.setStyleSheet(_BTN_EXPORT)
+        btn_export_r.clicked.connect(self._export_rekap)
+        fl.addWidget(btn_export_r)
 
         main.addWidget(card_f)
 
@@ -929,52 +952,50 @@ class RiwayatLaporanWidget(QWidget):
         tl.setContentsMargins(16, 16, 16, 16)
         tl.setSpacing(8)
 
-        hdr_row = QHBoxLayout()
         self.lbl_info_r = QLabel("Pilih filter dan klik Tampilkan.")
         self.lbl_info_r.setStyleSheet("color: #969696; font-size: 10px;")
-        hdr_row.addWidget(self.lbl_info_r)
-        hdr_row.addStretch()
-        btn_export_r = QPushButton("Export Excel")
-        btn_export_r.setMinimumSize(100, 30)
-        btn_export_r.setStyleSheet(_BTN_EXPORT)
-        btn_export_r.clicked.connect(self._export_rekap)
-        hdr_row.addWidget(btn_export_r)
-        tl.addLayout(hdr_row)
+        tl.addWidget(self.lbl_info_r)
 
         self.tabel_rekap = QTableWidget()
-        self.tabel_rekap.setColumnCount(3)
-        self.tabel_rekap.setHorizontalHeaderLabels(
-            ["Kategori", "Total Loss Time (H)", "Persentase (%)"]
-        )
-        self.tabel_rekap.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.tabel_rekap.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
-        self.tabel_rekap.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
-        self.tabel_rekap.setColumnWidth(1, 165)
-        self.tabel_rekap.setColumnWidth(2, 130)
+        self.tabel_rekap.setColumnCount(9)
+        self.tabel_rekap.setHorizontalHeaderLabels([
+            "No", "Date", "OPNo/St", "Problem/Masalah", "Cause/Penyebab",
+            "Action/Perbaikan", "Factor", "Lost (H)", "Stop (H)",
+        ])
+        hh = self.tabel_rekap.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Interactive)
+        for col in (3, 4, 5):
+            hh.setSectionResizeMode(col, QHeaderView.Stretch)
+        for col in (6, 7, 8):
+            hh.setSectionResizeMode(col, QHeaderView.Fixed)
         self.tabel_rekap.verticalHeader().setVisible(False)
         self.tabel_rekap.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_rekap.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_rekap.setStyleSheet(_TABLE_STYLE)
+        self.tabel_rekap.setMinimumHeight(400)
+        self.tabel_rekap.setColumnWidth(0, 40)
+        self.tabel_rekap.setColumnWidth(1, 92)
+        self.tabel_rekap.setColumnWidth(2, 80)
+        self.tabel_rekap.setColumnWidth(6, 110)
+        self.tabel_rekap.setColumnWidth(7, 80)
+        self.tabel_rekap.setColumnWidth(8, 80)
         tl.addWidget(self.tabel_rekap)
 
         # Summary bar
         sum_frame = QFrame()
-        sum_frame.setStyleSheet(
-            "QFrame { background-color: #2e2e2e; border-radius: 0px; }"
-        )
+        sum_frame.setStyleSheet("QFrame { background-color: #2e2e2e; border-radius: 0px; }")
         sum_lyt = QHBoxLayout(sum_frame)
         sum_lyt.setContentsMargins(16, 10, 16, 10)
         sum_lyt.setSpacing(30)
 
         self.lbl_total_hour = QLabel("Total Working Hour: —")
-        self.lbl_total_hour.setStyleSheet(
-            "color: #ffffff; font-size: 12px; font-weight: bold;"
-        )
-        self.lbl_ratio = QLabel("Ratio Produktivitas: —")
-        self.lbl_ratio.setStyleSheet(
-            "color: #969696; font-size: 12px; font-weight: bold;"
-        )
+        self.lbl_total_hour.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        self.lbl_total_lost = QLabel("Total Lost: —")
+        self.lbl_total_lost.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        self.lbl_ratio = QLabel("Ratio Loss: —")
+        self.lbl_ratio.setStyleSheet("color: #969696; font-size: 12px; font-weight: bold;")
         sum_lyt.addWidget(self.lbl_total_hour)
+        sum_lyt.addWidget(self.lbl_total_lost)
         sum_lyt.addWidget(self.lbl_ratio)
         sum_lyt.addStretch()
         tl.addWidget(sum_frame)
@@ -987,7 +1008,8 @@ class RiwayatLaporanWidget(QWidget):
 
     def load_rekap_bulanan(self):
         section_id = self.combo_section_rekap.currentData()
-        bulan = self.combo_bulan.currentData()
+        bulan      = self.combo_bulan.currentData()
+        factor     = self.combo_factor.currentText()
         try:
             tahun = int(self.input_tahun.text().strip())
         except ValueError:
@@ -995,51 +1017,45 @@ class RiwayatLaporanWidget(QWidget):
             return
 
         try:
-            rows, total_hour = _db_rekap_bulanan(section_id, bulan, tahun)
+            rows, total_hour = _db_display_line_stop(section_id, bulan, tahun, factor)
         except Exception as e:
             self.lbl_info_r.setText(f"Gagal memuat data: {e}")
             self.tabel_rekap.setRowCount(0)
             return
 
-        total_loss = sum(r[1] for r in rows)
+        total_lost = sum(float(r[6]) for r in rows)
+        ratio_loss = (total_lost / total_hour * 100) if total_hour > 0 else 0.0
+
         self.tabel_rekap.setRowCount(0)
         self.lbl_info_r.setText(
-            f"{len(rows)} kategori — {self.combo_bulan.currentText()} {tahun}"
+            f"{len(rows)} catatan — {self.combo_bulan.currentText()} {tahun}"
         )
 
-        for i, (kategori, loss) in enumerate(rows):
+        def _it(text, align=Qt.AlignLeft | Qt.AlignVCenter):
+            it = QTableWidgetItem(str(text) if text is not None else "")
+            it.setTextAlignment(align)
+            return it
+
+        for i, r in enumerate(rows):
             self.tabel_rekap.insertRow(i)
-            pct = (loss / total_loss * 100) if total_loss > 0 else 0.0
-
-            it_kat = QTableWidgetItem(kategori)
-            it_kat.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            it_loss = QTableWidgetItem(f"{loss:.2f}")
-            it_loss.setTextAlignment(Qt.AlignCenter)
-            it_pct = QTableWidgetItem(f"{pct:.1f}%")
-            it_pct.setTextAlignment(Qt.AlignCenter)
-
-            self.tabel_rekap.setItem(i, 0, it_kat)
-            self.tabel_rekap.setItem(i, 1, it_loss)
-            self.tabel_rekap.setItem(i, 2, it_pct)
+            self.tabel_rekap.setItem(i, 0, _it(i + 1, Qt.AlignCenter))
+            self.tabel_rekap.setItem(i, 1, _it(str(r[0]) if r[0] else "", Qt.AlignCenter))
+            self.tabel_rekap.setItem(i, 2, _it(r[1] or ""))
+            self.tabel_rekap.setItem(i, 3, _it(r[2] or ""))
+            self.tabel_rekap.setItem(i, 4, _it(r[3] or ""))
+            self.tabel_rekap.setItem(i, 5, _it(r[4] or ""))
+            self.tabel_rekap.setItem(i, 6, _it(r[5] or ""))
+            self.tabel_rekap.setItem(i, 7, _it(f"{float(r[6]):.2f}", Qt.AlignCenter))
+            self.tabel_rekap.setItem(i, 8, _it(f"{float(r[7]):.2f}", Qt.AlignCenter))
             self.tabel_rekap.setRowHeight(i, 32)
 
         self.lbl_total_hour.setText(f"Total Working Hour: {total_hour:.2f} H")
-        if total_hour > 0:
-            ratio = max(0.0, (total_hour - total_loss) / total_hour * 100)
-            color = (
-                "rgb(130, 220, 140)" if ratio >= 80
-                else "rgb(220, 170, 80)" if ratio >= 60
-                else "rgb(220, 100, 100)"
-            )
-            self.lbl_ratio.setText(f"Ratio Produktivitas: {ratio:.1f}%")
-            self.lbl_ratio.setStyleSheet(
-                f"color: {color}; font-size: 12px; font-weight: bold;"
-            )
-        else:
-            self.lbl_ratio.setText("Ratio Produktivitas: —")
-            self.lbl_ratio.setStyleSheet(
-                "color: #969696; font-size: 12px; font-weight: bold;"
-            )
+        self.lbl_total_lost.setText(f"Total Lost: {total_lost:.2f} H")
+        ratio_color = "#27ae60" if ratio_loss < 20 else "#f39c12" if ratio_loss < 40 else "#da291c"
+        self.lbl_ratio.setText(f"Ratio Loss: {ratio_loss:.2f}%")
+        self.lbl_ratio.setStyleSheet(
+            f"color: {ratio_color}; font-size: 12px; font-weight: bold;"
+        )
 
     def _export_rekap(self):
         try:
@@ -1056,13 +1072,18 @@ class RiwayatLaporanWidget(QWidget):
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Rekap Bulanan"
+        ws.title = "Display Line Stop"
 
         thin = Side(style="thin", color="3C4147")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         hdr_fill = PatternFill("solid", fgColor="1C2028")
 
-        for ci, h in enumerate(["Kategori", "Total Loss Time (H)", "Persentase (%)"], 1):
+        col_headers = [
+            "No", "Date", "OPNo/St", "Problem/Masalah",
+            "Cause/Penyebab", "Action/Perbaikan", "Factor", "Lost (H)", "Stop (H)",
+        ]
+        center_cols = {0, 1, 6, 7, 8}
+        for ci, h in enumerate(col_headers, 1):
             cell = ws.cell(row=1, column=ci, value=h)
             cell.fill = hdr_fill
             cell.font = Font(color="9696A0", bold=True, size=10)
@@ -1070,29 +1091,29 @@ class RiwayatLaporanWidget(QWidget):
             cell.border = border
 
         for ri in range(row_count):
-            for ci in range(3):
+            for ci in range(9):
                 item = self.tabel_rekap.item(ri, ci)
                 val = item.text() if item else ""
                 cell = ws.cell(row=ri + 2, column=ci + 1, value=val)
                 cell.alignment = Alignment(
-                    horizontal="left" if ci == 0 else "center", vertical="center"
+                    horizontal="center" if ci in center_cols else "left",
+                    vertical="center",
                 )
                 cell.border = border
 
         sum_row = row_count + 3
-        ws.cell(row=sum_row, column=1, value=self.lbl_total_hour.text()).font = Font(
-            bold=True, color="C8C8C8"
-        )
-        ws.cell(row=sum_row + 1, column=1, value=self.lbl_ratio.text()).font = Font(
-            bold=True, color="82DC8C"
-        )
+        for col_offset, lbl in enumerate([self.lbl_total_hour, self.lbl_total_lost, self.lbl_ratio]):
+            ws.cell(row=sum_row, column=col_offset + 1, value=lbl.text()).font = Font(
+                bold=True, color="C8C8C8"
+            )
 
-        for ci, w in enumerate([30, 22, 16], 1):
+        for ci, w in enumerate([6, 12, 10, 30, 30, 30, 16, 10, 10], 1):
             ws.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
+        ws.row_dimensions[1].height = 20
 
         downloads = os.path.join(os.path.expanduser("~"), "Downloads")
         filepath = os.path.join(
-            downloads, f"rekap_bulanan_{QDate.currentDate().toString('yyyyMMdd')}.xlsx"
+            downloads, f"display_line_stop_{QDate.currentDate().toString('yyyyMMdd')}.xlsx"
         )
         try:
             wb.save(filepath)
@@ -1478,10 +1499,9 @@ class RiwayatLaporanWidget(QWidget):
             sg.addWidget(l, row, 0); sg.addWidget(v, row, 1)
             setattr(self, attr, v)
 
-        _srow(0, "Working Hour", "_lbl_prod_total")
-        _srow(1, "Total Jam",   "_lbl_prod_used")
-        _srow(2, "Total Loss",  "_lbl_prod_bal")
-        _srow(3, "Laporan",     "_lbl_prod_count")
+        _srow(0, "Total Hour",   "_lbl_prod_total")
+        _srow(1, "Loss Time",    "_lbl_prod_bal")
+        _srow(2, "Laporan",      "_lbl_prod_count")
         rl.addWidget(sum_frame)
         rl.addStretch()
         content.addWidget(card_right, 2)
@@ -1509,6 +1529,9 @@ class RiwayatLaporanWidget(QWidget):
 
         tbl = self.tabel_prod_bkdn
         tbl.setRowCount(0)
+
+        loss_hour  = sum(c["hours"] for c in data["categories"])
+        total_hour = data["total_hour"]
 
         def _grp_row(text):
             r = tbl.rowCount()
@@ -1558,6 +1581,7 @@ class RiwayatLaporanWidget(QWidget):
         _data_row("Process", data["process_hour"], "#80c880")
 
         # ── Non-Produktif (line stop by category/group) ────────────────────
+
         groups: dict[str, list] = {}
         for cat in data["categories"]:
             groups.setdefault(cat["group"], []).append(cat)
@@ -1588,17 +1612,13 @@ class RiwayatLaporanWidget(QWidget):
             tbl.setItem(r, c, it)
         tbl.setRowHeight(r, 2)
 
-        loss_hour  = sum(c["hours"] for c in data["categories"])
-        used_hour  = loss_hour + data["prep_hour"] + data["sholat_hour"] + data["absence_hour"]
-        total_hour = data["total_hour"]
-
         r = tbl.rowCount()
         tbl.insertRow(r)
         it_n = QTableWidgetItem("TOTAL")
         it_n.setFlags(Qt.ItemIsEnabled)
         fn = it_n.font(); fn.setBold(True); it_n.setFont(fn)
         it_n.setForeground(QColor("#ffffff"))
-        it_h = QTableWidgetItem(f"{used_hour:.4f}")
+        it_h = QTableWidgetItem(f"{total_hour:.4f}")
         it_h.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
         it_h.setFlags(Qt.ItemIsEnabled)
         fh = it_h.font(); fh.setBold(True); it_h.setFont(fh)
@@ -1608,11 +1628,9 @@ class RiwayatLaporanWidget(QWidget):
         tbl.setRowHeight(r, 30)
 
         # ── Summary ────────────────────────────────────────────────────────
-        working_hour = total_hour - data["prep_hour"] - data["sholat_hour"]
-        balance      = loss_hour
-        used_hour    = working_hour
+        balance = loss_hour
 
-        ratio = (data["process_hour"] / working_hour * 100) if working_hour > 0 else 0.0
+        ratio = (data["process_hour"] / total_hour * 100) if total_hour > 0 else 0.0
         ratio_color = (
             "#27ae60" if ratio >= 80
             else "#f39c12" if ratio >= 60
@@ -1622,8 +1640,7 @@ class RiwayatLaporanWidget(QWidget):
         self._lbl_ratio_big.setStyleSheet(
             f"color: {ratio_color}; font-size: 40px; font-weight: bold;"
         )
-        self._lbl_prod_total.setText(f"{working_hour:.2f} H")
-        self._lbl_prod_used.setText(f"{used_hour:.2f} H")
+        self._lbl_prod_total.setText(f"{total_hour:.2f} H")
 
         bal_color = "#27ae60" if balance < 0.01 else "#da291c"
         self._lbl_prod_bal.setText(f"{balance:.4f}")

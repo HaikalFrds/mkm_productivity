@@ -1,5 +1,6 @@
 ﻿import matplotlib
 matplotlib.use("QtAgg")
+import mplcursors
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -357,23 +358,36 @@ class DashboardWidget(QWidget):
                 heights = [monthly[i]["by_group"].get(gname, 0.0) for i in range(12)]
                 ax1.bar(x, heights, bottom=bottoms, color=color,
                         label=gname, width=0.45, alpha=0.92, zorder=3)
-                # Label dalam segmen (hanya jika tinggi cukup)
-                for i, (h, b) in enumerate(zip(heights, bottoms)):
-                    if h >= 0.3:
-                        ax1.text(i, b + h / 2, f"{h:.1f}",
-                                 ha="center", va="center",
-                                 fontsize=6, color="white", alpha=0.7, zorder=4)
                 bottoms = [b + h for b, h in zip(bottoms, heights)]
             max_total = max(bottoms) if bottoms else 1.0
 
-            # Label total di atas bar
-            for i, top in enumerate(bottoms):
-                if top > 0:
-                    ax1.text(i, top + max_total * 0.02, f"{top:.1f}",
-                             ha="center", va="bottom",
-                             fontsize=7, color="#aaaaaa", zorder=5)
+            # Hover tooltip untuk bar
+            self._cursor = mplcursors.cursor(ax1, hover=mplcursors.HoverMode.Transient)
 
-            ax1.set_ylim(0, max_total * 1.25)
+            @self._cursor.connect("add")
+            def _on_bar_hover(sel):
+                x_idx = int(round(sel.target[0]))
+                if 0 <= x_idx < 12:
+                    month_name = _MONTHS[x_idx]
+                    m = monthly[x_idx]
+                    total_loss = sum(m.get("by_group", {}).values())
+                    pct        = m.get("process_pct", 0.0)
+                    total_hour = m.get("total_hour", 0.0)
+                    lines = [f"\U0001F4C5 {month_name}"]
+                    for _, gname in _GROUPS:
+                        val = m.get("by_group", {}).get(gname, 0.0)
+                        if val > 0:
+                            lines.append(f"  {gname}: {val:.2f} H")
+                    lines.append(f"  ─────────────────")
+                    lines.append(f"  Total Loss: {total_loss:.2f} H")
+                    lines.append(f"  Total Hour: {total_hour:.2f} H")
+                    lines.append(f"  Process Ratio: {pct:.1f}%")
+                    sel.annotation.set_text("\n".join(lines))
+                    sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#da291c", lw=1)
+                    sel.annotation.set_color("#f0f0f0")
+                    sel.annotation.set_fontsize(8)
+
+            ax1.set_ylim(0, max_total * 1.5)
 
             # Process % line
             pcts  = [monthly[i]["process_pct"] for i in range(12)]
@@ -384,19 +398,39 @@ class DashboardWidget(QWidget):
                          marker="o", markersize=4, markerfacecolor="#111111",
                          markeredgecolor="#4fc3f7", markeredgewidth=1.5,
                          zorder=6, label="Process %")
+                line_objs = ax2.get_lines()
+                if line_objs:
+                    self._cursor2 = mplcursors.cursor(line_objs[0], hover=mplcursors.HoverMode.Transient)
+
+                    @self._cursor2.connect("add")
+                    def _on_line_hover(sel):
+                        x_idx = int(round(sel.target[0]))
+                        if 0 <= x_idx < 12:
+                            pct   = monthly[x_idx]["process_pct"]
+                            total = monthly[x_idx]["total_hour"]
+                            sel.annotation.set_text(
+                                f"\U0001F4C5 {_MONTHS[x_idx]}\n"
+                                f"  Process Ratio: {pct:.1f}%\n"
+                                f"  Total Hour: {total:.2f} H"
+                            )
+                            sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#4fc3f7", lw=1)
+                            sel.annotation.set_color("#f0f0f0")
+                            sel.annotation.set_fontsize(8)
+
                 for xi, yi in zip(px, py):
-                    ax2.annotate(f"{yi:.1f}",
+                    ax2.annotate(f"{yi:.0f}%",
                                  xy=(xi, yi),
-                                 xytext=(0, 6), textcoords="offset points",
+                                 xytext=(0, 8), textcoords="offset points",
                                  ha="center", fontsize=7, color="#4fc3f7",
-                                 alpha=0.85, zorder=7)
+                                 fontweight="bold", zorder=7)
 
             # Target line
             ax2.axhline(y=TARGET_PROCESS, color="#da291c", linestyle="--",
                         linewidth=1.0, alpha=0.5, zorder=4,
                         label=f"Target {TARGET_PROCESS:.0f}%")
-            ax2.text(11.6, TARGET_PROCESS + 2, f"{TARGET_PROCESS:.0f}",
-                     fontsize=8, color="#da291c", ha="left", va="bottom")
+            ax2.text(11.6, TARGET_PROCESS + 2, f"{TARGET_PROCESS:.0f}%",
+                     fontsize=8, color="#e74c3c", ha="left", va="bottom",
+                     fontweight="bold")
 
         else:
             # Empty state
@@ -441,6 +475,22 @@ class DashboardWidget(QWidget):
             max_v  = max(vals)
 
             ax.barh(ypos, vals, color=colors, alpha=0.85, height=0.4, zorder=3)
+
+            self._cursor3 = mplcursors.cursor(ax, hover=mplcursors.HoverMode.Transient)
+
+            @self._cursor3.connect("add")
+            def _on_top3_hover(sel):
+                y_idx = int(round(sel.target[1]))
+                if 0 <= y_idx < len(top3):
+                    g = top3[y_idx]
+                    sel.annotation.set_text(
+                        f"  {g['group']}\n"
+                        f"  Loss: {g['hours']:.2f} H"
+                    )
+                    sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#da291c", lw=1)
+                    sel.annotation.set_color("#f0f0f0")
+                    sel.annotation.set_fontsize(8)
+
             ax.set_yticks(ypos)
             ax.set_yticklabels(names, fontsize=8.5, color="#cccccc")
             for i, v in enumerate(vals):

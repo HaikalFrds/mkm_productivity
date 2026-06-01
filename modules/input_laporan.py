@@ -162,9 +162,10 @@ class InputLaporanWidget(QWidget):
         base_hours        = data.get("total_hours", 0.0)
         self._prep_h      = data.get("preparation_min", 15.0) / 60
         self._sholat_h    = data.get("sholat_min", 10.0) / 60
-        # Jumat: potong 30 menit (0.5 jam)
-        is_friday = self.input_tanggal.date().dayOfWeek() == 5
-        self._shift_hours = base_hours - 0.5 if (is_friday and base_hours > 0) else base_hours
+        # Jumat: potong 30 menit (0.5 jam) — hanya untuk Day Shift
+        is_friday    = self.input_tanggal.date().dayOfWeek() == 5
+        is_day_shift = "night" not in self.combo_shift.currentText().lower()
+        self._shift_hours = base_hours - 0.5 if (is_friday and is_day_shift and base_hours > 0) else base_hours
         self._lbl_hour.setText(f"{self._shift_hours:.2f}")
         self._lbl_prep_val.setText(f"{self._prep_h:.4f}")
         self._lbl_sholat_val.setText(f"{self._sholat_h:.4f}")

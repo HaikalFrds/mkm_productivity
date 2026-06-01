@@ -1,3 +1,4 @@
+import calendar
 import logging
 from datetime import date as _date
 
@@ -1299,3 +1300,64 @@ def hapus_work_center(wc_id: int) -> tuple[bool, str]:
         return False, f"Gagal menghapus work center: {e}"
     finally:
         release_connection(conn)
+
+
+# =============================================================================
+# VOLUME PRODUKSI
+# =============================================================================
+
+def get_production_volume(section_id: int, bulan: int, tahun: int) -> dict:
+    """
+    Return:
+    {
+        'models': ['4G15', 'SF-1.5L', '4G17'],
+        'shifts': ['Day Shift', 'Night Shift'],
+        'days': 31,
+        'data': {('4G15', 'Day Shift'): {1: 102, 15: 91, ...}, ...},
+        'totals': {('4G15', 'Day Shift'): 1075, ...}
+    }
+    """
+    with db_cursor() as (_, cur):
+        cur.execute(
+            "SELECT model_name FROM shop_model WHERE section_id = %s ORDER BY model_name",
+            (section_id,),
+        )
+        models = [r[0] for r in cur.fetchall()]
+
+        cur.execute("SELECT name FROM shift ORDER BY id")
+        shifts = [r[0] for r in cur.fetchall()]
+
+        cur.execute("""
+            SELECT
+                dp.model,
+                sh.name AS shift_name,
+                EXTRACT(DAY FROM dr.date)::int AS day,
+                SUM(dp.actual_unit) AS total_unit
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            JOIN shift sh ON sh.id = dr.shift_id
+            WHERE dr.section_id = %s
+              AND EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s
+            GROUP BY dp.model, sh.name, EXTRACT(DAY FROM dr.date)
+            ORDER BY dp.model, sh.name, day
+        """, (section_id, bulan, tahun))
+
+        data: dict = {}
+        totals: dict = {}
+        for model, shift_name, day, unit in cur.fetchall():
+            key = (model, shift_name)
+            if key not in data:
+                data[key]   = {}
+                totals[key] = 0
+            data[key][day]  = int(unit or 0)
+            totals[key]    += int(unit or 0)
+
+    days_in_month = calendar.monthrange(tahun, bulan)[1]
+    return {
+        "models": models,
+        "shifts": shifts,
+        "days":   days_in_month,
+        "data":   data,
+        "totals": totals,
+    }

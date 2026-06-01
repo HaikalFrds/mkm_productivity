@@ -14,6 +14,7 @@ from modules.db_auth import get_connection, release_connection
 from modules.db_laporan import (
     get_all_sections, get_all_shifts, get_all_category_names,
     get_detail_laporan, hapus_laporan, get_monthly_productivity,
+    get_production_volume,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 
@@ -269,6 +270,11 @@ class RiwayatLaporanWidget(QWidget):
                 for sid, sname in sections:
                     combo.addItem(sname, sid)
                 combo.blockSignals(False)
+            # combo volume produksi — tanpa "Semua", shop wajib dipilih
+            self.combo_vol_section.blockSignals(True)
+            for sid, sname in sections:
+                self.combo_vol_section.addItem(sname, sid)
+            self.combo_vol_section.blockSignals(False)
         except Exception as e:
             QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar shop: {e}")
         try:
@@ -290,6 +296,8 @@ class RiwayatLaporanWidget(QWidget):
             self.load_ng_pending()
         elif idx == 3:
             self.load_produktivitas()
+        elif idx == 4:
+            pass  # tidak auto-load, user harus pilih shop dulu
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
@@ -301,6 +309,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabs.addTab(self._build_tab_rekap(), "Rekap Bulanan")
         self.tabs.addTab(self._build_tab_ng_pending(), "NG & Pending")
         self.tabs.addTab(self._build_tab_produktivitas(), "Produktivitas")
+        self.tabs.addTab(self._build_tab_volume(),       "Volume Produksi")
         outer.addWidget(self.tabs)
 
     # ── Tab 1: Riwayat Harian ────────────────────────────────────────────────
@@ -1651,3 +1660,182 @@ class RiwayatLaporanWidget(QWidget):
         lbl = QLabel(text)
         lbl.setStyleSheet("color: #969696; font-size: 11px;")
         return lbl
+
+    # ── Tab 5: Volume Produksi ───────────────────────────────────────────────
+
+    def _build_tab_volume(self):
+        tab = QWidget()
+        tab.setStyleSheet("background: transparent;")
+        outer = QVBoxLayout(tab)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        scroll_v = QScrollArea()
+        scroll_v.setWidgetResizable(True)
+        scroll_v.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        main = QVBoxLayout(container)
+        main.setContentsMargins(15, 15, 15, 15)
+        main.setSpacing(12)
+
+        # Filter card
+        card_f = QFrame()
+        card_f.setStyleSheet(_CARD_STYLE)
+        fl = QHBoxLayout(card_f)
+        fl.setContentsMargins(16, 12, 16, 12)
+        fl.setSpacing(10)
+
+        fl.addWidget(self._flabel("Shop"))
+        self.combo_vol_section = QComboBox()
+        self.combo_vol_section.setMinimumHeight(30)
+        self.combo_vol_section.setMinimumWidth(155)
+        self.combo_vol_section.setStyleSheet(_COMBO_STYLE)
+        fl.addWidget(self.combo_vol_section)
+
+        fl.addWidget(self._flabel("Bulan"))
+        self.combo_vol_bulan = QComboBox()
+        self.combo_vol_bulan.setMinimumHeight(30)
+        self.combo_vol_bulan.setMinimumWidth(115)
+        self.combo_vol_bulan.setStyleSheet(_COMBO_STYLE)
+        for i, name in enumerate([
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+        ], 1):
+            self.combo_vol_bulan.addItem(name, i)
+        self.combo_vol_bulan.setCurrentIndex(QDate.currentDate().month() - 1)
+        fl.addWidget(self.combo_vol_bulan)
+
+        fl.addWidget(self._flabel("Tahun"))
+        self.input_vol_tahun = QLineEdit()
+        self.input_vol_tahun.setMinimumHeight(30)
+        self.input_vol_tahun.setFixedWidth(70)
+        self.input_vol_tahun.setStyleSheet(_INPUT_STYLE)
+        self.input_vol_tahun.setText(str(QDate.currentDate().year()))
+        fl.addWidget(self.input_vol_tahun)
+
+        fl.addStretch()
+        btn_tampil = QPushButton("Tampilkan")
+        btn_tampil.setMinimumSize(90, 32)
+        btn_tampil.setStyleSheet(_BTN_CARI)
+        btn_tampil.clicked.connect(self.load_volume_produksi)
+        fl.addWidget(btn_tampil)
+        main.addWidget(card_f)
+
+        # Table card with horizontal scroll
+        card_t = QFrame()
+        card_t.setStyleSheet(_CARD_STYLE)
+        tl = QVBoxLayout(card_t)
+        tl.setContentsMargins(16, 16, 16, 16)
+        tl.setSpacing(8)
+
+        self.lbl_info_vol = QLabel("Pilih Shop dan klik Tampilkan.")
+        self.lbl_info_vol.setStyleSheet("color: #969696; font-size: 10px;")
+        tl.addWidget(self.lbl_info_vol)
+
+        scroll_h = QScrollArea()
+        scroll_h.setWidgetResizable(True)
+        scroll_h.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_h.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_h.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        self.tabel_volume = QTableWidget()
+        self.tabel_volume.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tabel_volume.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_volume.verticalHeader().setVisible(False)
+        self.tabel_volume.setStyleSheet(_TABLE_STYLE)
+        self.tabel_volume.horizontalHeader().setDefaultSectionSize(28)
+        self.tabel_volume.horizontalHeader().setMinimumSectionSize(20)
+        self.tabel_volume.setMinimumHeight(300)
+
+        scroll_h.setWidget(self.tabel_volume)
+        tl.addWidget(scroll_h)
+        main.addWidget(card_t)
+        main.addStretch()
+        scroll_v.setWidget(container)
+        outer.addWidget(scroll_v)
+        return tab
+
+    def load_volume_produksi(self):
+        section_id = self.combo_vol_section.currentData()
+        if section_id is None:
+            QMessageBox.warning(self, "Peringatan", "Pilih Shop terlebih dahulu.")
+            return
+        bulan = self.combo_vol_bulan.currentData()
+        try:
+            tahun = int(self.input_vol_tahun.text().strip())
+        except ValueError:
+            return
+
+        try:
+            result = get_production_volume(section_id, bulan, tahun)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat data: {e}")
+            return
+
+        tbl  = self.tabel_volume
+        days = result["days"]
+
+        tbl.setColumnCount(2 + days + 1)
+        headers = ["Model", "Shift"] + [str(d) for d in range(1, days + 1)] + ["TOTAL"]
+        tbl.setHorizontalHeaderLabels(headers)
+
+        hh = tbl.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Fixed)
+        hh.setSectionResizeMode(1, QHeaderView.Fixed)
+        hh.setSectionResizeMode(2 + days, QHeaderView.Fixed)
+
+        tbl.setColumnWidth(0, 100)
+        tbl.setColumnWidth(1, 90)
+        tbl.setColumnWidth(2 + days, 70)
+
+        tbl.setRowCount(0)
+
+        row_idx = 0
+        for model in result["models"]:
+            for shift in result["shifts"]:
+                tbl.insertRow(row_idx)
+                tbl.setRowHeight(row_idx, 26)
+
+                tbl.setItem(row_idx, 0, _vol_item(model, bold=(shift == result["shifts"][0])))
+                tbl.setItem(row_idx, 1, _vol_item(shift, center=True))
+
+                key      = (model, shift)
+                day_data = result["data"].get(key, {})
+                for d in range(1, days + 1):
+                    val = day_data.get(d)
+                    it  = QTableWidgetItem(str(val) if val else "")
+                    it.setTextAlignment(Qt.AlignCenter)
+                    it.setFlags(Qt.ItemIsEnabled)
+                    if val:
+                        it.setBackground(QColor("#222222"))
+                    else:
+                        it.setBackground(QColor("#1a1a1a"))
+                        it.setForeground(QColor("#2e2e2e"))
+                    tbl.setItem(row_idx, d + 1, it)
+
+                total    = result["totals"].get(key, 0)
+                it_total = QTableWidgetItem(str(total) if total else "")
+                it_total.setTextAlignment(Qt.AlignCenter)
+                it_total.setFlags(Qt.ItemIsEnabled)
+                it_total.setForeground(QColor("#da291c"))
+                fn = it_total.font(); fn.setBold(True); it_total.setFont(fn)
+                tbl.setItem(row_idx, 2 + days, it_total)
+
+                row_idx += 1
+
+        bulan_nama = self.combo_vol_bulan.currentText()
+        self.lbl_info_vol.setText(
+            f"{row_idx} baris — {bulan_nama} {tahun} | {self.combo_vol_section.currentText()}"
+        )
+
+
+# ── Module-level helpers ──────────────────────────────────────────────────────
+
+def _vol_item(text: str, bold: bool = False, center: bool = False) -> QTableWidgetItem:
+    it = QTableWidgetItem(text)
+    it.setTextAlignment(Qt.AlignCenter if center else Qt.AlignLeft | Qt.AlignVCenter)
+    it.setFlags(Qt.ItemIsEnabled)
+    if bold:
+        f = it.font(); f.setBold(True); it.setFont(f)
+    return it

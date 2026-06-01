@@ -1,8 +1,35 @@
-﻿from datetime import date as _date
+import logging
+from datetime import date as _date
 
-from modules.db_auth import get_connection, release_connection
+from modules.db_auth import get_connection, release_connection, db_cursor
 from modules.cache import get as _c_get, set as _c_set, invalidate as _c_inv
 
+
+# =============================================================================
+# STARTUP INITIALIZER
+# =============================================================================
+
+def initialize_tables():
+    """Pastikan semua tabel opsional sudah ada. Dipanggil sekali saat startup."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_material_table(cur)
+        _ensure_shop_model_table(cur)
+        _ensure_work_center_table(cur)
+        ensure_shift_columns()
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        logging.error(f"initialize_tables error: {e}")
+        conn.rollback()
+    finally:
+        release_connection(conn)
+
+
+# =============================================================================
+# DASHBOARD
+# =============================================================================
 
 def get_dashboard_data() -> dict:
     conn = get_connection()
@@ -81,93 +108,82 @@ def get_dashboard_data() -> dict:
             "recent":        recent,
             "process_ratio": process_ratio,
         }
-    except Exception:
-        return {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": []}
+    except Exception as e:
+        logging.error(f"get_dashboard_data error: {e}")
+        return {"report_count": 0, "loss_today": 0.0, "categories": [], "recent": [], "process_ratio": None}
     finally:
         release_connection(conn)
 
+
+# =============================================================================
+# SECTION (READ)
+# =============================================================================
 
 def get_all_sections() -> list:
     cached = _c_get("sections")
     if cached is not None:
         return cached
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute("SELECT id, name FROM section ORDER BY name")
         result = list(cur.fetchall())
-        cur.close()
-        _c_set("sections", result)
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    _c_set("sections", result)
+    return result
 
 
 def get_riwayat_laporan(
     section_id=None, shift_name=None, date_from=None, date_to=None
 ) -> list:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        query = """
-            SELECT
-                dr.id,
-                dr.date,
-                sec.name AS section,
-                sh.name  AS shift,
-                dr.coordinator,
-                COUNT(pr.id) AS jml_masalah,
-                dr.status
-            FROM daily_report dr
-            JOIN section sec ON sec.id = dr.section_id
-            JOIN shift   sh  ON sh.id  = dr.shift_id
-            LEFT JOIN problem_record pr ON pr.report_id = dr.id
-            WHERE 1=1
-        """
-        params = []
-        if section_id is not None:
-            query += " AND dr.section_id = %s"
-            params.append(section_id)
-        if shift_name is not None:
-            query += " AND sh.name = %s"
-            params.append(shift_name)
-        if date_from is not None:
-            query += " AND dr.date >= %s"
-            params.append(date_from)
-        if date_to is not None:
-            query += " AND dr.date <= %s"
-            params.append(date_to)
-        query += """
-            GROUP BY dr.id, dr.date, sec.name, sh.name, dr.coordinator, dr.status
-            ORDER BY dr.date DESC, dr.id DESC
-        """
+    query = """
+        SELECT
+            dr.id,
+            dr.date,
+            sec.name AS section,
+            sh.name  AS shift,
+            dr.coordinator,
+            COUNT(pr.id) AS jml_masalah,
+            dr.status
+        FROM daily_report dr
+        JOIN section sec ON sec.id = dr.section_id
+        JOIN shift   sh  ON sh.id  = dr.shift_id
+        LEFT JOIN problem_record pr ON pr.report_id = dr.id
+        WHERE 1=1
+    """
+    params = []
+    if section_id is not None:
+        query += " AND dr.section_id = %s"
+        params.append(section_id)
+    if shift_name is not None:
+        query += " AND sh.name = %s"
+        params.append(shift_name)
+    if date_from is not None:
+        query += " AND dr.date >= %s"
+        params.append(date_from)
+    if date_to is not None:
+        query += " AND dr.date <= %s"
+        params.append(date_to)
+    query += """
+        GROUP BY dr.id, dr.date, sec.name, sh.name, dr.coordinator, dr.status
+        ORDER BY dr.date DESC, dr.id DESC
+    """
+    with db_cursor() as (_, cur):
         cur.execute(query, params)
         rows = cur.fetchall()
-        cur.close()
-        return [
-            {
-                "id": r[0],
-                "date": str(r[1]),
-                "section": r[2],
-                "shift": r[3],
-                "coordinator": r[4],
-                "jml_masalah": int(r[5]) if r[5] is not None else 0,
-                "status": r[6],
-            }
-            for r in rows
-        ]
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    return [
+        {
+            "id": r[0],
+            "date": str(r[1]),
+            "section": r[2],
+            "shift": r[3],
+            "coordinator": r[4],
+            "jml_masalah": int(r[5]) if r[5] is not None else 0,
+            "status": r[6],
+        }
+        for r in rows
+    ]
 
 
 def get_detail_laporan(report_id: int) -> tuple:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute(
             """
             SELECT dr.id, dr.date, sec.name, sh.name,
@@ -181,7 +197,6 @@ def get_detail_laporan(report_id: int) -> tuple:
         )
         hdr = cur.fetchone()
         if not hdr:
-            cur.close()
             return None, [], [], [], [], [], []
         header = {
             "id": hdr[0], "date": str(hdr[1]), "section": hdr[2],
@@ -288,7 +303,6 @@ def get_detail_laporan(report_id: int) -> tuple:
             for r in cur.fetchall()
         ]
 
-        _ensure_material_table(cur)
         cur.execute(
             "SELECT material_name, material_no, qty, satuan, keterangan FROM material_usage WHERE report_id = %s ORDER BY id",
             (report_id,),
@@ -304,12 +318,7 @@ def get_detail_laporan(report_id: int) -> tuple:
             for r in cur.fetchall()
         ]
 
-        cur.close()
-        return header, produksi, catatan, manpower, absen, inhouse_claim, materials
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    return header, produksi, catatan, manpower, absen, inhouse_claim, materials
 
 
 def get_loss_time_per_bulan(section_id, tahun) -> list:
@@ -322,12 +331,10 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
       'loss_by_category': {'Machine': 2.5, ...}
     }
     """
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        sec = " AND dr.section_id = %s" if section_id is not None else ""
-        p = [tahun] + ([section_id] if section_id else [])
+    sec = " AND dr.section_id = %s" if section_id is not None else ""
+    p   = [tahun] + ([section_id] if section_id else [])
 
+    with db_cursor() as (_, cur):
         cur.execute(f"""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
                    SUM(s.total_hours),
@@ -360,26 +367,21 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
         for bulan, kat, val in cur.fetchall():
             loss_map.setdefault(bulan, {})[kat] = float(val or 0)
 
-        cur.close()
-        result = []
-        for m in range(1, 13):
-            total  = hours.get(m, 0.0)
-            lbc    = loss_map.get(m, {})
-            loss_total   = sum(lbc.values())
-            prep   = prep_map.get(m, 0.0)
-            sholat = sholat_map.get(m, 0.0)
-            process_hour = max(total - loss_total - prep - sholat, 0.0)
-            result.append({
-                "bulan":            m,
-                "total_hour":       total,
-                "process_hour":     process_hour,
-                "loss_by_category": lbc,
-            })
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    result = []
+    for m in range(1, 13):
+        total  = hours.get(m, 0.0)
+        lbc    = loss_map.get(m, {})
+        loss_total   = sum(lbc.values())
+        prep   = prep_map.get(m, 0.0)
+        sholat = sholat_map.get(m, 0.0)
+        process_hour = max(total - loss_total - prep - sholat, 0.0)
+        result.append({
+            "bulan":            m,
+            "total_hour":       total,
+            "process_hour":     process_hour,
+            "loss_by_category": lbc,
+        })
+    return result
 
 
 def get_monthly_loss_by_group(year: int) -> list:
@@ -388,9 +390,7 @@ def get_monthly_loss_by_group(year: int) -> list:
     {'bulan': 1-12, 'total_hour': float, 'loss_total': float,
      'process_pct': float, 'by_group': {'Production': x, ...}}
     """
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute("""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
                    COALESCE(SUM(s.total_hours), 0),
@@ -423,37 +423,30 @@ def get_monthly_loss_by_group(year: int) -> list:
         for bulan, gname, _, val in cur.fetchall():
             loss_map.setdefault(bulan, {})[gname] = float(val)
 
-        cur.close()
-        result = []
-        for m in range(1, 13):
-            total      = shift_hours.get(m, 0.0)
-            by_group   = loss_map.get(m, {})
-            loss_total = sum(by_group.values())
-            prep       = prep_map.get(m, 0.0)
-            sholat     = sholat_map.get(m, 0.0)
-            process    = max(total - loss_total - prep - sholat, 0.0)
-            pct        = round(process / total * 100, 1) if total > 0 else 0.0
-            result.append({
-                "bulan":       m,
-                "total_hour":  total,
-                "loss_total":  loss_total,
-                "process_pct": pct,
-                "by_group":    by_group,
-            })
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    result = []
+    for m in range(1, 13):
+        total      = shift_hours.get(m, 0.0)
+        by_group   = loss_map.get(m, {})
+        loss_total = sum(by_group.values())
+        prep       = prep_map.get(m, 0.0)
+        sholat     = sholat_map.get(m, 0.0)
+        process    = max(total - loss_total - prep - sholat, 0.0)
+        pct        = round(process / total * 100, 1) if total > 0 else 0.0
+        result.append({
+            "bulan":       m,
+            "total_hour":  total,
+            "loss_total":  loss_total,
+            "process_pct": pct,
+            "by_group":    by_group,
+        })
+    return result
 
 
 def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        sec = " AND dr.section_id = %s" if section_id is not None else ""
-        p   = [bulan, tahun] + ([section_id] if section_id else [])
+    sec = " AND dr.section_id = %s" if section_id is not None else ""
+    p   = [bulan, tahun] + ([section_id] if section_id else [])
 
+    with db_cursor() as (_, cur):
         cur.execute(f"""
             SELECT COALESCE(SUM(s.total_hours), 0),
                    COALESCE(SUM(s.preparation_min / 60.0), 0),
@@ -465,9 +458,9 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
               AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
         """, p)
         r = cur.fetchone()
-        total_hour  = float(r[0] or 0)
-        prep_hour   = float(r[1] or 0)
-        sholat_hour = float(r[2] or 0)
+        total_hour   = float(r[0] or 0)
+        prep_hour    = float(r[1] or 0)
+        sholat_hour  = float(r[2] or 0)
         report_count = int(r[3] or 0)
 
         cur.execute(f"""
@@ -500,24 +493,23 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         """, p)
         absence_hour = float((cur.fetchone() or [0])[0] or 0)
 
-        loss_hour    = sum(c["hours"] for c in categories)
-        process_hour = max(total_hour - prep_hour - sholat_hour - loss_hour - absence_hour, 0.0)
+    loss_hour    = sum(c["hours"] for c in categories)
+    process_hour = max(total_hour - prep_hour - sholat_hour - loss_hour - absence_hour, 0.0)
 
-        cur.close()
-        return {
-            "total_hour":   total_hour,
-            "process_hour": process_hour,
-            "prep_hour":    prep_hour,
-            "sholat_hour":  sholat_hour,
-            "absence_hour": absence_hour,
-            "categories":   categories,
-            "report_count": report_count,
-        }
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    return {
+        "total_hour":   total_hour,
+        "process_hour": process_hour,
+        "prep_hour":    prep_hour,
+        "sholat_hour":  sholat_hour,
+        "absence_hour": absence_hour,
+        "categories":   categories,
+        "report_count": report_count,
+    }
 
+
+# =============================================================================
+# LAPORAN WRITE
+# =============================================================================
 
 def hapus_laporan(report_id: int) -> tuple[bool, str]:
     conn = get_connection()
@@ -564,7 +556,6 @@ def simpan_laporan_harian(
         if not section_row:
             return False, f"Shop '{header['section']}' tidak ditemukan di database"
         section_id = section_row[0]
-
 
         # 2. Insert ke daily_report
         cur.execute("""
@@ -684,7 +675,6 @@ def simpan_laporan_harian(
             ))
 
         # 8. Insert material usage
-        _ensure_material_table(cur)
         for mat in (material_usage or []):
             if not mat.get("material_name"):
                 continue
@@ -750,6 +740,7 @@ def edit_section(section_id: int, nama: str) -> tuple[bool, str]:
         cur.execute("UPDATE section SET code = %s, name = %s WHERE id = %s", (code, nama, section_id))
         conn.commit()
         cur.close()
+        _c_inv('sections')
         return True, f"Shop berhasil diubah menjadi '{nama}'."
     except Exception as e:
         conn.rollback()
@@ -769,6 +760,7 @@ def hapus_section(section_id: int) -> tuple[bool, str]:
         cur.execute("DELETE FROM section WHERE id = %s", (section_id,))
         conn.commit()
         cur.close()
+        _c_inv('sections')
         return True, "Shop berhasil dihapus."
     except Exception as e:
         conn.rollback()
@@ -785,19 +777,12 @@ def get_all_users() -> list:
     cached = _c_get("users")
     if cached is not None:
         return cached
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute('SELECT id, nik, name, role FROM "user" ORDER BY name')
         rows = cur.fetchall()
-        cur.close()
-        result = [{"id": r[0], "nik": r[1], "name": r[2], "role": r[3]} for r in rows]
-        _c_set("users", result)
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    result = [{"id": r[0], "nik": r[1], "name": r[2], "role": r[3]} for r in rows]
+    _c_set("users", result)
+    return result
 
 
 def tambah_user(nik: str, nama: str, role: str, password_hash: str) -> tuple[bool, str]:
@@ -844,6 +829,7 @@ def hapus_user(user_id: int) -> tuple[bool, str]:
         cur.execute('DELETE FROM "user" WHERE id = %s', (user_id,))
         conn.commit()
         cur.close()
+        _c_inv('users')
         return True, "User berhasil dihapus."
     except Exception as e:
         conn.rollback()
@@ -860,27 +846,18 @@ def get_all_groups() -> list:
     cached = _c_get("groups")
     if cached is not None:
         return cached
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute("SELECT id, name FROM problem_group ORDER BY id")
         result = list(cur.fetchall())
-        cur.close()
-        _c_set("groups", result)
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    _c_set("groups", result)
+    return result
 
 
 def get_all_kategori() -> list:
     cached = _c_get("categories")
     if cached is not None:
         return cached
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute("""
             SELECT pc.id, pc.group_id, pg.name AS group_name,
                    pc.code, pc.name, pc.order_num
@@ -889,37 +866,29 @@ def get_all_kategori() -> list:
             ORDER BY pc.group_id, pc.order_num, pc.id
         """)
         rows = cur.fetchall()
-        cur.close()
-        result = [
-            {"id": r[0], "group_id": r[1], "group_name": r[2],
-             "code": r[3], "name": r[4], "order_num": r[5],
-             "parent_id": None}
-            for r in rows
-        ]
-        _c_set("categories", result)
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    result = [
+        {"id": r[0], "group_id": r[1], "group_name": r[2],
+         "code": r[3], "name": r[4], "order_num": r[5],
+         "parent_id": None}
+        for r in rows
+    ]
+    _c_set("categories", result)
+    return result
 
 
 def get_all_category_names() -> list[str]:
     """Returns ordered list of category names for dropdowns."""
-    conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT pc.name
-            FROM problem_category pc
-            JOIN problem_group pg ON pg.id = pc.group_id
-            ORDER BY pg.order_num, pc.order_num, pc.id
-        """)
-        return [r[0] for r in cur.fetchall()]
+        with db_cursor() as (_, cur):
+            cur.execute("""
+                SELECT pc.name
+                FROM problem_category pc
+                JOIN problem_group pg ON pg.id = pc.group_id
+                ORDER BY pg.order_num, pc.order_num, pc.id
+            """)
+            return [r[0] for r in cur.fetchall()]
     except Exception:
         return []
-    finally:
-        release_connection(conn)
 
 
 def tambah_kategori(name: str, group_id: int) -> tuple[bool, str]:
@@ -969,6 +938,7 @@ def edit_kategori(cat_id: int, name: str, group_id: int) -> tuple[bool, str]:
         )
         conn.commit()
         cur.close()
+        _c_inv('categories')
         return True, f"Kategori berhasil diubah menjadi '{name}'."
     except Exception as e:
         conn.rollback()
@@ -988,6 +958,7 @@ def hapus_kategori(cat_id: int) -> tuple[bool, str]:
         cur.execute("DELETE FROM problem_category WHERE id = %s", (cat_id,))
         conn.commit()
         cur.close()
+        _c_inv('categories')
         return True, "Kategori berhasil dihapus."
     except Exception as e:
         conn.rollback()
@@ -1022,35 +993,27 @@ def get_all_shifts() -> list:
     cached = _c_get("shifts")
     if cached is not None:
         return cached
-    ensure_shift_columns()
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
+    with db_cursor() as (_, cur):
         cur.execute("""
             SELECT id, name, start_time, end_time, total_hours,
                    COALESCE(preparation_min, 15), COALESCE(sholat_min, 10)
             FROM shift ORDER BY id
         """)
         rows = cur.fetchall()
-        cur.close()
-        result = [
-            {
-                "id":              r[0],
-                "name":            r[1],
-                "start_time":      str(r[2])[:5] if r[2] else "",
-                "end_time":        str(r[3])[:5] if r[3] else "",
-                "total_hours":     float(r[4]) if r[4] is not None else 0.0,
-                "preparation_min": float(r[5]) if r[5] is not None else 15.0,
-                "sholat_min":      float(r[6]) if r[6] is not None else 10.0,
-            }
-            for r in rows
-        ]
-        _c_set("shifts", result)
-        return result
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    result = [
+        {
+            "id":              r[0],
+            "name":            r[1],
+            "start_time":      str(r[2])[:5] if r[2] else "",
+            "end_time":        str(r[3])[:5] if r[3] else "",
+            "total_hours":     float(r[4]) if r[4] is not None else 0.0,
+            "preparation_min": float(r[5]) if r[5] is not None else 15.0,
+            "sholat_min":      float(r[6]) if r[6] is not None else 10.0,
+        }
+        for r in rows
+    ]
+    _c_set("shifts", result)
+    return result
 
 
 def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool, str]:
@@ -1072,7 +1035,6 @@ def tambah_shift(
     name: str, start_time: str, end_time: str,
     total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
 ) -> tuple[bool, str]:
-    ensure_shift_columns()
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -1099,7 +1061,6 @@ def edit_shift(
     shift_id: int, name: str, start_time: str, end_time: str,
     total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
 ) -> tuple[bool, str]:
-    ensure_shift_columns()
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -1116,6 +1077,7 @@ def edit_shift(
         )
         conn.commit()
         cur.close()
+        _c_inv('shifts')
         return True, f"Shift berhasil diubah menjadi '{name}'."
     except Exception as e:
         conn.rollback()
@@ -1135,6 +1097,7 @@ def hapus_shift(shift_id: int) -> tuple[bool, str]:
         cur.execute("DELETE FROM shift WHERE id = %s", (shift_id,))
         conn.commit()
         cur.close()
+        _c_inv('shifts')
         return True, "Shift berhasil dihapus."
     except Exception as e:
         conn.rollback()
@@ -1165,36 +1128,26 @@ def _ensure_shop_model_table(cur):
 
 
 def get_models_by_section(section_id: int) -> list:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        _ensure_shop_model_table(cur)
-        conn.commit()
+    with db_cursor() as (_, cur):
         cur.execute(
             "SELECT id, model_name, working_hour, cycle_time FROM shop_model WHERE section_id = %s ORDER BY model_name",
             (section_id,),
         )
         rows = cur.fetchall()
-        cur.close()
-        return [
-            {
-                "id": r[0], "model_name": r[1],
-                "working_hour": float(r[2] or 0),
-                "cycle_time":   float(r[3] or 0),
-            }
-            for r in rows
-        ]
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    return [
+        {
+            "id": r[0], "model_name": r[1],
+            "working_hour": float(r[2] or 0),
+            "cycle_time":   float(r[3] or 0),
+        }
+        for r in rows
+    ]
 
 
 def tambah_shop_model(section_id: int, model_name: str, working_hour: float = 0.0, cycle_time: float = 0.0) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        _ensure_shop_model_table(cur)
         cur.execute(
             "SELECT id FROM shop_model WHERE section_id = %s AND LOWER(model_name) = LOWER(%s) LIMIT 1",
             (section_id, model_name),
@@ -1282,29 +1235,19 @@ def _ensure_work_center_table(cur):
 
 
 def get_work_centers_by_section(section_id: int) -> list:
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        _ensure_work_center_table(cur)
-        conn.commit()
+    with db_cursor() as (_, cur):
         cur.execute(
             "SELECT id, name FROM work_center WHERE section_id = %s ORDER BY name",
             (section_id,),
         )
         rows = cur.fetchall()
-        cur.close()
-        return [{"id": r[0], "name": r[1]} for r in rows]
-    except Exception:
-        raise
-    finally:
-        release_connection(conn)
+    return [{"id": r[0], "name": r[1]} for r in rows]
 
 
 def tambah_work_center(section_id: int, name: str) -> tuple[bool, str]:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        _ensure_work_center_table(cur)
         cur.execute(
             "SELECT id FROM work_center WHERE section_id = %s AND LOWER(name) = LOWER(%s) LIMIT 1",
             (section_id, name),
@@ -1356,4 +1299,3 @@ def hapus_work_center(wc_id: int) -> tuple[bool, str]:
         return False, f"Gagal menghapus work center: {e}"
     finally:
         release_connection(conn)
-

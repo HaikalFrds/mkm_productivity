@@ -1,6 +1,7 @@
 import os
 import hashlib
 import threading
+from contextlib import contextmanager
 import psycopg2
 from psycopg2 import pool as pg_pool
 from dotenv import load_dotenv
@@ -42,6 +43,26 @@ def release_connection(conn):
             conn.close()
         except Exception:
             pass
+
+
+@contextmanager
+def db_cursor(commit: bool = False):
+    """Context manager: otomatis handle get/release connection dan cursor."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        yield conn, cur
+        if commit:
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        release_connection(conn)
 
 
 def hash_password(password: str) -> str:

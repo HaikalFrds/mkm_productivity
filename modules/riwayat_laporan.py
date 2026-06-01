@@ -258,8 +258,13 @@ class RiwayatLaporanWidget(QWidget):
             return
         try:
             sections = get_all_sections()
-            for combo in (self.combo_section, self.combo_section_rekap,
-                          self.combo_section_ng, self.combo_prod_section):
+            # combo_section (Riwayat Harian) — tanpa item "Semua", shop wajib dipilih
+            self.combo_section.blockSignals(True)
+            for sid, sname in sections:
+                self.combo_section.addItem(sname, sid)
+            self.combo_section.blockSignals(False)
+            # combo lain — dengan item "Semua"
+            for combo in (self.combo_section_rekap, self.combo_section_ng, self.combo_prod_section):
                 combo.blockSignals(True)
                 for sid, sname in sections:
                     combo.addItem(sname, sid)
@@ -327,7 +332,6 @@ class RiwayatLaporanWidget(QWidget):
         self.combo_section.setMinimumHeight(30)
         self.combo_section.setMinimumWidth(155)
         self.combo_section.setStyleSheet(_COMBO_STYLE)
-        self.combo_section.addItem("Semua", None)
         fl.addWidget(self.combo_section)
 
         fl.addWidget(self._flabel("Shift"))
@@ -433,6 +437,7 @@ class RiwayatLaporanWidget(QWidget):
         self._worker.start()
 
     def _on_harian_loaded(self, rows: list):
+        self._loaded_rows = rows
         self.tabel_harian.setRowCount(0)
         self.lbl_info_h.setText(f"{len(rows)} data ditemukan")
 
@@ -485,19 +490,9 @@ class RiwayatLaporanWidget(QWidget):
             )
             btn_hapus.clicked.connect(lambda _, rid=report_id: self._hapus(rid))
 
-            btn_export_row = QPushButton("Export")
-            btn_export_row.setMinimumWidth(60); btn_export_row.setFixedHeight(26)
-            btn_export_row.setStyleSheet(
-                "QPushButton { background-color: #1a2a1a; color: #22863a;"
-                " border: 1px solid #1a4a1a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
-                "QPushButton:hover { background-color: #1e341e; }"
-            )
-            btn_export_row.clicked.connect(lambda _, rid=report_id: self._export_laporan(rid))
-
             al.addWidget(btn_lihat)
             al.addWidget(btn_edit)
             al.addWidget(btn_hapus)
-            al.addWidget(btn_export_row)
             self.tabel_harian.setCellWidget(i, 6, aksi_w)
             self.tabel_harian.setRowHeight(i, 40)
 
@@ -810,58 +805,60 @@ class RiwayatLaporanWidget(QWidget):
             QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor laporan: {e}")
 
     def _export_rah(self):
-        try:
-            import openpyxl
-            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        except ImportError:
-            QMessageBox.critical(self, "Error", "openpyxl tidak terinstall.\nJalankan: pip install openpyxl")
+        if self.combo_section.currentData() is None:
+            QMessageBox.warning(self, "Peringatan", "Pilih Shop terlebih dahulu sebelum export.")
             return
-
-        row_count = self.tabel_harian.rowCount()
-        if row_count == 0:
+        if self.tabel_harian.rowCount() == 0:
             QMessageBox.warning(self, "Peringatan", "Tidak ada data untuk diekspor.")
             return
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Riwayat Harian"
+        all_catatan  = []
+        all_manpower = []
+        section_name = ""
+        shift_name   = ""
+        coordinator  = ""
 
-        thin = Side(style="thin", color="3C4147")
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
-        hdr_fill = PatternFill("solid", fgColor="1C2028")
-        hdr_font = Font(color="9696A0", bold=True, size=10)
-
-        col_headers = ["No", "Tanggal", "Shop", "Shift", "Koordinator", "Jml Masalah"]
-        for ci, h in enumerate(col_headers, 1):
-            cell = ws.cell(row=1, column=ci, value=h)
-            cell.fill = hdr_fill
-            cell.font = hdr_font
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.border = border
-
-        center_cols = {0, 1, 3, 5}
-        for ri in range(row_count):
-            for ci in range(6):
-                item = self.tabel_harian.item(ri, ci)
-                val = item.text() if item else ""
-                cell = ws.cell(row=ri + 2, column=ci + 1, value=val)
-                cell.alignment = Alignment(
-                    horizontal="center" if ci in center_cols else "left",
-                    vertical="center",
-                )
-                cell.border = border
-
-        for ci, w in enumerate([6, 12, 30, 12, 22, 14], 1):
-            ws.column_dimensions[openpyxl.utils.get_column_letter(ci)].width = w
-        ws.row_dimensions[1].height = 20
-
-        downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-        filepath = os.path.join(downloads, f"riwayat_harian_{QDate.currentDate().toString('yyyyMMdd')}.xlsx")
         try:
-            wb.save(filepath)
+            for row in getattr(self, "_loaded_rows", []):
+                _, _, catatan, manpower, _, _, _ = get_detail_laporan(row["id"])
+                all_catatan.extend(catatan)
+                all_manpower.extend(manpower)
+                if not section_name:
+                    section_name = row.get("section", "")
+                if not shift_name:
+                    shift_name = row.get("shift", "")
+                if not coordinator:
+                    coordinator = row.get("coordinator", "")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat detail laporan: {e}")
+            return
+
+        header_info = {
+            "date":        self.date_from.date().toString("yyyy-MM-dd"),
+            "section":     section_name,
+            "shift":       shift_name,
+            "coordinator": coordinator,
+            "approved_by": "",
+            "checked_by":  "",
+        }
+
+        if not all_catatan:
+            QMessageBox.warning(self, "Peringatan", "Tidak ada catatan masalah untuk diekspor.")
+            return
+
+        try:
+            from modules.export_excel import export_loss_time_record
+            filepath = export_loss_time_record(
+                header=header_info,
+                catatan=all_catatan,
+                produksi=[],
+                manpower=all_manpower,
+                absen=[],
+                inhouse_claim=[],
+            )
             QMessageBox.information(self, "Export Berhasil", f"File disimpan di:\n{filepath}")
         except Exception as e:
-            QMessageBox.critical(self, "Gagal Export", f"Gagal menyimpan file:\n{e}")
+            QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor: {e}")
 
     # ── Tab 2: Rekap Bulanan ─────────────────────────────────────────────────
 

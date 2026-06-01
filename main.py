@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 os.environ["QT_FONT_DPI"] = "96"
 
+from modules.db_laporan import initialize_tables
 from views.login import LoginWindow
 
 _login  = None
@@ -44,5 +45,6 @@ if __name__ == "__main__":
     except FileNotFoundError:
         pass
 
+    initialize_tables()
     show_login()
     sys.exit(app.exec())

@@ -19,7 +19,7 @@ from modules.db_laporan import (
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 
 
-# ── Shared styles ─────────────────────────────────────────────────────────────
+# Shared styles
 
 # (prev: #1e1e1e bg, #303030 border, #252525 card, #969696 text-sec)
 
@@ -129,7 +129,7 @@ _BTN_EXPORT = """
 """
 
 
-# ── DB helpers ────────────────────────────────────────────────────────────────
+#  DB helpers
 
 def _db_display_line_stop(section_id, bulan, tahun, factor=None):
     conn = get_connection()
@@ -214,7 +214,7 @@ def _db_ng_pending(section_id, date_from, date_to):
         release_connection(conn)
 
 
-# ── Background worker ─────────────────────────────────────────────────────────
+# Background worker
 
 class _RiwayatWorker(QThread):
     finished = Signal(list)
@@ -241,7 +241,7 @@ class _RiwayatWorker(QThread):
             self.error.emit(str(e))
 
 
-# ── Widget ────────────────────────────────────────────────────────────────────
+# Widget
 
 class RiwayatLaporanWidget(QWidget):
     def __init__(self, parent=None):
@@ -312,7 +312,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabs.addTab(self._build_tab_volume(),       "Volume Produksi")
         outer.addWidget(self.tabs)
 
-    # ── Tab 1: Riwayat Harian ────────────────────────────────────────────────
+    # Tab 1: Riwayat Harian
 
     def _build_tab_harian(self):
         tab = QWidget()
@@ -553,7 +553,7 @@ class RiwayatLaporanWidget(QWidget):
             )
             return lbl
 
-        # ── Header info ──────────────────────────────────────────────────────
+        # Header info
         hdr_frame = QFrame()
         hdr_frame.setStyleSheet("QFrame { background-color: #2e2e2e; border-radius: 0px; }")
         hdr_lyt = QGridLayout(hdr_frame)
@@ -586,7 +586,7 @@ class RiwayatLaporanWidget(QWidget):
             hdr_lyt.addWidget(val, r, c * 2 + 1)
         lyt.addWidget(hdr_frame)
 
-        # ── Data Produksi ────────────────────────────────────────────────────
+        # Data Produksi
         if produksi:
             lyt.addWidget(_sec_lbl("Data Produksi"))
             tbl_prod = QTableWidget()
@@ -617,7 +617,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_prod.setItem(i, 5, bal_cell)
             lyt.addWidget(tbl_prod)
 
-        # ── Catatan Masalah ──────────────────────────────────────────────────
+        # Catatan Masalah
         lyt.addWidget(_sec_lbl("Catatan Masalah"))
         tbl_cat = QTableWidget()
         tbl_cat.setColumnCount(9)
@@ -648,7 +648,7 @@ class RiwayatLaporanWidget(QWidget):
             tbl_cat.resizeRowToContents(i)
         lyt.addWidget(tbl_cat)
 
-        # ── Manpower ─────────────────────────────────────────────────────────
+        # Manpower
         if manpower:
             lyt.addWidget(_sec_lbl("Manpower"))
             tbl_mp = QTableWidget()
@@ -676,7 +676,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_mp.setItem(i, 3, bal_cell)
             lyt.addWidget(tbl_mp)
 
-        # ── Absen ────────────────────────────────────────────────────────────
+        # Absen
         if absen:
             lyt.addWidget(_sec_lbl("Absen"))
             tbl_absen = QTableWidget()
@@ -702,7 +702,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_absen.setItem(i, 4, _cell(a.get("keterangan", "")))
             lyt.addWidget(tbl_absen)
 
-        # ── Inhouse Claim ────────────────────────────────────────────────────
+        # Inhouse Claim
         if inhouse_claim:
             lyt.addWidget(_sec_lbl("Inhouse Claim"))
             tbl_ic = QTableWidget()
@@ -742,7 +742,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_ic.setItem(i, 10, it_status)
             lyt.addWidget(tbl_ic)
 
-        # ── Material Used ────────────────────────────────────────────────────
+        # Material Used
         if materials:
             lyt.addWidget(_sec_lbl("Material Used"))
             tbl_mat = QTableWidget()
@@ -869,7 +869,7 @@ class RiwayatLaporanWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor: {e}")
 
-    # ── Tab 2: Rekap Bulanan ─────────────────────────────────────────────────
+    # Tab 2: Rekap Bulanan
 
     def _build_tab_rekap(self):
         tab = QWidget()
@@ -1127,7 +1127,7 @@ class RiwayatLaporanWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Gagal Export", f"Gagal menyimpan file:\n{e}")
 
-    # ── Tab 3: NG & Pending ──────────────────────────────────────────────────
+    # Tab 3: NG & Pending
 
     def _build_tab_ng_pending(self):
         tab = QWidget()
@@ -1339,11 +1339,11 @@ class RiwayatLaporanWidget(QWidget):
             QMessageBox.warning(self, "Peringatan", "Tidak ada data untuk diekspor.")
             return
 
-        # ── Section name ──────────────────────────────────────────────────────
+        # Section name
         sec_text     = self.combo_section_ng.currentText()
         section_name = sec_text if sec_text != "Semua" else ""
 
-        # ── Period string ─────────────────────────────────────────────────────
+        # Period string
         d_from = self.date_ng_from.date()
         d_to   = self.date_ng_to.date()
         _bln   = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN",
@@ -1355,7 +1355,7 @@ class RiwayatLaporanWidget(QWidget):
                 f"{d_from.toString('dd/MM/yy')} - {d_to.toString('dd/MM/yy')}"
             )
 
-        # ── Extract table data ────────────────────────────────────────────────
+        # Extract table data 
         def _read_table(tbl, ncols):
             """
             Baca ncols kolom dari QTableWidget.
@@ -1382,7 +1382,7 @@ class RiwayatLaporanWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor: {e}")
 
-    # ── Tab 4: Produktivitas Bulanan ─────────────────────────────────────────
+    # Tab 4: Produktivitas Bulanan
 
     def _build_tab_produktivitas(self):
         tab = QWidget()
@@ -1582,11 +1582,11 @@ class RiwayatLaporanWidget(QWidget):
             tbl.setItem(r, 1, it_h)
             tbl.setRowHeight(r, 28)
 
-        # ── Produktif ──────────────────────────────────────────────────────
+        # Produktif 
         _grp_row("PRODUKTIF")
         _data_row("Process", data["process_hour"], "#80c880")
 
-        # ── Non-Produktif (line stop by category/group) ────────────────────
+        # Non-Produktif (line stop by category/group)
 
         groups: dict[str, list] = {}
         for cat in data["categories"]:
@@ -1599,16 +1599,16 @@ class RiwayatLaporanWidget(QWidget):
                 for cat in cats:
                     _data_row(cat["name"], cat["hours"])
 
-        # ── Waktu Tetap ────────────────────────────────────────────────────
+        # Waktu Tetap 
         _grp_row("WAKTU TETAP")
         _data_row("Preparation", data["prep_hour"])
         _data_row("Sholat",      data["sholat_hour"])
 
-        # ── Ketidakhadiran ─────────────────────────────────────────────────
+        # Ketidakhadiran
         _grp_row("KETIDAKHADIRAN")
         _data_row("Absence", data["absence_hour"])
 
-        # ── Divider + TOTAL ────────────────────────────────────────────────
+        # Divider + TOTAL
         r = tbl.rowCount()
         tbl.insertRow(r)
         for c in range(2):
@@ -1633,7 +1633,7 @@ class RiwayatLaporanWidget(QWidget):
         tbl.setItem(r, 1, it_h)
         tbl.setRowHeight(r, 30)
 
-        # ── Summary ────────────────────────────────────────────────────────
+        # Summary
         balance = loss_hour
 
         ratio = (data["process_hour"] / total_hour * 100) if total_hour > 0 else 0.0
@@ -1661,7 +1661,7 @@ class RiwayatLaporanWidget(QWidget):
         lbl.setStyleSheet("color: #969696; font-size: 11px;")
         return lbl
 
-    # ── Tab 5: Volume Produksi ───────────────────────────────────────────────
+    # Tab 5: Volume Produksi
 
     def _build_tab_volume(self):
         tab = QWidget()
@@ -1830,7 +1830,7 @@ class RiwayatLaporanWidget(QWidget):
         )
 
 
-# ── Module-level helpers ──────────────────────────────────────────────────────
+# Module-level helpers
 
 def _vol_item(text: str, bold: bool = False, center: bool = False) -> QTableWidgetItem:
     it = QTableWidgetItem(text)

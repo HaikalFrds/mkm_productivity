@@ -222,9 +222,9 @@ def get_detail_laporan(report_id: int) -> tuple:
                 "actual_unit":  float(r[2]) if r[2] is not None else 0.0,
                 "plan_whour":   float(r[3]) if r[3] is not None else 0.0,
                 "actual_whour": float(r[4]) if r[4] is not None else 0.0,
-                "ot_2h":        float(r[5]) if r[5] is not None else 0.0,
-                "ot_3h":        float(r[6]) if r[6] is not None else 0.0,
-                "ot_11h":       float(r[7]) if r[7] is not None else 0.0,
+                "ot_2h":        bool(r[5]) if r[5] is not None else False,
+                "ot_3h":        bool(r[6]) if r[6] is not None else False,
+                "ot_11h":       bool(r[7]) if r[7] is not None else False,
             }
             for r in cur.fetchall()
         ]
@@ -424,9 +424,23 @@ def get_monthly_loss_by_group(year: int) -> list:
         for bulan, gname, _, val in cur.fetchall():
             loss_map.setdefault(bulan, {})[gname] = float(val)
 
+        cur.execute("""
+            SELECT EXTRACT(MONTH FROM dr.date)::int,
+                   COALESCE(SUM(
+                       CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
+                       CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
+                       CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
+                   ), 0)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(YEAR FROM dr.date) = %s
+            GROUP BY 1
+        """, (year,))
+        ot_map = {r[0]: float(r[1]) for r in cur.fetchall()}
+
     result = []
     for m in range(1, 13):
-        total      = shift_hours.get(m, 0.0)
+        total      = shift_hours.get(m, 0.0) + ot_map.get(m, 0.0)
         by_group   = loss_map.get(m, {})
         loss_total = sum(by_group.values())
         prep       = prep_map.get(m, 0.0)
@@ -463,6 +477,20 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         prep_hour    = float(r[1] or 0)
         sholat_hour  = float(r[2] or 0)
         report_count = int(r[3] or 0)
+
+        cur.execute(f"""
+            SELECT COALESCE(SUM(
+                CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
+                CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
+                CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
+            ), 0)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        ot_hour = float((cur.fetchone() or [0])[0] or 0)
+        total_hour += ot_hour
 
         cur.execute(f"""
             SELECT COALESCE(pcg.name, 'Others') AS grp,
@@ -594,9 +622,9 @@ def simpan_laporan_harian(
                 p.get("actual_unit") or 0,
                 plan_wh,
                 actual_wh,
-                p.get("ot_2h")  or 0,
-                p.get("ot_3h")  or 0,
-                p.get("ot_11h") or 0,
+                bool(p.get("ot_2h",  False)),
+                bool(p.get("ot_3h",  False)),
+                bool(p.get("ot_11h", False)),
             ))
 
         # 4. Insert catatan masalah

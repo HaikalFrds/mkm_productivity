@@ -15,7 +15,7 @@ from PySide6.QtGui import QColor
 from modules.db_laporan import get_dashboard_data, get_monthly_loss_by_group
 
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# Constants
 
 _MONTHS  = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]
 _DAYS_ID = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"]
@@ -51,7 +51,7 @@ _TABLE_SS = """
 """
 
 
-# ── Chart helpers ─────────────────────────────────────────────────────────────
+# Chart helpers 
 
 def _dark_ax(fig, ax):
     """Terapkan dark theme ke axes tunggal."""
@@ -78,7 +78,7 @@ def _dark_twin(ax2):
     ax2.yaxis.tick_right()
 
 
-# ── StatCard ──────────────────────────────────────────────────────────────────
+# StatCard
 
 class _StatCard(QFrame):
     def __init__(self, title: str, init_val: str, subtitle: str, accent: str):
@@ -117,14 +117,14 @@ class _StatCard(QFrame):
         self._val.setText(v)
 
 
-# ── DashboardWidget ───────────────────────────────────────────────────────────
+# DashboardWidget
 
 class DashboardWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
 
-    # ── UI ────────────────────────────────────────────────────────────────────
+    # UI
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
@@ -136,7 +136,7 @@ class DashboardWidget(QWidget):
         outer.addWidget(self._build_main_chart_card(), stretch=3)
         outer.addLayout(self._build_bottom_row(), stretch=2)
 
-    # ── Header bar ────────────────────────────────────────────────────────────
+    # Header bar
 
     def _build_header(self) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -182,7 +182,7 @@ class DashboardWidget(QWidget):
             f"{today.toString('d')} {_MONTHS[today.month()-1]} {today.toString('yyyy')}"
         )
 
-    # ── Stat row ──────────────────────────────────────────────────────────────
+    # Stat row
 
     def _build_stat_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -195,7 +195,7 @@ class DashboardWidget(QWidget):
             row.addWidget(c)
         return row
 
-    # ── Main chart ────────────────────────────────────────────────────────────
+    # Main chart
 
     def _build_main_chart_card(self) -> QFrame:
         card = QFrame()
@@ -228,7 +228,7 @@ class DashboardWidget(QWidget):
         lay.addWidget(self._canvas)
         return card
 
-    # ── Bottom row ────────────────────────────────────────────────────────────
+    # Bottom row
 
     def _build_bottom_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -292,13 +292,13 @@ class DashboardWidget(QWidget):
         lay.addWidget(self._tbl)
         return card
 
-    # ── Events ────────────────────────────────────────────────────────────────
+    # Events
 
     def showEvent(self, event):
         super().showEvent(event)
         self.load_data()
 
-    # ── Data ──────────────────────────────────────────────────────────────────
+    # Data
 
     def load_data(self):
         self._refresh_date()

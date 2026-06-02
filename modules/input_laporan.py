@@ -542,10 +542,10 @@ class InputLaporanWidget(QWidget):
         lay.addLayout(hdr)
 
         # No | Model | OP/ST | Item | Qty | Satuan | Cause/Penyebab | Action/Perbaikan | Factor | Hour | Lost
-        self.tbl_claim = QTableWidget(0, 11)
+        self.tbl_claim = QTableWidget(0, 12)
         self.tbl_claim.setHorizontalHeaderLabels([
             "No", "Model", "OP/ST", "Item", "Qty", "Satuan",
-            "Cause / Penyebab", "Action / Perbaikan", "Factor", "Hour", "Lost",
+            "Cause / Penyebab", "Action / Perbaikan", "Factor", "Hour", "Lost", "Status",
         ])
         h = self.tbl_claim.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Fixed)
@@ -560,6 +560,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setColumnWidth(8,  75)
         self.tbl_claim.setColumnWidth(9,  50)
         self.tbl_claim.setColumnWidth(10, 50)
+        self.tbl_claim.setColumnWidth(11, 75)
         self.tbl_claim.verticalHeader().setVisible(False)
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_claim.setStyleSheet(_TBL)
@@ -717,6 +718,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setCellWidget(r, 8, _mk_combo(self._factors, popup_w=100))
         self.tbl_claim.setItem(r, 9,  _item("0", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 10, _item("0", Qt.AlignCenter))
+        self.tbl_claim.setCellWidget(r, 11, _mk_combo(["NG", "Pending", "OK"], popup_w=70))
 
     def _hapus_claim(self):
         r = self.tbl_claim.currentRow()
@@ -1019,7 +1021,9 @@ class InputLaporanWidget(QWidget):
                 "actual_unit":  _fv(self.tbl_prod, r, 2),
                 "plan_whour":   _fv(self.tbl_prod, r, 3),
                 "actual_whour": _fv(self.tbl_prod, r, 4),
-                "ot_2h": 0, "ot_3h": 0, "ot_11h": 0,
+                "ot_2h":  self._ot_hours == 2.0,
+                "ot_3h":  self._ot_hours == 3.0,
+                "ot_11h": self._ot_hours == 11.0,
             })
 
         # Line Stop → catatan (problem_record)
@@ -1095,7 +1099,8 @@ class InputLaporanWidget(QWidget):
                 "faktor":   cb_factor.currentText() if cb_factor else "",
                 "stop_hr":  _fv(self.tbl_claim, r, 9),
                 "lost_hr":  _fv(self.tbl_claim, r, 10),
-                "status":   "NG",
+                "status":   (self.tbl_claim.cellWidget(r, 11).currentText()
+                             if self.tbl_claim.cellWidget(r, 11) else "NG"),
             })
 
         manpower_data = []

@@ -139,9 +139,16 @@ def _db_display_line_stop(section_id, bulan, tahun, factor=None):
         p = [bulan, tahun] + ([section_id] if section_id else [])
 
         cur.execute(f"""
-            SELECT COALESCE(SUM(s.total_hours), 0)
+            SELECT
+                COALESCE(SUM(s.total_hours), 0) +
+                COALESCE(SUM(
+                    CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
+                    CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
+                    CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
+                ), 0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
+            LEFT JOIN daily_production dp ON dp.report_id = dr.id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
               AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
         """, p)
@@ -191,7 +198,7 @@ def _db_ng_pending(section_id, date_from, date_to):
                    ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr, ic.status
             FROM inhouse_claim ic
             JOIN daily_report dr ON dr.id = ic.report_id
-            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'NG' {sec}
+            WHERE dr.date BETWEEN %s AND %s AND UPPER(ic.status) = 'NG' {sec}
             ORDER BY ic.tanggal DESC, ic.id DESC
         """, p)
         inhouse_ng = cur.fetchall()
@@ -201,7 +208,7 @@ def _db_ng_pending(section_id, date_from, date_to):
                    ic.penyebab, ic.tindakan, ic.faktor, ic.stop_hr, ic.lost_hr
             FROM inhouse_claim ic
             JOIN daily_report dr ON dr.id = ic.report_id
-            WHERE dr.date BETWEEN %s AND %s AND ic.status = 'PENDING' {sec}
+            WHERE dr.date BETWEEN %s AND %s AND UPPER(ic.status) = 'PENDING' {sec}
             ORDER BY ic.tanggal DESC, ic.id DESC
         """, p)
         inhouse_pending = cur.fetchall()

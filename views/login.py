@@ -56,7 +56,7 @@ class LoginWindow(QWidget):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(0)
 
-        # ── Logo ──────────────────────────────────────────────────────────────
+        # Logo
         title = QLabel("MKM")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet(
@@ -75,7 +75,7 @@ class LoginWindow(QWidget):
         divider.setFrameShape(QFrame.HLine)
         divider.setStyleSheet("background-color: #2e2e2e; border: none; max-height: 1px;")
 
-        # ── Fields ────────────────────────────────────────────────────────────
+        # Fields
         _lbl_ss = (
             "color: #888888; font-size: 9pt; letter-spacing: 1px;"
             " background: transparent; border: none; padding: 0px;"
@@ -100,7 +100,7 @@ class LoginWindow(QWidget):
         self.input_password.setEchoMode(QLineEdit.Password)
         self.input_password.setStyleSheet(_inp_ss)
 
-        # ── Error ─────────────────────────────────────────────────────────────
+        # Error
         self.lbl_error = QLabel("")
         self.lbl_error.setStyleSheet(
             "color: #da291c; font-size: 9pt; background: transparent;"
@@ -110,7 +110,7 @@ class LoginWindow(QWidget):
         self.lbl_error.setWordWrap(True)
         self.lbl_error.hide()
 
-        # ── Button ────────────────────────────────────────────────────────────
+        # Button
         self.btn_login = QPushButton("MASUK")
         self.btn_login.setObjectName("btn_primary")
         self.btn_login.setStyleSheet(
@@ -124,7 +124,7 @@ class LoginWindow(QWidget):
         self.input_password.returnPressed.connect(self.do_login)
         self.input_nik.returnPressed.connect(self.do_login)
 
-        # ── Layout ────────────────────────────────────────────────────────────
+        # Layout
         layout.addWidget(title)
         layout.addSpacing(4)
         layout.addWidget(subtitle)

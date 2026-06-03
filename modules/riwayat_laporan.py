@@ -14,7 +14,7 @@ from modules.db_auth import get_connection, release_connection
 from modules.db_laporan import (
     get_all_sections, get_all_shifts, get_all_category_names,
     get_detail_laporan, hapus_laporan, get_monthly_productivity,
-    get_production_volume,
+    get_production_volume, get_riwayat_laporan,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 
@@ -139,20 +139,26 @@ def _db_display_line_stop(section_id, bulan, tahun, factor=None):
         p = [bulan, tahun] + ([section_id] if section_id else [])
 
         cur.execute(f"""
-            SELECT
-                COALESCE(SUM(s.total_hours), 0) +
-                COALESCE(SUM(
-                    CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
-                    CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
-                    CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
-                ), 0)
+            SELECT COALESCE(SUM(s.total_hours), 0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
-            LEFT JOIN daily_production dp ON dp.report_id = dr.id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
               AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
         """, p)
         total_hour = float((cur.fetchone() or [0])[0] or 0)
+
+        cur.execute(f"""
+            SELECT COALESCE(SUM(
+                CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
+                CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
+                CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
+            ), 0)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
+        """, p)
+        total_hour += float((cur.fetchone() or [0])[0] or 0)
 
         extra = ""
         p2 = list(p)
@@ -180,8 +186,6 @@ def _db_display_line_stop(section_id, bulan, tahun, factor=None):
         rows = cur.fetchall()
         cur.close()
         return rows, total_hour
-    except Exception:
-        raise
     finally:
         release_connection(conn)
 
@@ -215,8 +219,6 @@ def _db_ng_pending(section_id, date_from, date_to):
 
         cur.close()
         return inhouse_ng, inhouse_pending
-    except Exception:
-        raise
     finally:
         release_connection(conn)
 
@@ -236,7 +238,6 @@ class _RiwayatWorker(QThread):
 
     def run(self):
         try:
-            from modules.db_laporan import get_riwayat_laporan
             rows = get_riwayat_laporan(
                 section_id=self.section_id,
                 shift_name=self.shift_name,
@@ -739,7 +740,7 @@ class RiwayatLaporanWidget(QWidget):
                 tbl_ic.setItem(i, 8, _cell(f"{ic.get('stop_hr', 0):.2f}", Qt.AlignCenter))
                 tbl_ic.setItem(i, 9, _cell(f"{ic.get('lost_hr', 0):.2f}", Qt.AlignCenter))
                 it_status = _cell(ic.get("status", ""), Qt.AlignCenter)
-                s = ic.get("status", "")
+                s = ic.get("status", "").upper()
                 if s == "NG":
                     it_status.setForeground(QColor(220, 100, 100))
                 elif s == "PENDING":
@@ -805,21 +806,6 @@ class RiwayatLaporanWidget(QWidget):
             else:
                 QMessageBox.critical(self, "Gagal", msg)
 
-    def _export_laporan(self, report_id):
-        try:
-            header, produksi, catatan, manpower, absen, inhouse_claim, _ = get_detail_laporan(report_id)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Gagal memuat detail: {e}")
-            return
-        if header is None:
-            QMessageBox.warning(self, "Tidak Ditemukan", f"Laporan #{report_id} tidak ditemukan.")
-            return
-        try:
-            filepath = export_loss_time_record(header, produksi, catatan, manpower, absen, inhouse_claim)
-            QMessageBox.information(self, "Export Berhasil", f"File disimpan di:\n{filepath}")
-        except Exception as e:
-            QMessageBox.critical(self, "Gagal Export", f"Gagal mengekspor laporan: {e}")
-
     def _export_rah(self):
         if self.combo_section.currentData() is None:
             QMessageBox.warning(self, "Peringatan", "Pilih Shop terlebih dahulu sebelum export.")
@@ -863,7 +849,6 @@ class RiwayatLaporanWidget(QWidget):
             return
 
         try:
-            from modules.export_excel import export_loss_time_record
             filepath = export_loss_time_record(
                 header=header_info,
                 catatan=all_catatan,

@@ -90,6 +90,19 @@ def get_dashboard_data() -> dict:
         sholat_hour_bln = float(r[2] or 0)
 
         cur.execute("""
+            SELECT COALESCE(SUM(
+                CASE WHEN dp.ot_2h  THEN 2.0  ELSE 0 END +
+                CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
+                CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
+            ), 0)
+            FROM daily_production dp
+            JOIN daily_report dr ON dr.id = dp.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = %s
+              AND EXTRACT(YEAR  FROM dr.date) = %s
+        """, (today.month, today.year))
+        total_hour_bln += float((cur.fetchone() or [0])[0] or 0)
+
+        cur.execute("""
             SELECT COALESCE(SUM(pr.loss_time), 0)
             FROM problem_record pr
             JOIN daily_report dr ON dr.id = pr.report_id
@@ -916,7 +929,8 @@ def get_all_category_names() -> list[str]:
                 ORDER BY pg.order_num, pc.order_num, pc.id
             """)
             return [r[0] for r in cur.fetchall()]
-    except Exception:
+    except Exception as e:
+        logging.error(f"get_all_category_names error: {e}")
         return []
 
 

@@ -1,11 +1,8 @@
-import hashlib
-import os
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
+    QWidget, QVBoxLayout,
     QLabel, QLineEdit, QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QFont
 from modules.db_auth import verify_login
 
 

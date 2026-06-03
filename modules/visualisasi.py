@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 import matplotlib.ticker as mticker
 
 from modules.db_laporan import get_all_sections, get_loss_time_per_bulan
+from modules.config import TARGET_PROCESS_RATIO
 
 
 # ── Styles ────────────────────────────────────────────────────────────────────
@@ -285,10 +286,10 @@ class VisualisasiWidget(QWidget):
                 )
 
         # ── Plan target line ──────────────────────────────────────────────────
-        ax_line.axhline(86, color=PLAN_COLOR, linewidth=1.5,
-                        linestyle="--", zorder=5, label="Plan 86%")
-        ax_line.text(11.55, 86.8, "86%", color=PLAN_COLOR, fontsize=8,
-                     va="bottom", ha="right")
+        ax_line.axhline(TARGET_PROCESS_RATIO, color=PLAN_COLOR, linewidth=1.5,
+                        linestyle="--", zorder=5, label=f"Plan {TARGET_PROCESS_RATIO:.0f}%")
+        ax_line.text(11.55, TARGET_PROCESS_RATIO + 0.8, f"{TARGET_PROCESS_RATIO:.0f}%",
+                     color=PLAN_COLOR, fontsize=8, va="bottom", ha="right")
 
         # ── Axes config ───────────────────────────────────────────────────────
         ax_bar.set_xticks(x)

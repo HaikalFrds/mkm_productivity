@@ -210,8 +210,8 @@ class InputLaporanWidget(QWidget):
         main.addLayout(self._build_footer())
         main.addStretch()
 
-        # Build material panel without adding to layout — initializes self.tbl_mat
         self._mat_card = self._build_material_panel()
+        main.addWidget(self._mat_card)
 
         scroll.setWidget(container)
         outer.addWidget(scroll)
@@ -565,6 +565,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_claim.setStyleSheet(_TBL)
         self.tbl_claim.setMinimumHeight(140)
+        self.tbl_claim.itemChanged.connect(self._on_claim_item_changed)
         lay.addWidget(self.tbl_claim)
         return card
 
@@ -708,7 +709,9 @@ class InputLaporanWidget(QWidget):
         no_it.setFlags(Qt.ItemIsEnabled)
         self.tbl_claim.setItem(r, 0, no_it)
 
-        self.tbl_claim.setCellWidget(r, 1, _mk_combo(self._shop_models or _MODELS))
+        combo_model = _mk_combo(self._shop_models or _MODELS)
+        self.tbl_claim.setCellWidget(r, 1, combo_model)
+        combo_model.currentTextChanged.connect(lambda _, row=r: self._calc_claim_stop(row))
         self.tbl_claim.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
         self.tbl_claim.setItem(r, 3, _item("", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 4, _item("", Qt.AlignCenter))
@@ -728,6 +731,30 @@ class InputLaporanWidget(QWidget):
                 it = self.tbl_claim.item(i, 0)
                 if it:
                     it.setText(str(i + 1))
+
+    def _on_claim_item_changed(self, item):
+        if item.column() == 4:  # Qty changed
+            self._calc_claim_stop(item.row())
+
+    def _calc_claim_stop(self, r: int):
+        cb_model = self.tbl_claim.cellWidget(r, 1)
+        qty_it   = self.tbl_claim.item(r, 4)
+        if not cb_model or not qty_it:
+            return
+        model = cb_model.currentText()
+        mhu   = self._shop_model_hours.get(model, 0.0)
+        try:
+            qty = float(qty_it.text()) if qty_it.text() else 0.0
+        except ValueError:
+            qty = 0.0
+        stop = round(mhu * qty, 4) if mhu > 0 and qty > 0 else 0.0
+        self.tbl_claim.blockSignals(True)
+        stop_it = self.tbl_claim.item(r, 9)
+        if not stop_it:
+            stop_it = _item("0", Qt.AlignCenter)
+            self.tbl_claim.setItem(r, 9, stop_it)
+        stop_it.setText(f"{stop:.4f}" if stop > 0 else "0")
+        self.tbl_claim.blockSignals(False)
 
     def _tambah_linestop(self):
         r = self.tbl_ls.rowCount()
@@ -794,12 +821,11 @@ class InputLaporanWidget(QWidget):
             diff_min += 1440
         h = round(diff_min / 60, 4)
         self.tbl_ls.blockSignals(True)
-        for col in (9, 10):
-            it = self.tbl_ls.item(r, col)
-            if not it:
-                it = _item("0", Qt.AlignCenter)
-                self.tbl_ls.setItem(r, col, it)
-            it.setText(f"{h:.4f}")
+        it = self.tbl_ls.item(r, 9)
+        if not it:
+            it = _item("0", Qt.AlignCenter)
+            self.tbl_ls.setItem(r, 9, it)
+        it.setText(f"{h:.4f}")
         self.tbl_ls.blockSignals(False)
 
     # Auto-fill Hour dari MHU
@@ -1103,7 +1129,11 @@ class InputLaporanWidget(QWidget):
                              if self.tbl_claim.cellWidget(r, 11) else "NG"),
             })
 
-        manpower_data = []
+        manpower_data = [
+            {"role": "Foreman", "plan": 0, "act": 0},
+            {"role": "Ass.For", "plan": 0, "act": 0},
+            {"role": "Worker",  "plan": 0, "act": 0},
+        ]
 
         # Material Used
         material_data = []

@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 
 from modules.db_laporan import get_dashboard_data, get_monthly_loss_by_group
+from modules.config import TARGET_PROCESS_RATIO
 
 
 # Constants
@@ -29,7 +30,6 @@ _GROUPS = [
     ("#8e44ad", "Production Engineering"),
 ]
 
-TARGET_PROCESS = 86.0
 
 # (prev: #1e1e1e tbl, #303030 border, #252525 row, #969696 header)
 _TABLE_SS = """
@@ -425,10 +425,10 @@ class DashboardWidget(QWidget):
                                  fontweight="bold", zorder=7)
 
             # Target line
-            ax2.axhline(y=TARGET_PROCESS, color="#da291c", linestyle="--",
+            ax2.axhline(y=TARGET_PROCESS_RATIO, color="#da291c", linestyle="--",
                         linewidth=1.0, alpha=0.5, zorder=4,
-                        label=f"Target {TARGET_PROCESS:.0f}%")
-            ax2.text(11.6, TARGET_PROCESS + 2, f"{TARGET_PROCESS:.0f}%",
+                        label=f"Target {TARGET_PROCESS_RATIO:.0f}%")
+            ax2.text(11.6, TARGET_PROCESS_RATIO + 2, f"{TARGET_PROCESS_RATIO:.0f}%",
                      fontsize=8, color="#e74c3c", ha="left", va="bottom",
                      fontweight="bold")
 

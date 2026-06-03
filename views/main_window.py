@@ -2,10 +2,8 @@ import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget,
-    QSizePolicy, QSpacerItem
 )
 from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QIcon, QFont
 
 
 class MainWindow(QMainWindow):
@@ -16,7 +14,6 @@ class MainWindow(QMainWindow):
         self.user = user
         self.setWindowTitle("MKM Productivity System")
         self.setMinimumSize(900, 600)
-        self.active_btn = None
         self.setup_ui()
         self.load_pages()
         self.navigate_to("dashboard")

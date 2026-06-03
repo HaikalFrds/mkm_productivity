@@ -649,15 +649,15 @@ def simpan_laporan_harian(
             cur.execute("""
                 INSERT INTO daily_production
                     (report_id, model, plan_unit, actual_unit, plan_whour, actual_whour,
-                    ot_2h, ot_3h, ot_11h)
+                     ot_2h, ot_3h, ot_11h)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 report_id,
                 p["model"],
                 p.get("plan_unit")   or 0,
                 p.get("actual_unit") or 0,
-                plan_wh,
-                actual_wh,
+                p.get("plan_whour")   or 0,
+                p.get("actual_whour") or 0,
                 bool(p.get("ot_2h",  False)),
                 bool(p.get("ot_3h",  False)),
                 bool(p.get("ot_11h", False)),

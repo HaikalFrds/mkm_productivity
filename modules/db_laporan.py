@@ -201,10 +201,11 @@ def get_detail_laporan(report_id: int) -> tuple:
         cur.execute(
             """
             SELECT dr.id, dr.date, sec.name, sh.name,
-                   dr.coordinator, dr.approved_by, dr.checked_by, dr.status
+                   dr.coordinator, dr.approved_by, dr.checked_by, s.total_hours
             FROM daily_report dr
             JOIN section sec ON sec.id = dr.section_id
             JOIN shift   sh  ON sh.id  = dr.shift_id
+            JOIN shift s ON s.id = dr.shift_id
             WHERE dr.id = %s
             """,
             (report_id,),
@@ -212,10 +213,34 @@ def get_detail_laporan(report_id: int) -> tuple:
         hdr = cur.fetchone()
         if not hdr:
             return None, [], [], [], [], [], []
+        
+        # Determine overtime
+        cur.execute(
+            """
+            SELECT ot_2h, ot_3h, ot_11h
+            FROM daily_production
+            WHERE report_id = %s
+            LIMIT 1
+            """,
+            (report_id,),
+        )
+        ot_row = cur.fetchone()
+        overtime_text = "-"
+        if ot_row:
+            ot_2h, ot_3h, ot_11h = ot_row
+            if ot_2h:
+                overtime_text = "2H"
+            elif ot_3h:
+                overtime_text = "3H"
+            elif ot_11h:
+                overtime_text = "11.4H"
+        
         header = {
             "id": hdr[0], "date": str(hdr[1]), "section": hdr[2],
             "shift": hdr[3], "coordinator": hdr[4],
-            "approved_by": hdr[5], "checked_by": hdr[6], "status": hdr[7],
+            "approved_by": hdr[5], "checked_by": hdr[6],
+            "shift_duration": float(hdr[7]) if hdr[7] is not None else 0.0,
+            "overtime": overtime_text,
         }
 
         cur.execute(
@@ -631,8 +656,8 @@ def simpan_laporan_harian(
                 p["model"],
                 p.get("plan_unit")   or 0,
                 p.get("actual_unit") or 0,
-                p.get("plan_whour")   or 0,    # ← AMBIL DARI SETIAP p
-                p.get("actual_whour") or 0,    # ← AMBIL DARI SETIAP p
+                plan_wh,
+                actual_wh,
                 bool(p.get("ot_2h",  False)),
                 bool(p.get("ot_3h",  False)),
                 bool(p.get("ot_11h", False)),

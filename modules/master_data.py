@@ -333,7 +333,7 @@ class _WorkCenterDialog(QDialog):
 
 class _ShiftDialog(QDialog):
     def __init__(self, parent, name="", start="07:00", end="15:00", total=8.0,
-                 preparation_min=15.0, sholat_min=10.0):
+                 preparation_min=15.0, other_min=10.0):
         super().__init__(parent)
         self.setWindowTitle("Tambah Shift" if not name else "Edit Shift")
         self.setFixedWidth(380)
@@ -387,25 +387,25 @@ class _ShiftDialog(QDialog):
         lay.addWidget(lbl_prep)
         lay.addWidget(self.input_prep)
 
-        lbl_sholat = QLabel("Sholat / Istirahat Ibadah")
-        lbl_sholat.setStyleSheet(_LBL_FIELD)
-        self.input_sholat = QDoubleSpinBox()
-        self.input_sholat.setRange(0.0, 60.0)
-        self.input_sholat.setSingleStep(1.0)
-        self.input_sholat.setDecimals(1)
-        self.input_sholat.setValue(sholat_min)
-        self.input_sholat.setSuffix(" menit")
-        self.input_sholat.setMinimumHeight(32)
-        self.input_sholat.setStyleSheet(_TIME_EDIT_STYLE)
-        lay.addWidget(lbl_sholat)
-        lay.addWidget(self.input_sholat)
+        lbl_other = QLabel("Other")
+        lbl_other.setStyleSheet(_LBL_FIELD)
+        self.input_other = QDoubleSpinBox()
+        self.input_other.setRange(0.0, 60.0)
+        self.input_other.setSingleStep(1.0)
+        self.input_other.setDecimals(1)
+        self.input_other.setValue(other_min)
+        self.input_other.setSuffix(" menit")
+        self.input_other.setMinimumHeight(32)
+        self.input_other.setStyleSheet(_TIME_EDIT_STYLE)
+        lay.addWidget(lbl_other)
+        lay.addWidget(self.input_other)
 
         # preview
         self._lbl_preview = QLabel()
         self._lbl_preview.setStyleSheet("color: #666666; font-size: 10px;")
         lay.addWidget(self._lbl_preview)
         self.input_prep.valueChanged.connect(self._update_preview)
-        self.input_sholat.valueChanged.connect(self._update_preview)
+        self.input_other.valueChanged.connect(self._update_preview)
         self._update_preview()
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -416,9 +416,9 @@ class _ShiftDialog(QDialog):
 
     def _update_preview(self):
         p = self.input_prep.value()
-        s = self.input_sholat.value()
+        s = self.input_other.value()
         self._lbl_preview.setText(
-            f"Preparation = {p/60:.4f} H  |  Sholat = {s/60:.4f} H"
+            f"Preparation = {p/60:.4f} H  |  Other = {s/60:.4f} H"
         )
 
     def get_data(self) -> dict:
@@ -428,7 +428,7 @@ class _ShiftDialog(QDialog):
             "end_time":        self.time_end.time().toString("HH:mm"),
             "total_hours":     self.input_total.value(),
             "preparation_min": self.input_prep.value(),
-            "sholat_min":      self.input_sholat.value(),
+            "other_min":       self.input_other.value(),
         }
 
 
@@ -633,7 +633,7 @@ class MasterDataWidget(QWidget):
         self.tabel_shift.setColumnCount(8)
         self.tabel_shift.setHorizontalHeaderLabels(
             ["No", "Nama Shift", "Mulai", "Selesai", "Working Hour (H)",
-             "Preparation (mnt)", "Sholat (mnt)", "Aksi"]
+             "Preparation (mnt)", "Other (mnt)", "Aksi"]
         )
         hh = self.tabel_shift.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.Stretch)
@@ -1050,7 +1050,7 @@ class MasterDataWidget(QWidget):
             self.tabel_shift.setItem(i, 3, _item(s["end_time"],   Qt.AlignCenter))
             self.tabel_shift.setItem(i, 4, _item(f"{s['total_hours']:.1f}", Qt.AlignCenter))
             self.tabel_shift.setItem(i, 5, _item(f"{s['preparation_min']:.0f}", Qt.AlignCenter))
-            self.tabel_shift.setItem(i, 6, _item(f"{s['sholat_min']:.0f}", Qt.AlignCenter))
+            self.tabel_shift.setItem(i, 6, _item(f"{s['other_min']:.0f}", Qt.AlignCenter))
             self.tabel_shift.setCellWidget(i, 7, self._aksi_shift(s))
             self.tabel_shift.setRowHeight(i, 40)
         _fit_table(self.tabel_shift)
@@ -1076,7 +1076,7 @@ class MasterDataWidget(QWidget):
             return
         ok, msg = tambah_shift(
             d["name"], d["start_time"], d["end_time"], d["total_hours"],
-            d["preparation_min"], d["sholat_min"],
+            d["preparation_min"], d["other_min"],
         )
         if ok:
             self._load_shifts()
@@ -1087,7 +1087,7 @@ class MasterDataWidget(QWidget):
     def _edit_shift(self, s: dict):
         dlg = _ShiftDialog(
             self, s["name"], s["start_time"], s["end_time"], s["total_hours"],
-            s.get("preparation_min", 15.0), s.get("sholat_min", 10.0),
+            s.get("preparation_min", 15.0), s.get("other_min", 10.0),
         )
         if dlg.exec() != QDialog.Accepted:
             return
@@ -1097,7 +1097,7 @@ class MasterDataWidget(QWidget):
             return
         ok, msg = edit_shift(
             s["id"], d["name"], d["start_time"], d["end_time"], d["total_hours"],
-            d["preparation_min"], d["sholat_min"],
+            d["preparation_min"], d["other_min"],
         )
         if ok:
             self._load_shifts()

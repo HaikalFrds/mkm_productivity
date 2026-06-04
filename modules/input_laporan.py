@@ -70,16 +70,22 @@ def _item(text="", align=Qt.AlignLeft | Qt.AlignVCenter) -> QTableWidgetItem:
     return it
 
 
+def _fmt(v: float) -> str:
+    """Format angka dinamis: hilangkan trailing zero, max 4 desimal."""
+    s = f"{v:.4f}".rstrip('0').rstrip('.')
+    return s or "0"
+
+
 # Main Widget
 
 class InputLaporanWidget(QWidget):
     def __init__(self, user: dict, parent=None):
         super().__init__(parent)
         self._user         = user
-        self._shift_map: dict = {}   # name → {total_hours, preparation_min, sholat_min}
+        self._shift_map: dict = {}   # name → {total_hours, preparation_min, other_min}
         self._shift_hours  = 0.0
         self._prep_h       = 15.0 / 60
-        self._sholat_h     = 10.0 / 60
+        self._other_h      = 10.0 / 60
         self._ot_hours     = 0.0
         self._shop_models: list[str] = []
         self._shop_model_hours: dict[str, float] = {}   # model → H/unit (MHU)
@@ -141,7 +147,7 @@ class InputLaporanWidget(QWidget):
                 s["name"]: {
                     "total_hours":     s["total_hours"],
                     "preparation_min": s.get("preparation_min", 15.0),
-                    "sholat_min":      s.get("sholat_min", 10.0),
+                    "other_min":       s.get("other_min", 10.0),
                 }
                 for s in shifts
             }
@@ -162,7 +168,7 @@ class InputLaporanWidget(QWidget):
         data = self._shift_map.get(self.combo_shift.currentText(), {})
         base_hours        = data.get("total_hours", 0.0)
         self._prep_h      = data.get("preparation_min", 15.0) / 60
-        self._sholat_h    = data.get("sholat_min", 10.0) / 60
+        self._other_h     = data.get("other_min", 10.0) / 60
         # Jumat: potong 30 menit (0.5 jam) — hanya untuk Day Shift
         if self.chk_pengganti.isChecked():
             day_map = {"Senin": 1, "Selasa": 2, "Rabu": 3, "Kamis": 4,
@@ -174,9 +180,9 @@ class InputLaporanWidget(QWidget):
         is_day_shift = "night" not in self.combo_shift.currentText().lower()
         self._shift_hours = base_hours - 0.5 if (is_friday and is_day_shift and base_hours > 0) else base_hours
         self._shift_hours += self._ot_hours
-        self._lbl_hour.setText(f"{self._shift_hours:.2f}")
-        self._lbl_prep_val.setText(f"{self._prep_h:.4f}")
-        self._lbl_sholat_val.setText(f"{self._sholat_h:.4f}")
+        self._lbl_hour.setText(_fmt(self._shift_hours))
+        self._lbl_prep_val.setText(_fmt(self._prep_h))
+        self._lbl_other_val.setText(_fmt(self._other_h))
         self._hitung_calc_hour()
 
     def _update_day(self, date: QDate):
@@ -209,9 +215,6 @@ class InputLaporanWidget(QWidget):
         main.addWidget(self._build_line_stop())
         main.addLayout(self._build_footer())
         main.addStretch()
-
-        self._mat_card = self._build_material_panel()
-        main.addWidget(self._mat_card)
 
         scroll.setWidget(container)
         outer.addWidget(scroll)
@@ -465,26 +468,28 @@ class InputLaporanWidget(QWidget):
             l.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             return l
 
-        self._lbl_process   = _vlbl()
-        self._lbl_prep_val  = _vlbl(f"{self._prep_h:.4f}")
+        self._lbl_process    = _vlbl()
+        self._lbl_prep_val   = _vlbl(_fmt(self._prep_h))
         self._lbl_prep_val.setStyleSheet("color:#969696; font-size:11px;")
         self._lbl_prep_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_quality   = _vlbl("0.0000")
-        self._lbl_linestop  = _vlbl()
+        self._lbl_quality    = _vlbl("0.0000")
+        self._lbl_linestop   = _vlbl()
+        self._lbl_claim_loss = _vlbl()
         self._lbl_absence   = _vlbl()
-        self._lbl_sholat_val = _vlbl(f"{self._sholat_h:.4f}")
-        self._lbl_sholat_val.setStyleSheet("color:#969696; font-size:11px;")
-        self._lbl_sholat_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_total     = _vlbl()
-        self._lbl_balance   = _vlbl()
+        self._lbl_other_val = _vlbl(_fmt(self._other_h))
+        self._lbl_other_val.setStyleSheet("color:#969696; font-size:11px;")
+        self._lbl_other_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._lbl_total      = _vlbl()
+        self._lbl_balance    = _vlbl()
 
         rows = [
             ("Process",     self._lbl_process),
             ("Preparation", self._lbl_prep_val),
             ("Quality",     self._lbl_quality),
             ("Line Stop",   self._lbl_linestop),
+            ("Claim Loss",  self._lbl_claim_loss),
             ("Absence",     self._lbl_absence),
-            ("Sholat",      self._lbl_sholat_val),
+            ("Other",       self._lbl_other_val),
         ]
         for i, (name, wgt) in enumerate(rows):
             grid.addWidget(_rlbl(name), i, 0)
@@ -733,8 +738,10 @@ class InputLaporanWidget(QWidget):
                     it.setText(str(i + 1))
 
     def _on_claim_item_changed(self, item):
-        if item.column() == 4:  # Qty changed
+        if item.column() == 4:    # Qty changed → recalc Stop Hr
             self._calc_claim_stop(item.row())
+        elif item.column() == 10:  # Lost Hr changed → update balance
+            self._hitung_calc_hour()
 
     def _calc_claim_stop(self, r: int):
         cb_model = self.tbl_claim.cellWidget(r, 1)
@@ -753,7 +760,7 @@ class InputLaporanWidget(QWidget):
         if not stop_it:
             stop_it = _item("0", Qt.AlignCenter)
             self.tbl_claim.setItem(r, 9, stop_it)
-        stop_it.setText(f"{stop:.4f}" if stop > 0 else "0")
+        stop_it.setText(_fmt(stop) if stop > 0 else "0")
         self.tbl_claim.blockSignals(False)
 
     def _tambah_linestop(self):
@@ -825,7 +832,7 @@ class InputLaporanWidget(QWidget):
         if not it:
             it = _item("0", Qt.AlignCenter)
             self.tbl_ls.setItem(r, 9, it)
-        it.setText(f"{h:.4f}")
+        it.setText(_fmt(h))
         self.tbl_ls.blockSignals(False)
 
     # Auto-fill Hour dari MHU
@@ -851,13 +858,13 @@ class InputLaporanWidget(QWidget):
                         plh_it.setBackground(QColor("#1a1a1a"))
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
-                    plh_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                    plh_it.setText(_fmt(qty * mhu) if qty > 0 else "")
                 else:  # col == 2, Act Qty → Act H
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
-                    ach_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                    ach_it.setText(_fmt(qty * mhu) if qty > 0 else "")
                 self.tbl_prod.blockSignals(False)
         self._hitung_calc_hour()
 
@@ -882,74 +889,16 @@ class InputLaporanWidget(QWidget):
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
                     pq = _qty(1)
-                    plh_it.setText(f"{pq * mhu:.4f}" if pq > 0 else "")
+                    plh_it.setText(_fmt(pq * mhu) if pq > 0 else "")
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
                     aq = _qty(2)
-                    ach_it.setText(f"{aq * mhu:.4f}" if aq > 0 else "")
+                    ach_it.setText(_fmt(aq * mhu) if aq > 0 else "")
                 self.tbl_prod.blockSignals(False)
                 self._hitung_calc_hour()
                 break
-
-    # Material Used
-
-    def _build_material_panel(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(10, 10, 10, 10); lay.setSpacing(6)
-
-        hdr = QHBoxLayout()
-        hdr.addWidget(QLabel("Material Used", styleSheet=_HDR_LBL))
-        hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
-        ba.clicked.connect(self._tambah_material)
-        bd.clicked.connect(self._hapus_material)
-        hdr.addWidget(ba); hdr.addWidget(bd)
-        lay.addLayout(hdr)
-
-        self.tbl_mat = QTableWidget(0, 6)
-        self.tbl_mat.setHorizontalHeaderLabels(
-            ["No", "Material Name", "Mat. No", "Qty", "Satuan", "Keterangan"]
-        )
-        h = self.tbl_mat.horizontalHeader()
-        h.setSectionResizeMode(QHeaderView.Fixed)
-        h.setSectionResizeMode(1, QHeaderView.Stretch)
-        h.setSectionResizeMode(5, QHeaderView.Stretch)
-        self.tbl_mat.setColumnWidth(0, 28)
-        self.tbl_mat.setColumnWidth(2, 90)
-        self.tbl_mat.setColumnWidth(3, 55)
-        self.tbl_mat.setColumnWidth(4, 65)
-        self.tbl_mat.verticalHeader().setVisible(False)
-        self.tbl_mat.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tbl_mat.setStyleSheet(_TBL)
-        self.tbl_mat.setMinimumHeight(120)
-        lay.addWidget(self.tbl_mat)
-        return card
-
-    def _tambah_material(self):
-        r = self.tbl_mat.rowCount()
-        self.tbl_mat.insertRow(r)
-        self.tbl_mat.setRowHeight(r, 28)
-        no_it = _item(str(r + 1), Qt.AlignCenter)
-        no_it.setFlags(Qt.ItemIsEnabled)
-        self.tbl_mat.setItem(r, 0, no_it)
-        self.tbl_mat.setItem(r, 1, _item(""))
-        self.tbl_mat.setItem(r, 2, _item(""))
-        self.tbl_mat.setItem(r, 3, _item("0", Qt.AlignCenter))
-        self.tbl_mat.setCellWidget(r, 4, _mk_combo(_SATUAN, popup_w=70))
-        self.tbl_mat.setItem(r, 5, _item(""))
-
-    def _hapus_material(self):
-        r = self.tbl_mat.currentRow()
-        if r >= 0:
-            self.tbl_mat.removeRow(r)
-            for i in range(self.tbl_mat.rowCount()):
-                it = self.tbl_mat.item(i, 0)
-                if it:
-                    it.setText(str(i + 1))
 
     # Calculation Hour
 
@@ -957,6 +906,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(True)
         self.tbl_absen.blockSignals(True)
         self.tbl_ls.blockSignals(True)
+        self.tbl_claim.blockSignals(True)
 
         def _fval(tbl, row, col):
             it = tbl.item(row, col)
@@ -967,22 +917,24 @@ class InputLaporanWidget(QWidget):
                     pass
             return 0.0
 
-        process  = sum(_fval(self.tbl_prod,  r, 4) for r in range(self.tbl_prod.rowCount()))
-        absence  = sum(_fval(self.tbl_absen, r, 3) for r in range(self.tbl_absen.rowCount()))
-        linestop = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
-        quality  = 0.0
-        total    = self._shift_hours
-        balance  = total - process - self._prep_h - quality - linestop - absence - self._sholat_h
+        process    = sum(_fval(self.tbl_prod,  r, 4)  for r in range(self.tbl_prod.rowCount()))
+        absence    = sum(_fval(self.tbl_absen, r, 3)  for r in range(self.tbl_absen.rowCount()))
+        linestop   = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
+        claim_loss = sum(_fval(self.tbl_claim, r, 10) for r in range(self.tbl_claim.rowCount()))
+        quality    = 0.0
+        total      = self._shift_hours
+        balance    = total - process - self._prep_h - quality - linestop - claim_loss - absence - self._other_h
 
-        self._lbl_process.setText(f"{process:.4f}")
-        self._lbl_quality.setText(f"{quality:.4f}")
-        self._lbl_linestop.setText(f"{linestop:.4f}")
-        self._lbl_absence.setText(f"{absence:.4f}")
-        self._lbl_total.setText(f"{total:.4f}")
+        self._lbl_process.setText(_fmt(process))
+        self._lbl_quality.setText(_fmt(quality))
+        self._lbl_linestop.setText(_fmt(linestop))
+        self._lbl_claim_loss.setText(_fmt(claim_loss))
+        self._lbl_absence.setText(_fmt(absence))
+        self._lbl_total.setText(_fmt(total))
 
         ok = abs(balance) < 0.001
         clr = "rgb(80,200,100)" if ok else "rgb(220,80,80)"
-        self._lbl_balance.setText(f"{balance:.4f}")
+        self._lbl_balance.setText(_fmt(balance))
         self._lbl_balance.setStyleSheet(
             f"color: {clr}; font-size:13px; font-weight:bold;"
         )
@@ -990,6 +942,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(False)
         self.tbl_absen.blockSignals(False)
         self.tbl_ls.blockSignals(False)
+        self.tbl_claim.blockSignals(False)
 
     # Reset
 
@@ -999,7 +952,6 @@ class InputLaporanWidget(QWidget):
         self.tbl_absen.setRowCount(0)
         self.tbl_claim.setRowCount(0)
         self.tbl_ls.setRowCount(0)
-        self.tbl_mat.setRowCount(0)
 
         self._hitung_calc_hour()
 
@@ -1135,24 +1087,6 @@ class InputLaporanWidget(QWidget):
             {"role": "Worker",  "plan": 0, "act": 0},
         ]
 
-        # Material Used
-        material_data = []
-        for r in range(self.tbl_mat.rowCount()):
-            name_it = self.tbl_mat.item(r, 1)
-            name = name_it.text().strip() if name_it else ""
-            if not name:
-                continue
-            matno_it = self.tbl_mat.item(r, 2)
-            sat_cb   = self.tbl_mat.cellWidget(r, 4)
-            ket_it   = self.tbl_mat.item(r, 5)
-            material_data.append({
-                "material_name": name,
-                "material_no":   matno_it.text().strip() if matno_it else "",
-                "qty":           _fv(self.tbl_mat, r, 3),
-                "satuan":        sat_cb.currentText() if sat_cb else "",
-                "keterangan":    ket_it.text().strip() if ket_it else "",
-            })
-
         header = {
             "tanggal":     self.input_tanggal.date().toString("yyyy-MM-dd"),
             "shift":       self.combo_shift.currentText(),
@@ -1172,7 +1106,6 @@ class InputLaporanWidget(QWidget):
             inhouse_claim=claim_data,
             manpower=manpower_data,
             absen=absen_data,
-            material_usage=material_data,
         )
         if ok:
             self.reset_form()

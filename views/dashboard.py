@@ -418,7 +418,7 @@ class DashboardWidget(QWidget):
                             sel.annotation.set_fontsize(8)
 
                 for xi, yi in zip(px, py):
-                    ax2.annotate(f"{yi:.0f}%",
+                    ax2.annotate(f"{yi:.1f}%",
                                  xy=(xi, yi),
                                  xytext=(0, 8), textcoords="offset points",
                                  ha="center", fontsize=7, color="#4fc3f7",

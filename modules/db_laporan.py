@@ -78,7 +78,7 @@ def get_dashboard_data() -> dict:
             SELECT
                 COALESCE(SUM(s.total_hours), 0),
                 COALESCE(SUM(s.preparation_min / 60.0), 0),
-                COALESCE(SUM(s.sholat_min / 60.0), 0)
+                COALESCE(SUM(s.other_min / 60.0), 0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
@@ -87,7 +87,7 @@ def get_dashboard_data() -> dict:
         r = cur.fetchone()
         total_hour_bln  = float(r[0] or 0)
         prep_hour_bln   = float(r[1] or 0)
-        sholat_hour_bln = float(r[2] or 0)
+        other_hour_bln  = float(r[2] or 0)
 
         cur.execute("""
             SELECT COALESCE(SUM(
@@ -95,7 +95,8 @@ def get_dashboard_data() -> dict:
                 CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
                 CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
             ), 0)
-            FROM daily_production dp
+            FROM (SELECT DISTINCT ON (report_id) report_id, ot_2h, ot_3h, ot_11h
+                  FROM daily_production) dp
             JOIN daily_report dr ON dr.id = dp.report_id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
               AND EXTRACT(YEAR  FROM dr.date) = %s
@@ -111,7 +112,7 @@ def get_dashboard_data() -> dict:
         """, (today.month, today.year))
         loss_bln = float((cur.fetchone() or [0])[0] or 0)
 
-        process_hour_bln = max(total_hour_bln - loss_bln - prep_hour_bln - sholat_hour_bln, 0.0)
+        process_hour_bln = max(total_hour_bln - loss_bln - prep_hour_bln - other_hour_bln, 0.0)
         process_ratio    = (process_hour_bln / total_hour_bln * 100) if total_hour_bln > 0 else 0.0
 
         cur.close()
@@ -378,19 +379,19 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
             SELECT EXTRACT(MONTH FROM dr.date)::int,
                    SUM(s.total_hours),
                    SUM(s.preparation_min / 60.0),
-                   SUM(s.sholat_min / 60.0)
+                   SUM(s.other_min / 60.0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(YEAR FROM dr.date) = %s {sec}
             GROUP BY 1
         """, p)
-        hours      = {}
-        prep_map   = {}
-        sholat_map = {}
+        hours     = {}
+        prep_map  = {}
+        other_map = {}
         for r in cur.fetchall():
-            hours[r[0]]      = float(r[1] or 0)
-            prep_map[r[0]]   = float(r[2] or 0)
-            sholat_map[r[0]] = float(r[3] or 0)
+            hours[r[0]]     = float(r[1] or 0)
+            prep_map[r[0]]  = float(r[2] or 0)
+            other_map[r[0]] = float(r[3] or 0)
 
         cur.execute(f"""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
@@ -411,9 +412,9 @@ def get_loss_time_per_bulan(section_id, tahun) -> list:
         total  = hours.get(m, 0.0)
         lbc    = loss_map.get(m, {})
         loss_total   = sum(lbc.values())
-        prep   = prep_map.get(m, 0.0)
-        sholat = sholat_map.get(m, 0.0)
-        process_hour = max(total - loss_total - prep - sholat, 0.0)
+        prep  = prep_map.get(m, 0.0)
+        other = other_map.get(m, 0.0)
+        process_hour = max(total - loss_total - prep - other, 0.0)
         result.append({
             "bulan":            m,
             "total_hour":       total,
@@ -434,7 +435,7 @@ def get_monthly_loss_by_group(year: int) -> list:
             SELECT EXTRACT(MONTH FROM dr.date)::int,
                    COALESCE(SUM(s.total_hours), 0),
                    COALESCE(SUM(s.preparation_min / 60.0), 0),
-                   COALESCE(SUM(s.sholat_min / 60.0), 0)
+                   COALESCE(SUM(s.other_min / 60.0), 0)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
             WHERE EXTRACT(YEAR FROM dr.date) = %s
@@ -442,11 +443,11 @@ def get_monthly_loss_by_group(year: int) -> list:
         """, (year,))
         shift_hours = {}
         prep_map    = {}
-        sholat_map  = {}
+        other_map   = {}
         for r in cur.fetchall():
             shift_hours[r[0]] = float(r[1])
             prep_map[r[0]]    = float(r[2])
-            sholat_map[r[0]]  = float(r[3])
+            other_map[r[0]]   = float(r[3])
 
         cur.execute("""
             SELECT EXTRACT(MONTH FROM dr.date)::int,
@@ -469,7 +470,8 @@ def get_monthly_loss_by_group(year: int) -> list:
                        CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
                        CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
                    ), 0)
-            FROM daily_production dp
+            FROM (SELECT DISTINCT ON (report_id) report_id, ot_2h, ot_3h, ot_11h
+                  FROM daily_production) dp
             JOIN daily_report dr ON dr.id = dp.report_id
             WHERE EXTRACT(YEAR FROM dr.date) = %s
             GROUP BY 1
@@ -481,9 +483,9 @@ def get_monthly_loss_by_group(year: int) -> list:
         total      = shift_hours.get(m, 0.0) + ot_map.get(m, 0.0)
         by_group   = loss_map.get(m, {})
         loss_total = sum(by_group.values())
-        prep       = prep_map.get(m, 0.0)
-        sholat     = sholat_map.get(m, 0.0)
-        process    = max(total - loss_total - prep - sholat, 0.0)
+        prep    = prep_map.get(m, 0.0)
+        other   = other_map.get(m, 0.0)
+        process = max(total - loss_total - prep - other, 0.0)
         pct        = round(process / total * 100, 1) if total > 0 else 0.0
         result.append({
             "bulan":       m,
@@ -503,7 +505,7 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         cur.execute(f"""
             SELECT COALESCE(SUM(s.total_hours), 0),
                    COALESCE(SUM(s.preparation_min / 60.0), 0),
-                   COALESCE(SUM(s.sholat_min / 60.0), 0),
+                   COALESCE(SUM(s.other_min / 60.0), 0),
                    COUNT(dr.id)
             FROM daily_report dr
             JOIN shift s ON s.id = dr.shift_id
@@ -513,7 +515,7 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         r = cur.fetchone()
         total_hour   = float(r[0] or 0)
         prep_hour    = float(r[1] or 0)
-        sholat_hour  = float(r[2] or 0)
+        other_hour   = float(r[2] or 0)
         report_count = int(r[3] or 0)
 
         cur.execute(f"""
@@ -522,7 +524,8 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
                 CASE WHEN dp.ot_3h  THEN 3.0  ELSE 0 END +
                 CASE WHEN dp.ot_11h THEN 11.0 ELSE 0 END
             ), 0)
-            FROM daily_production dp
+            FROM (SELECT DISTINCT ON (report_id) report_id, ot_2h, ot_3h, ot_11h
+                  FROM daily_production) dp
             JOIN daily_report dr ON dr.id = dp.report_id
             WHERE EXTRACT(MONTH FROM dr.date) = %s
               AND EXTRACT(YEAR  FROM dr.date) = %s {sec}
@@ -561,13 +564,13 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         absence_hour = float((cur.fetchone() or [0])[0] or 0)
 
     loss_hour    = sum(c["hours"] for c in categories)
-    process_hour = max(total_hour - prep_hour - sholat_hour - loss_hour - absence_hour, 0.0)
+    process_hour = max(total_hour - prep_hour - other_hour - loss_hour - absence_hour, 0.0)
 
     return {
         "total_hour":   total_hour,
         "process_hour": process_hour,
         "prep_hour":    prep_hour,
-        "sholat_hour":  sholat_hour,
+        "other_hour":   other_hour,
         "absence_hour": absence_hour,
         "categories":   categories,
         "report_count": report_count,
@@ -1045,7 +1048,7 @@ def ensure_shift_columns():
         cur.execute("""
             ALTER TABLE shift
                 ADD COLUMN IF NOT EXISTS preparation_min FLOAT DEFAULT 15,
-                ADD COLUMN IF NOT EXISTS sholat_min      FLOAT DEFAULT 10
+                ADD COLUMN IF NOT EXISTS other_min       FLOAT DEFAULT 10
         """)
         conn.commit()
         cur.close()
@@ -1062,7 +1065,7 @@ def get_all_shifts() -> list:
     with db_cursor() as (_, cur):
         cur.execute("""
             SELECT id, name, start_time, end_time, total_hours,
-                   COALESCE(preparation_min, 15), COALESCE(sholat_min, 10)
+                   COALESCE(preparation_min, 15), COALESCE(other_min, 10)
             FROM shift ORDER BY id
         """)
         rows = cur.fetchall()
@@ -1074,7 +1077,7 @@ def get_all_shifts() -> list:
             "end_time":        str(r[3])[:5] if r[3] else "",
             "total_hours":     float(r[4]) if r[4] is not None else 0.0,
             "preparation_min": float(r[5]) if r[5] is not None else 15.0,
-            "sholat_min":      float(r[6]) if r[6] is not None else 10.0,
+            "other_min":       float(r[6]) if r[6] is not None else 10.0,
         }
         for r in rows
     ]
@@ -1099,7 +1102,7 @@ def update_shift_working_hour(shift_id: int, working_hour: float) -> tuple[bool,
 
 def tambah_shift(
     name: str, start_time: str, end_time: str,
-    total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
+    total_hours: float, preparation_min: float = 15.0, other_min: float = 10.0,
 ) -> tuple[bool, str]:
     conn = get_connection()
     try:
@@ -1108,9 +1111,9 @@ def tambah_shift(
         if cur.fetchone():
             return False, f"Shift '{name}' sudah ada."
         cur.execute(
-            """INSERT INTO shift (name, start_time, end_time, total_hours, preparation_min, sholat_min)
+            """INSERT INTO shift (name, start_time, end_time, total_hours, preparation_min, other_min)
                VALUES (%s, %s, %s, %s, %s, %s)""",
-            (name, start_time, end_time, total_hours, preparation_min, sholat_min),
+            (name, start_time, end_time, total_hours, preparation_min, other_min),
         )
         conn.commit()
         cur.close()
@@ -1125,7 +1128,7 @@ def tambah_shift(
 
 def edit_shift(
     shift_id: int, name: str, start_time: str, end_time: str,
-    total_hours: float, preparation_min: float = 15.0, sholat_min: float = 10.0,
+    total_hours: float, preparation_min: float = 15.0, other_min: float = 10.0,
 ) -> tuple[bool, str]:
     conn = get_connection()
     try:
@@ -1138,8 +1141,8 @@ def edit_shift(
             return False, f"Shift '{name}' sudah ada."
         cur.execute(
             """UPDATE shift SET name=%s, start_time=%s, end_time=%s,
-               total_hours=%s, preparation_min=%s, sholat_min=%s WHERE id=%s""",
-            (name, start_time, end_time, total_hours, preparation_min, sholat_min, shift_id),
+               total_hours=%s, preparation_min=%s, other_min=%s WHERE id=%s""",
+            (name, start_time, end_time, total_hours, preparation_min, other_min, shift_id),
         )
         conn.commit()
         cur.close()

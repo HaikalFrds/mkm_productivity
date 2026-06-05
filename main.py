@@ -8,6 +8,7 @@ load_dotenv()
 os.environ["QT_FONT_DPI"] = "96"
 
 from modules.db_laporan import initialize_tables
+from modules.config import DEV_MODE, DEV_USER, DEV_START_PAGE
 from views.login import LoginWindow
 
 _login  = None
@@ -46,5 +47,11 @@ if __name__ == "__main__":
         pass
 
     initialize_tables()
-    show_login()
+
+    if DEV_MODE:
+        on_login_success(DEV_USER)
+        _window.navigate_to(DEV_START_PAGE)
+    else:
+        show_login()
+
     sys.exit(app.exec())

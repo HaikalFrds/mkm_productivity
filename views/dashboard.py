@@ -85,7 +85,7 @@ class _StatCard(QFrame):
         super().__init__()
         self.setFixedHeight(88)
         self.setStyleSheet(
-            "QFrame { background-color: #222222; border-left: 3px solid #da291c; border-radius: 0px; }"
+            f"QFrame {{ background-color: #222222; border-left: 3px solid {accent}; border-radius: 0px; }}"
         )
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 10, 14, 10)
@@ -288,6 +288,7 @@ class DashboardWidget(QWidget):
         self._tbl.verticalHeader().setVisible(False)
         self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self._tbl.setSelectionBehavior(QTableWidget.SelectRows)
+        self._tbl.setAlternatingRowColors(True)
         self._tbl.setStyleSheet(_TABLE_SS)
         lay.addWidget(self._tbl)
         return card

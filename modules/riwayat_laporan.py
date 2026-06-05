@@ -5,10 +5,10 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QComboBox, QPushButton, QDateEdit,
     QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QDialog, QAbstractItemView,
-    QTabWidget, QLineEdit,
+    QTabWidget, QLineEdit, QStyledItemDelegate, QApplication,
 )
-from PySide6.QtCore import Qt, QDate, QThread, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QDate, QThread, Signal, QSize, QRect
+from PySide6.QtGui import QColor, QTextDocument
 
 from modules.db_auth import get_connection, release_connection
 from modules.db_laporan import (
@@ -139,6 +139,43 @@ def _fmt(v: float) -> str:
     """Format angka dinamis: hilangkan trailing zero, max 4 desimal."""
     s = f"{v:.4f}".rstrip('0').rstrip('.')
     return s or "0"
+
+
+class _WrapDelegate(QStyledItemDelegate):
+    """Read-only delegate: paint multi-line text via QTextDocument, auto row height."""
+
+    def __init__(self, table, parent=None):
+        super().__init__(parent)
+        self._table = table
+
+    def paint(self, painter, option, index):
+        text = index.data(Qt.DisplayRole) or ""
+        if not text:
+            super().paint(painter, option, index)
+            return
+        painter.save()
+        doc = QTextDocument()
+        doc.setDefaultFont(option.font)
+        doc.setPlainText(text)
+        doc.setTextWidth(option.rect.width() - 12)
+        painter.setClipRect(option.rect)
+        painter.translate(option.rect.topLeft())
+        painter.translate(6, 4)
+        doc.drawContents(painter)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        text = index.data(Qt.DisplayRole) or ""
+        if not text:
+            return QSize(option.rect.width(), 30)
+        fm = option.fontMetrics
+        col_w = max(option.rect.width() - 12, 40)
+        rect = fm.boundingRect(
+            QRect(0, 0, col_w, 10000),
+            Qt.TextWordWrap | Qt.AlignLeft,
+            text,
+        )
+        return QSize(option.rect.width(), max(30, rect.height() + 8))
 
 
 #  DB helpers
@@ -400,6 +437,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabel_harian.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_harian.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_harian.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tabel_harian.setAlternatingRowColors(True)
         self.tabel_harian.setStyleSheet(_TABLE_STYLE)
         self.tabel_harian.setColumnWidth(0, 40)
         self.tabel_harian.setColumnWidth(1, 92)
@@ -458,7 +496,7 @@ class RiwayatLaporanWidget(QWidget):
             al.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
 
             btn_lihat = QPushButton("Lihat")
-            btn_lihat.setMinimumWidth(52); btn_lihat.setFixedHeight(26)
+            btn_lihat.setMinimumWidth(48); btn_lihat.setFixedHeight(24)
             btn_lihat.setStyleSheet(
                 "QPushButton { background-color: #1a2a3a; color: #4a9fd4;"
                 " border: 1px solid #1a4a6a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
@@ -477,7 +515,7 @@ class RiwayatLaporanWidget(QWidget):
             btn_edit.setVisible(False)  # akan diimplementasi di sprint berikutnya
 
             btn_hapus = QPushButton("Hapus")
-            btn_hapus.setMinimumWidth(52); btn_hapus.setFixedHeight(26)
+            btn_hapus.setMinimumWidth(48); btn_hapus.setFixedHeight(24)
             btn_hapus.setStyleSheet(
                 "QPushButton { background-color: #2a1a1a; color: #da291c;"
                 " border: 1px solid #4a1a1a; border-radius: 0px; padding: 0 8px; font-size: 10px; }"
@@ -489,7 +527,7 @@ class RiwayatLaporanWidget(QWidget):
             al.addWidget(btn_edit)
             al.addWidget(btn_hapus)
             self.tabel_harian.setCellWidget(i, 6, aksi_w)
-            self.tabel_harian.setRowHeight(i, 40)
+            self.tabel_harian.setRowHeight(i, 36)
 
     def _reset_filter_harian(self):
         self.combo_section.setCurrentIndex(0)
@@ -530,8 +568,14 @@ class RiwayatLaporanWidget(QWidget):
         # ── Dialog ────────────────────────────────────────────────────────
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Detail Laporan — #{report_id}")
-        dlg.setMinimumSize(1100, 750)
+        dlg.setMinimumSize(1200, 700)
+        dlg.resize(1300, 800)
         dlg.setStyleSheet("QDialog { background-color: #1e1e1e; color: #ffffff; }")
+        _screen = QApplication.primaryScreen().geometry()
+        dlg.move(
+            _screen.center().x() - dlg.width() // 2,
+            _screen.center().y() - dlg.height() // 2,
+        )
 
         outer_lyt = QVBoxLayout(dlg)
         outer_lyt.setContentsMargins(0, 0, 0, 0)
@@ -554,13 +598,6 @@ class RiwayatLaporanWidget(QWidget):
             l.setStyleSheet(_HDR_LBL_D)
             return l
 
-        def _vsep():
-            f = QFrame()
-            f.setFrameShape(QFrame.VLine)
-            f.setFixedWidth(1)
-            f.setStyleSheet("background-color: #303030; border: none;")
-            return f
-
         def _tbl(cols, headers, stretch_cols=(), fixed_cols=()):
             t = QTableWidget(0, cols)
             t.setHorizontalHeaderLabels(headers)
@@ -574,54 +611,71 @@ class RiwayatLaporanWidget(QWidget):
             t.verticalHeader().setVisible(False)
             t.setEditTriggers(QAbstractItemView.NoEditTriggers)
             t.setSelectionBehavior(QAbstractItemView.SelectRows)
+            t.setAlternatingRowColors(True)
             t.setStyleSheet(_TABLE_STYLE)
             return t
 
         # ── HEADER BAR ────────────────────────────────────────────────────
         hdr_bar = QFrame()
+        hdr_bar.setFixedHeight(70)
         hdr_bar.setStyleSheet(
-            "QFrame { background-color: #252525; border-radius: 0px;"
-            " border-top: 2px solid #da291c; }"
+            "QFrame { background-color: #1a1a1a;"
+            " border-bottom: 2px solid #da291c; }"
         )
         hdr_row = QHBoxLayout(hdr_bar)
-        hdr_row.setContentsMargins(12, 8, 12, 8)
-        hdr_row.setSpacing(6)
+        hdr_row.setContentsMargins(16, 10, 16, 10)
+        hdr_row.setSpacing(0)
 
         _days = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         try:
             from datetime import date as _dt
-            _d   = _dt.fromisoformat(header.get("date", ""))
+            _d    = _dt.fromisoformat(header.get("date", ""))
             _hari = _days[_d.weekday()]
         except Exception:
             _hari = "—"
 
         overtime = header.get("overtime", "-")
 
-        def _hdr_field(label, value, val_style="color:#ffffff; font-size:12px; font-weight:bold;"):
+        def _make_field(label, value):
+            w = QWidget()
+            w.setStyleSheet("background: transparent;")
+            v = QVBoxLayout(w)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(2)
             lbl = QLabel(label)
-            lbl.setStyleSheet("color:#969696; font-size:10px; letter-spacing:1px;")
+            lbl.setStyleSheet(
+                "color:#666666; font-size:9px; letter-spacing:1px;"
+                " background:transparent;"
+            )
             val = QLabel(str(value))
-            val.setStyleSheet(val_style)
-            box = QVBoxLayout()
-            box.setSpacing(1)
-            box.addWidget(lbl)
-            box.addWidget(val)
-            return box
+            val.setStyleSheet(
+                "color:#f0f0f0; font-size:12px; font-weight:bold;"
+                " background:transparent;"
+            )
+            v.addWidget(lbl)
+            v.addWidget(val)
+            return w
 
-        hdr_row.addLayout(_hdr_field("SHOP",       header.get("section", "—")))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("TANGGAL",    header.get("date", "—")))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("HARI",       _hari))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("SHIFT",      header.get("shift", "—")))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("HOUR",       _fmt(total_hour)))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("OT",         overtime))
-        hdr_row.addWidget(_vsep())
-        hdr_row.addLayout(_hdr_field("KOORDINATOR", header.get("coordinator", "—")))
-        hdr_row.addStretch()
+        def _vsep_h():
+            sep = QFrame()
+            sep.setFrameShape(QFrame.VLine)
+            sep.setFixedWidth(1)
+            sep.setStyleSheet("background:#333333; border:none;")
+            return sep
+
+        hdr_row.addWidget(_make_field("SHOP",        header.get("section", "—")), 2)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("TANGGAL",     header.get("date", "—")), 1)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("HARI",        _hari), 1)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("SHIFT",       header.get("shift", "—")), 1)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("HOUR",        _fmt(total_hour)), 1)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("OT",          overtime), 1)
+        hdr_row.addWidget(_vsep_h())
+        hdr_row.addWidget(_make_field("KOORDINATOR", header.get("coordinator", "—")), 2)
         outer_lyt.addWidget(hdr_bar)
 
         # ── SCROLL AREA ───────────────────────────────────────────────────
@@ -758,49 +812,52 @@ class RiwayatLaporanWidget(QWidget):
         main_lyt.addLayout(top_row)
 
         # ── INHOUSE CLAIM ─────────────────────────────────────────────────
-        if inhouse_claim:
-            card_ic = _card()
-            lay_ic  = QVBoxLayout(card_ic)
-            lay_ic.setContentsMargins(10, 10, 10, 10)
-            lay_ic.setSpacing(6)
-            lay_ic.addWidget(_hdr_lbl("In House (Reject) and Market Claim"))
-            tbl_ic = _tbl(
-                12,
-                ["No", "Model", "OP/ST", "Item", "Qty", "Satuan",
-                 "Cause / Penyebab", "Action / Perbaikan", "Factor",
-                 "Stop (H)", "Lost (H)", "Status"],
-                fixed_cols=[(0, 28), (1, 60), (2, 60), (4, 42),
-                            (5, 55), (8, 75), (9, 50), (10, 50), (11, 65)],
-            )
-            tbl_ic.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-            tbl_ic.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
-            tbl_ic.horizontalHeader().setSectionResizeMode(7, QHeaderView.Stretch)
-            for i, ic in enumerate(inhouse_claim):
-                tbl_ic.insertRow(i)
-                tbl_ic.setRowHeight(i, 28)
-                tbl_ic.setItem(i, 0,  _c(str(i + 1), Qt.AlignCenter))
-                tbl_ic.setItem(i, 1,  _c(ic.get("model", ""), Qt.AlignCenter))
-                tbl_ic.setItem(i, 2,  _c(ic.get("op_no_st", ""), Qt.AlignCenter))
-                tbl_ic.setItem(i, 3,  _c(ic.get("item", "")))
-                tbl_ic.setItem(i, 4,  _c(f"{ic.get('qty', 0) or 0:.0f}", Qt.AlignCenter))
-                tbl_ic.setItem(i, 5,  _c(ic.get("satuan", ""), Qt.AlignCenter))
-                tbl_ic.setItem(i, 6,  _c(ic.get("penyebab", "")))
-                tbl_ic.setItem(i, 7,  _c(ic.get("tindakan", "")))
-                tbl_ic.setItem(i, 8,  _c(ic.get("faktor", ""), Qt.AlignCenter))
-                tbl_ic.setItem(i, 9,  _c(_fmt(ic.get("stop_hr", 0) or 0), Qt.AlignCenter))
-                tbl_ic.setItem(i, 10, _c(_fmt(ic.get("lost_hr", 0) or 0), Qt.AlignCenter))
-                st = ic.get("status", "").upper()
-                st_item = _c(ic.get("status", ""), Qt.AlignCenter)
-                if st == "NG":
-                    st_item.setForeground(QColor(220, 100, 100))
-                elif st == "PENDING":
-                    st_item.setForeground(QColor(220, 170, 80))
-                elif st == "OK":
-                    st_item.setForeground(QColor(80, 200, 100))
-                tbl_ic.setItem(i, 11, st_item)
-            tbl_ic.setMinimumHeight(min(len(inhouse_claim) * 28 + 32, 220))
-            lay_ic.addWidget(tbl_ic)
-            main_lyt.addWidget(card_ic)
+        card_ic = _card()
+        lay_ic  = QVBoxLayout(card_ic)
+        lay_ic.setContentsMargins(10, 10, 10, 10)
+        lay_ic.setSpacing(6)
+        lay_ic.addWidget(_hdr_lbl("In House (Reject) and Market Claim"))
+        tbl_ic = _tbl(
+            12,
+            ["No", "Model", "OP/ST", "Item", "Qty", "Satuan",
+             "Cause / Penyebab", "Action / Perbaikan", "Factor",
+             "Stop (H)", "Lost (H)", "Status"],
+            fixed_cols=[(0, 28), (1, 60), (2, 60), (4, 42),
+                        (5, 55), (8, 75), (9, 50), (10, 50), (11, 65)],
+        )
+        tbl_ic.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        tbl_ic.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+        tbl_ic.horizontalHeader().setSectionResizeMode(7, QHeaderView.Stretch)
+        tbl_ic.setWordWrap(True)
+        _wrap_ic = _WrapDelegate(tbl_ic)
+        for _col in (3, 6, 7):
+            tbl_ic.setItemDelegateForColumn(_col, _wrap_ic)
+        tbl_ic.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for i, ic in enumerate(inhouse_claim):
+            tbl_ic.insertRow(i)
+            tbl_ic.setItem(i, 0,  _c(str(i + 1), Qt.AlignCenter))
+            tbl_ic.setItem(i, 1,  _c(ic.get("model", ""), Qt.AlignCenter))
+            tbl_ic.setItem(i, 2,  _c(ic.get("op_no_st", ""), Qt.AlignCenter))
+            tbl_ic.setItem(i, 3,  _c(ic.get("item", "")))
+            tbl_ic.setItem(i, 4,  _c(f"{ic.get('qty', 0) or 0:.0f}", Qt.AlignCenter))
+            tbl_ic.setItem(i, 5,  _c(ic.get("satuan", ""), Qt.AlignCenter))
+            tbl_ic.setItem(i, 6,  _c(ic.get("penyebab", "")))
+            tbl_ic.setItem(i, 7,  _c(ic.get("tindakan", "")))
+            tbl_ic.setItem(i, 8,  _c(ic.get("faktor", ""), Qt.AlignCenter))
+            tbl_ic.setItem(i, 9,  _c(_fmt(ic.get("stop_hr", 0) or 0), Qt.AlignCenter))
+            tbl_ic.setItem(i, 10, _c(_fmt(ic.get("lost_hr", 0) or 0), Qt.AlignCenter))
+            st = ic.get("status", "").upper()
+            st_item = _c(ic.get("status", ""), Qt.AlignCenter)
+            if st == "NG":
+                st_item.setForeground(QColor(220, 100, 100))
+            elif st == "PENDING":
+                st_item.setForeground(QColor(220, 170, 80))
+            elif st == "OK":
+                st_item.setForeground(QColor(80, 200, 100))
+            tbl_ic.setItem(i, 11, st_item)
+        tbl_ic.setMinimumHeight(120)
+        lay_ic.addWidget(tbl_ic)
+        main_lyt.addWidget(card_ic)
 
         # ── LINE STOP ─────────────────────────────────────────────────────
         card_ls = _card()
@@ -821,6 +878,11 @@ class RiwayatLaporanWidget(QWidget):
         tbl_ls.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         tbl_ls.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         tbl_ls.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        tbl_ls.setWordWrap(True)
+        _wrap_ls = _WrapDelegate(tbl_ls)
+        for _col in (3, 4, 5):
+            tbl_ls.setItemDelegateForColumn(_col, _wrap_ls)
+        tbl_ls.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         import re as _re
         for i, c in enumerate(catatan):
@@ -828,7 +890,6 @@ class RiwayatLaporanWidget(QWidget):
             m    = _re.match(r"^\[([^\]]+)\]", desc)
             model_val = m.group(1) if m else ""
             tbl_ls.insertRow(i)
-            tbl_ls.setRowHeight(i, 30)
             tbl_ls.setItem(i, 0,  _c(str(i + 1), Qt.AlignCenter))
             tbl_ls.setItem(i, 1,  _c(model_val, Qt.AlignCenter))
             tbl_ls.setItem(i, 2,  _c(c.get("ra_number", ""), Qt.AlignCenter))
@@ -1074,6 +1135,7 @@ class RiwayatLaporanWidget(QWidget):
         self.tabel_rekap.verticalHeader().setVisible(False)
         self.tabel_rekap.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_rekap.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_rekap.setAlternatingRowColors(True)
         self.tabel_rekap.setStyleSheet(_TABLE_STYLE)
         self.tabel_rekap.setMinimumHeight(400)
         self.tabel_rekap.setColumnWidth(0, 40)
@@ -1639,9 +1701,12 @@ class RiwayatLaporanWidget(QWidget):
         for model in result["models"]:
             for shift in result["shifts"]:
                 tbl.insertRow(row_idx)
-                tbl.setRowHeight(row_idx, 26)
+                tbl.setRowHeight(row_idx, 24)
 
-                tbl.setItem(row_idx, 0, _vol_item(model, bold=(shift == result["shifts"][0])))
+                is_day = (shift == result["shifts"][0])
+                row_bg = QColor("#252525") if is_day else QColor("#1a1a1a")
+
+                tbl.setItem(row_idx, 0, _vol_item(model, bold=is_day))
                 tbl.setItem(row_idx, 1, _vol_item(shift, center=True))
 
                 key      = (model, shift)
@@ -1652,9 +1717,9 @@ class RiwayatLaporanWidget(QWidget):
                     it.setTextAlignment(Qt.AlignCenter)
                     it.setFlags(Qt.ItemIsEnabled)
                     if val:
-                        it.setBackground(QColor("#222222"))
+                        it.setBackground(QColor("#222222") if is_day else QColor("#1e1e1e"))
                     else:
-                        it.setBackground(QColor("#1a1a1a"))
+                        it.setBackground(row_bg)
                         it.setForeground(QColor("#2e2e2e"))
                     tbl.setItem(row_idx, d + 1, it)
 
@@ -1664,7 +1729,14 @@ class RiwayatLaporanWidget(QWidget):
                 it_total.setFlags(Qt.ItemIsEnabled)
                 it_total.setForeground(QColor("#da291c"))
                 fn = it_total.font(); fn.setBold(True); it_total.setFont(fn)
+                it_total.setBackground(row_bg)
                 tbl.setItem(row_idx, 2 + days, it_total)
+
+                # Day Shift rows: set model/shift cell background
+                for c in (0, 1):
+                    it = tbl.item(row_idx, c)
+                    if it:
+                        it.setBackground(row_bg)
 
                 row_idx += 1
 

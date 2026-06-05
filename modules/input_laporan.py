@@ -3,9 +3,10 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QComboBox, QPushButton, QCheckBox,
     QDateEdit, QTimeEdit, QScrollArea, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QAbstractItemView,
+    QPlainTextEdit, QStyledItemDelegate,
 )
-from PySide6.QtCore import Qt, QDate, QTime
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QDate, QTime, QSize, QRect, QEvent, QTimer
+from PySide6.QtGui import QColor, QTextDocument, QTextCursor
 
 from modules.db_laporan import (
     simpan_laporan_harian, get_all_sections, get_all_shifts, get_models_by_section,
@@ -68,6 +69,93 @@ def _item(text="", align=Qt.AlignLeft | Qt.AlignVCenter) -> QTableWidgetItem:
     it = QTableWidgetItem(text)
     it.setTextAlignment(align)
     return it
+
+
+class TextBubbleDelegate(QStyledItemDelegate):
+    """Delegate yang menampilkan QPlainTextEdit saat cell diklik.
+    Enter = newline, Tab = tutup+simpan, Escape = tutup tanpa simpan."""
+
+    def __init__(self, table, parent=None):
+        super().__init__(parent)
+        self._table = table
+
+    def createEditor(self, parent, option, index):
+        editor = QPlainTextEdit(parent)
+        editor.setStyleSheet(
+            "QPlainTextEdit { background-color: #2a2a2a; color: #f0f0f0;"
+            " border: 1px solid #da291c; border-radius: 4px;"
+            " font-size: 11px; padding: 4px; }"
+        )
+        editor.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        editor.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        editor.installEventFilter(self)
+        return editor
+    
+    def eventFilter(self, editor, event):
+       if event.type() == QEvent.KeyPress:
+           if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+               if event.modifiers() == Qt.ShiftModifier:
+                   editor.insertPlainText("\n")
+                   return True
+               else:
+                   self.commitData.emit(editor)
+                   self.closeEditor.emit(editor)
+                   return True
+           if event.key() == Qt.Key_Tab:
+               self.commitData.emit(editor)
+               self.closeEditor.emit(editor)
+               return True
+           if event.key() == Qt.Key_Escape:
+               self.closeEditor.emit(editor)
+               return True
+       return False
+
+    def setEditorData(self, editor, index):
+        text = index.data(Qt.DisplayRole) or ""
+        editor.setPlainText(text)
+        cursor = editor.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        editor.setTextCursor(cursor)
+
+    def setModelData(self, editor, model, index):
+        text = editor.toPlainText()
+        model.setData(index, text, Qt.EditRole)
+        row = index.row()
+        QTimer.singleShot(0, lambda: self._table.resizeRowToContents(row))
+
+    def updateEditorGeometry(self, editor, option, index):
+        col_w = self._table.columnWidth(index.column())
+        cell_rect = option.rect
+        editor.setGeometry(cell_rect.x(), cell_rect.y(), col_w, 120)
+
+    def paint(self, painter, option, index):
+        text = index.data(Qt.DisplayRole) or ""
+        if not text:
+            super().paint(painter, option, index)
+            return
+        painter.save()
+        doc = QTextDocument()
+        doc.setDefaultFont(option.font)
+        doc.setPlainText(text)
+        doc.setTextWidth(option.rect.width() - 8)
+        painter.translate(option.rect.topLeft())
+        painter.translate(4, 4)
+        doc.drawContents(painter)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        text = index.data(Qt.DisplayRole) or ""
+        if not text:
+            return QSize(option.rect.width(), 35)
+        fm    = option.fontMetrics
+        col_w = max(self._table.columnWidth(index.column()) - 8, 40)
+        rect  = fm.boundingRect(
+            QRect(0, 0, col_w, 10000),
+            Qt.TextWordWrap | Qt.AlignLeft,
+            text,
+        )
+        return QSize(option.rect.width(), max(35, rect.height() + 8))
 
 
 def _fmt(v: float) -> str:
@@ -558,18 +646,22 @@ class InputLaporanWidget(QWidget):
         h.setSectionResizeMode(6, QHeaderView.Stretch)
         h.setSectionResizeMode(7, QHeaderView.Stretch)
         self.tbl_claim.setColumnWidth(0,  28)
-        self.tbl_claim.setColumnWidth(1,  60)
-        self.tbl_claim.setColumnWidth(2,  60)
-        self.tbl_claim.setColumnWidth(4,  42)
-        self.tbl_claim.setColumnWidth(5,  55)
-        self.tbl_claim.setColumnWidth(8,  75)
-        self.tbl_claim.setColumnWidth(9,  50)
-        self.tbl_claim.setColumnWidth(10, 50)
+        self.tbl_claim.setColumnWidth(1,  85)
+        self.tbl_claim.setColumnWidth(2,  85)
+        self.tbl_claim.setColumnWidth(4,  45)
+        self.tbl_claim.setColumnWidth(5,  65)
+        self.tbl_claim.setColumnWidth(8,  60)
+        self.tbl_claim.setColumnWidth(9,  60)
+        self.tbl_claim.setColumnWidth(10, 60)
         self.tbl_claim.setColumnWidth(11, 75)
         self.tbl_claim.verticalHeader().setVisible(False)
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_claim.setStyleSheet(_TBL)
         self.tbl_claim.setMinimumHeight(140)
+        _del_c = TextBubbleDelegate(self.tbl_claim)
+        for _col in (3, 6, 7):
+            self.tbl_claim.setItemDelegateForColumn(_col, _del_c)
+        self.tbl_claim.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tbl_claim.itemChanged.connect(self._on_claim_item_changed)
         lay.addWidget(self.tbl_claim)
         return card
@@ -610,17 +702,21 @@ class InputLaporanWidget(QWidget):
         h.setSectionResizeMode(4, QHeaderView.Stretch)
         h.setSectionResizeMode(5, QHeaderView.Stretch)
         self.tbl_ls.setColumnWidth(0,  28)
-        self.tbl_ls.setColumnWidth(1,  60)
-        self.tbl_ls.setColumnWidth(2,  60)
-        self.tbl_ls.setColumnWidth(6,  80)
-        self.tbl_ls.setColumnWidth(7,  54)
-        self.tbl_ls.setColumnWidth(8,  54)
-        self.tbl_ls.setColumnWidth(9,  52)
-        self.tbl_ls.setColumnWidth(10, 52)
+        self.tbl_ls.setColumnWidth(1,  85)
+        self.tbl_ls.setColumnWidth(2,  85)
+        self.tbl_ls.setColumnWidth(6,  85)
+        self.tbl_ls.setColumnWidth(7,  60)
+        self.tbl_ls.setColumnWidth(8,  60)
+        self.tbl_ls.setColumnWidth(9,  60)
+        self.tbl_ls.setColumnWidth(10, 60)
         self.tbl_ls.verticalHeader().setVisible(False)
         self.tbl_ls.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_ls.setStyleSheet(_TBL)
         self.tbl_ls.setMinimumHeight(140)
+        _del_l = TextBubbleDelegate(self.tbl_ls)
+        for _col in (3, 4, 5):
+            self.tbl_ls.setItemDelegateForColumn(_col, _del_l)
+        self.tbl_ls.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tbl_ls.itemChanged.connect(self._hitung_calc_hour)
         lay.addWidget(self.tbl_ls)
         return card
@@ -658,7 +754,7 @@ class InputLaporanWidget(QWidget):
         r = self.tbl_prod.rowCount()
         self.tbl_prod.blockSignals(True)
         self.tbl_prod.insertRow(r)
-        self.tbl_prod.setRowHeight(r, 30)
+        self.tbl_prod.setRowHeight(r, 35)
         models = self._shop_models or _MODELS
         combo = _mk_combo(models)
         self.tbl_prod.setCellWidget(r, 0, combo)
@@ -692,7 +788,7 @@ class InputLaporanWidget(QWidget):
         r = self.tbl_absen.rowCount()
         self.tbl_absen.blockSignals(True)
         self.tbl_absen.insertRow(r)
-        self.tbl_absen.setRowHeight(r, 30)
+        self.tbl_absen.setRowHeight(r, 35)
         self.tbl_absen.setItem(r, 0, _item("", Qt.AlignCenter))
         self.tbl_absen.setItem(r, 1, _item("", Qt.AlignCenter))
         self.tbl_absen.setCellWidget(r, 2, _mk_combo(_NOTE_TYPES, popup_w=100))
@@ -708,7 +804,7 @@ class InputLaporanWidget(QWidget):
     def _tambah_claim(self):
         r = self.tbl_claim.rowCount()
         self.tbl_claim.insertRow(r)
-        self.tbl_claim.setRowHeight(r, 30)
+        self.tbl_claim.setRowHeight(r, 35)
 
         no_it = _item(str(r + 1), Qt.AlignCenter)
         no_it.setFlags(Qt.ItemIsEnabled)
@@ -718,11 +814,11 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setCellWidget(r, 1, combo_model)
         combo_model.currentTextChanged.connect(lambda _, row=r: self._calc_claim_stop(row))
         self.tbl_claim.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
-        self.tbl_claim.setItem(r, 3, _item("", Qt.AlignCenter))
+        self.tbl_claim.setItem(r, 3, _item(""))
         self.tbl_claim.setItem(r, 4, _item("", Qt.AlignCenter))
         self.tbl_claim.setCellWidget(r, 5, _mk_combo(_SATUAN, popup_w=70))
-        self.tbl_claim.setItem(r, 6, _item("", Qt.AlignCenter))
-        self.tbl_claim.setItem(r, 7, _item("", Qt.AlignCenter))
+        self.tbl_claim.setItem(r, 6, _item(""))
+        self.tbl_claim.setItem(r, 7, _item(""))
         self.tbl_claim.setCellWidget(r, 8, _mk_combo(self._factors, popup_w=100))
         self.tbl_claim.setItem(r, 9,  _item("0", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 10, _item("0", Qt.AlignCenter))
@@ -767,7 +863,7 @@ class InputLaporanWidget(QWidget):
         r = self.tbl_ls.rowCount()
         self.tbl_ls.blockSignals(True)
         self.tbl_ls.insertRow(r)
-        self.tbl_ls.setRowHeight(r, 30)
+        self.tbl_ls.setRowHeight(r, 35)
 
         no_it = _item(str(r + 1), Qt.AlignCenter)
         no_it.setFlags(Qt.ItemIsEnabled)
@@ -775,9 +871,9 @@ class InputLaporanWidget(QWidget):
 
         self.tbl_ls.setCellWidget(r, 1, _mk_combo(self._shop_models or _MODELS))
         self.tbl_ls.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
-        self.tbl_ls.setItem(r, 3, _item("", Qt.AlignCenter))
-        self.tbl_ls.setItem(r, 4, _item("", Qt.AlignCenter))
-        self.tbl_ls.setItem(r, 5, _item("", Qt.AlignCenter))
+        self.tbl_ls.setItem(r, 3, _item(""))
+        self.tbl_ls.setItem(r, 4, _item(""))
+        self.tbl_ls.setItem(r, 5, _item(""))
         self.tbl_ls.setCellWidget(r, 6, _mk_combo(self._factors, popup_w=100))
 
         for col in (7, 8):

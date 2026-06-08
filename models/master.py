@@ -10,9 +10,10 @@ class Section(Base):
     code = Column(String(100))
     name = Column(String(200), nullable=False)
 
-    reports    = relationship("DailyReport", back_populates="section")
-    shop_models = relationship("ShopModel",  back_populates="section", cascade="all, delete-orphan")
-    work_centers = relationship("WorkCenter", back_populates="section", cascade="all, delete-orphan")
+    reports      = relationship("DailyReport", back_populates="section")
+    shop_models  = relationship("ShopModel",   back_populates="section", cascade="all, delete-orphan")
+    work_centers = relationship("WorkCenter",  back_populates="section", cascade="all, delete-orphan")
+    op_numbers   = relationship("OpNumber",    back_populates="section", cascade="all, delete-orphan")
 
     def to_dict(self) -> dict:
         return {"id": self.id, "name": self.name}
@@ -110,3 +111,16 @@ class WorkCenter(Base):
 
     def to_dict(self) -> dict:
         return {"id": self.id, "name": self.name}
+
+
+class OpNumber(Base):
+    __tablename__ = "op_number"
+
+    id         = Column(Integer, primary_key=True)
+    section_id = Column(Integer, ForeignKey("section.id"), nullable=False)
+    op_no      = Column(String(100), nullable=False)
+
+    section = relationship("Section", back_populates="op_numbers")
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "op_no": self.op_no}

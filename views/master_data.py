@@ -15,6 +15,7 @@ from controllers.master_controller import (
     get_all_shifts, tambah_shift, edit_shift, hapus_shift,
     update_shift_working_hour, ensure_shift_columns,
     get_models_by_section, tambah_shop_model, edit_shop_model, hapus_shop_model,
+    get_op_numbers_by_section, tambah_op_number, hapus_op_number,
 )
 from styles.theme import ThemeManager
 from modules.icons import ic_add, ic_edit, ic_trash, BTN_ICON_SIZE
@@ -260,6 +261,29 @@ class _WorkCenterDialog(QDialog):
         return self.input_nama.text().strip()
 
 
+class _OpDialog(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Tambah OP Number")
+        self.setFixedWidth(320)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 20, 20, 16)
+        lay.setSpacing(10)
+        lbl = QLabel("OP Number"); lbl.setObjectName("field_label")
+        lay.addWidget(lbl)
+        self.input_op = QLineEdit()
+        self.input_op.setPlaceholderText("Contoh: CS-10")
+        lay.addWidget(self.input_op)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.button(QDialogButtonBox.Ok).setText("Tambah")
+        btns.button(QDialogButtonBox.Cancel).setText("Batal")
+        btns.accepted.connect(self.accept); btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
+
+    def get_op_no(self) -> str:
+        return self.input_op.text().strip()
+
+
 class _ShiftDialog(QDialog):
     def __init__(self, parent, name="", start="07:00", end="15:00", total=8.0,
                  preparation_min=15.0, other_min=10.0):
@@ -371,6 +395,7 @@ class MasterDataWidget(QWidget):
         super().showEvent(event)
         self._load_sections()
         self._load_shop_model_sections()
+        self._load_op_number_sections()
         self._load_users()
         self._load_kategori()
         self._load_shifts()
@@ -412,6 +437,8 @@ class MasterDataWidget(QWidget):
 
         lay.addWidget(_divider())
         lay.addWidget(self._build_shop_model_card())
+        lay.addWidget(_divider())
+        lay.addWidget(self._build_op_number_card())
         lay.addWidget(_divider())
         lay.addWidget(self._build_kategori_card())
         lay.addStretch()
@@ -503,6 +530,50 @@ class MasterDataWidget(QWidget):
         self.tabel_model.setColumnWidth(3, 150)
         self.tabel_model.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         lay.addWidget(self.tabel_model)
+        return card
+
+    def _build_op_number_card(self) -> QFrame:
+        card = QFrame(); card.setObjectName("card")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(12, 10, 12, 12)
+        lay.setSpacing(8)
+
+        # Header
+        hdr = QHBoxLayout()
+        lbl = QLabel("OP Number per Shop"); lbl.setStyleSheet(_CARD_HDR())
+        hdr.addWidget(lbl); hdr.addStretch()
+        btn_add_op = QPushButton("Tambah OP")
+        btn_add_op.setIcon(ic_add()); btn_add_op.setIconSize(BTN_ICON_SIZE)
+        btn_add_op.setMinimumSize(110, 30); btn_add_op.setStyleSheet(_BTN_ADD())
+        btn_add_op.clicked.connect(self._tambah_op_number)
+        hdr.addWidget(btn_add_op)
+        lay.addLayout(hdr)
+
+        # Shop selector
+        sel_row = QHBoxLayout()
+        sel_row.addWidget(QLabel("SHOP :", styleSheet="color:#6B7280; font-size:11px; font-weight:bold;"))
+        self._combo_shop_op = QComboBox()
+        self._combo_shop_op.setMinimumHeight(28); self._combo_shop_op.setMinimumWidth(180)
+        sel_row.addWidget(self._combo_shop_op); sel_row.addStretch()
+        lay.addLayout(sel_row)
+        self._combo_shop_op.currentIndexChanged.connect(self._load_op_numbers)
+
+        # Tabel
+        self.tabel_op = QTableWidget()
+        self.tabel_op.setColumnCount(3)
+        self.tabel_op.setHorizontalHeaderLabels(["No", "OP Number", "Aksi"])
+        hh = self.tabel_op.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(0, QHeaderView.Fixed)
+        hh.setSectionResizeMode(2, QHeaderView.Fixed)
+        self.tabel_op.setColumnWidth(0, 45)
+        self.tabel_op.setColumnWidth(2, 100)
+        self.tabel_op.verticalHeader().setVisible(False)
+        self.tabel_op.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tabel_op.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabel_op.setAlternatingRowColors(True)
+        self.tabel_op.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        lay.addWidget(self.tabel_op)
         return card
 
     def _build_kategori_card(self) -> QFrame:
@@ -798,6 +869,83 @@ class MasterDataWidget(QWidget):
         ok, msg = hapus_shop_model(model_id)
         if ok:
             self._on_shop_model_changed()
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    # ── OP Number CRUD ───────────────────────────────────────────────────────
+
+    def _load_op_number_sections(self):
+        try:
+            rows = get_all_sections()
+        except Exception:
+            return
+        prev = self._combo_shop_op.currentData()
+        self._combo_shop_op.blockSignals(True)
+        self._combo_shop_op.clear()
+        for sid, sname in rows:
+            self._combo_shop_op.addItem(sname, sid)
+        if prev is not None:
+            idx = self._combo_shop_op.findData(prev)
+            if idx >= 0:
+                self._combo_shop_op.setCurrentIndex(idx)
+        self._combo_shop_op.blockSignals(False)
+        self._load_op_numbers()
+
+    def _load_op_numbers(self):
+        section_id = self._combo_shop_op.currentData()
+        self.tabel_op.setRowCount(0)
+        if section_id is None:
+            _fit_table(self.tabel_op)
+            return
+        try:
+            ops = get_op_numbers_by_section(section_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal memuat OP Number: {e}")
+            return
+        for i, op in enumerate(ops):
+            self.tabel_op.insertRow(i)
+            self.tabel_op.setItem(i, 0, _item(str(i + 1), Qt.AlignCenter))
+            self.tabel_op.setItem(i, 1, _item(op["op_no"]))
+            self.tabel_op.setCellWidget(i, 2, self._aksi_op(op["id"], op["op_no"]))
+            self.tabel_op.setRowHeight(i, 36)
+        _fit_table(self.tabel_op)
+
+    def _aksi_op(self, op_id: int, op_no: str) -> QWidget:
+        w = QWidget(); w.setStyleSheet("background: transparent;")
+        hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(6)
+        hl.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
+        btn_d = QPushButton("Hapus"); btn_d.setIcon(ic_trash()); btn_d.setIconSize(BTN_ICON_SIZE)
+        btn_d.setMinimumWidth(60); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL())
+        btn_d.clicked.connect(lambda _, i=op_id, n=op_no: self._hapus_op_number(i, n))
+        hl.addWidget(btn_d)
+        return w
+
+    def _tambah_op_number(self):
+        section_id = self._combo_shop_op.currentData()
+        if section_id is None:
+            QMessageBox.warning(self, "Pilih Shop", "Pilih shop terlebih dahulu.")
+            return
+        dlg = _OpDialog(self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        op_no = dlg.get_op_no()
+        ok, msg = tambah_op_number(section_id, op_no)
+        if ok:
+            self._load_op_numbers()
+            QMessageBox.information(self, "Berhasil", msg)
+        else:
+            QMessageBox.warning(self, "Gagal", msg)
+
+    def _hapus_op_number(self, op_id: int, op_no: str):
+        ans = QMessageBox.question(
+            self, "Konfirmasi Hapus", f"Hapus OP Number '{op_no}'?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ans != QMessageBox.Yes:
+            return
+        ok, msg = hapus_op_number(op_id)
+        if ok:
+            self._load_op_numbers()
         else:
             QMessageBox.warning(self, "Gagal", msg)
 

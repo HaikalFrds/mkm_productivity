@@ -132,8 +132,17 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         """), params).fetchone()
         absence_hour = float((r3 or [0])[0] or 0)
 
+        r4 = session.execute(text(f"""
+            SELECT COALESCE(SUM(ic.lost_hr), 0)
+            FROM inhouse_claim ic
+            JOIN daily_report dr ON dr.id = ic.report_id
+            WHERE EXTRACT(MONTH FROM dr.date) = :bulan
+              AND EXTRACT(YEAR  FROM dr.date) = :tahun {sec_filter}
+        """), params).fetchone()
+        quality_hour = float((r4 or [0])[0] or 0)
+
     loss_hour    = sum(c["hours"] for c in categories)
-    process_hour = max(total_hour - prep_hour - other_hour - loss_hour - absence_hour, 0.0)
+    process_hour = max(total_hour - prep_hour - other_hour - loss_hour - absence_hour - quality_hour, 0.0)
 
     return {
         "total_hour":   total_hour,
@@ -141,6 +150,7 @@ def get_monthly_productivity(section_id, bulan: int, tahun: int) -> dict:
         "prep_hour":    prep_hour,
         "other_hour":   other_hour,
         "absence_hour": absence_hour,
+        "quality_hour": quality_hour,
         "categories":   categories,
         "report_count": report_count,
     }

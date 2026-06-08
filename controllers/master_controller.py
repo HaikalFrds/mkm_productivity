@@ -7,7 +7,7 @@ import logging
 from sqlalchemy import func, text
 
 from database.session import get_session, engine
-from models.master import Section, Shift, ProblemGroup, ProblemCategory, ShopModel, WorkCenter
+from models.master import Section, Shift, ProblemGroup, ProblemCategory, ShopModel, WorkCenter, OpNumber
 from models.user import User
 from models.laporan import DailyReport
 from modules.cache import get as _c_get, set as _c_set, invalidate as _c_inv
@@ -470,3 +470,48 @@ def hapus_work_center(wc_id: int) -> tuple[bool, str]:
         return True, "Work Center berhasil dihapus."
     except Exception as e:
         return False, f"Gagal menghapus work center: {e}"
+
+
+# =============================================================================
+# OP NUMBER
+# =============================================================================
+
+def get_op_numbers_by_section(section_id: int) -> list[dict]:
+    with get_session() as session:
+        rows = (
+            session.query(OpNumber)
+            .filter(OpNumber.section_id == section_id)
+            .order_by(OpNumber.op_no)
+            .all()
+        )
+        return [r.to_dict() for r in rows]
+
+
+def tambah_op_number(section_id: int, op_no: str) -> tuple[bool, str]:
+    op_no = op_no.strip()
+    if not op_no:
+        return False, "OP Number tidak boleh kosong."
+    try:
+        with get_session() as session:
+            exists = session.query(OpNumber).filter(
+                OpNumber.section_id == section_id,
+                OpNumber.op_no == op_no,
+            ).first()
+            if exists:
+                return False, f"OP Number '{op_no}' sudah ada di shop ini."
+            session.add(OpNumber(section_id=section_id, op_no=op_no))
+        return True, f"OP Number '{op_no}' berhasil ditambah."
+    except Exception as e:
+        return False, f"Gagal menambah OP Number: {e}"
+
+
+def hapus_op_number(op_id: int) -> tuple[bool, str]:
+    try:
+        with get_session() as session:
+            op = session.get(OpNumber, op_id)
+            if not op:
+                return False, "OP Number tidak ditemukan."
+            session.delete(op)
+        return True, "OP Number berhasil dihapus."
+    except Exception as e:
+        return False, f"Gagal menghapus OP Number: {e}"

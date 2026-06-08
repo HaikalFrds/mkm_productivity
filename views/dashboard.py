@@ -73,8 +73,8 @@ def _style_ax(fig, ax):
 
 def _style_twin(ax2):
     """Light theme untuk secondary (twinx) axis."""
-    ax2.tick_params(axis="y", colors="#1a6fa8", labelsize=8)
-    ax2.spines["right"].set_color("#1a6fa8")
+    ax2.tick_params(axis="y", colors="#27AE60", labelsize=8)
+    ax2.spines["right"].set_color("#27AE60")
     ax2.spines["top"].set_visible(False)
     ax2.spines["left"].set_visible(False)
     ax2.spines["bottom"].set_visible(False)
@@ -189,7 +189,7 @@ class DashboardWidget(QWidget):
         row.setSpacing(8)
         self._c_laporan  = _StatCard("LAPORAN HARI INI",      "0",      "laporan harian",    "#E60012")
         self._c_loss_hr  = _StatCard("LOSS TIME HARI INI",    "0.00 H", "jam terbuang",      "#e67e22")
-        self._c_process  = _StatCard("PROCESS RATIO BLN INI", "— %",    "efisiensi produksi","#4fc3f7")
+        self._c_process  = _StatCard("PROCESS RATIO BLN INI", "— %",    "efisiensi produksi","#27AE60")
         self._c_loss_bln = _StatCard("TOTAL LOSS BLN INI",    "0.00 H", "akumulasi bulanan", "#27ae60")
         for c in (self._c_laporan, self._c_loss_hr, self._c_process, self._c_loss_bln):
             row.addWidget(c)
@@ -384,9 +384,9 @@ class DashboardWidget(QWidget):
             px   = [i for i, p in enumerate(pcts) if monthly[i]["total_hour"] > 0]
             py   = [pcts[i] for i in px]
             if px:
-                ax2.plot(px, py, color="#1a6fa8", linewidth=1.8,
+                ax2.plot(px, py, color="#27AE60", linewidth=1.8,
                          marker="o", markersize=4, markerfacecolor="#FFFFFF",
-                         markeredgecolor="#1a6fa8", markeredgewidth=1.5,
+                         markeredgecolor="#27AE60", markeredgewidth=1.5,
                          zorder=6, label="Process %")
                 line_objs = ax2.get_lines()
                 if line_objs:
@@ -403,7 +403,7 @@ class DashboardWidget(QWidget):
                                 f"  Process Ratio: {pct:.1f}%\n"
                                 f"  Total Hour: {total:.2f} H"
                             )
-                            sel.annotation.get_bbox_patch().set(fc="#FFFFFF", alpha=0.95, ec="#1a6fa8", lw=1)
+                            sel.annotation.get_bbox_patch().set(fc="#FFFFFF", alpha=0.95, ec="#27AE60", lw=1)
                             sel.annotation.set_color("#212121")
                             sel.annotation.set_fontsize(8)
 
@@ -411,7 +411,7 @@ class DashboardWidget(QWidget):
                     ax2.annotate(f"{yi:.0f}%",
                                  xy=(xi, yi),
                                  xytext=(0, 8), textcoords="offset points",
-                                 ha="center", fontsize=7, color="#1a6fa8",
+                                 ha="center", fontsize=7, color="#27AE60",
                                  fontweight="bold", zorder=7)
 
             ax2.axhline(y=TARGET_PROCESS_RATIO, color="#E60012", linestyle="--",
@@ -431,7 +431,7 @@ class DashboardWidget(QWidget):
         ax1.set_xticklabels(_MONTHS, fontsize=8, color="#6B7280")
         ax1.set_ylabel("Loss (H)", fontsize=8, color="#6B7280", labelpad=4)
         ax2.set_ylim(0, 115)
-        ax2.set_ylabel("Process (%)", fontsize=8, color="#1a6fa8", labelpad=4)
+        ax2.set_ylabel("Process (%)", fontsize=8, color="#27AE60", labelpad=4)
 
         if has_data:
             h1, l1 = ax1.get_legend_handles_labels()

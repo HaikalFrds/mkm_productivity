@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor
 from controllers.laporan_controller import simpan_laporan_harian
 from controllers.master_controller import (
     get_all_sections, get_all_shifts, get_models_by_section, get_all_category_names,
+    get_op_numbers_by_section,
 )
 from modules.icons import ic_add, ic_del, ic_prev, ic_next, BTN_ICON_SIZE, NAV_ICON_SIZE
 
@@ -84,6 +85,7 @@ class InputLaporanWidget(QWidget):
         self._shop_models: list[str] = []
         self._shop_model_hours: dict[str, float] = {}   # model → H/unit (MHU)
         self._shop_model_cycle: dict[str, float] = {}   # model → cycle time (s)
+        self._op_numbers: list[str] = []                # OP/ST per shop
         self._factors: list[str] = _FACTORS[:]
         self._setup_ui()
 
@@ -119,8 +121,9 @@ class InputLaporanWidget(QWidget):
     def _reload_models_for_shop(self):
         section_id = self.combo_section.currentData()
         if section_id is None:
-            self._shop_models = []
+            self._shop_models  = []
             self._shop_model_hours = {}
+            self._op_numbers   = []
             return
         try:
             rows = get_models_by_section(section_id)
@@ -132,6 +135,11 @@ class InputLaporanWidget(QWidget):
             self._shop_model_hours = {}
             self._shop_model_cycle = {}
             QMessageBox.warning(self, "Gagal Memuat Model", str(e))
+        try:
+            op_rows = get_op_numbers_by_section(section_id)
+            self._op_numbers = [r["op_no"] for r in op_rows]
+        except Exception:
+            self._op_numbers = []
 
     def _reload_shifts(self):
         try:
@@ -747,7 +755,7 @@ class InputLaporanWidget(QWidget):
         combo_model = _mk_combo(self._shop_models or _MODELS)
         self.tbl_claim.setCellWidget(r, 1, combo_model)
         combo_model.currentTextChanged.connect(lambda _, row=r: self._calc_claim_stop(row))
-        self.tbl_claim.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
+        self.tbl_claim.setCellWidget(r, 2, _mk_combo(self._op_numbers or _OP_ST, popup_w=80))
         self.tbl_claim.setItem(r, 3, _item("", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 4, _item("", Qt.AlignCenter))
         self.tbl_claim.setCellWidget(r, 5, _mk_combo(_SATUAN, popup_w=70))
@@ -803,7 +811,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_ls.setItem(r, 0, no_it)
 
         self.tbl_ls.setCellWidget(r, 1, _mk_combo(self._shop_models or _MODELS))
-        self.tbl_ls.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
+        self.tbl_ls.setCellWidget(r, 2, _mk_combo(self._op_numbers or _OP_ST, popup_w=80))
         self.tbl_ls.setItem(r, 3, _item("", Qt.AlignCenter))
         self.tbl_ls.setItem(r, 4, _item("", Qt.AlignCenter))
         self.tbl_ls.setItem(r, 5, _item("", Qt.AlignCenter))

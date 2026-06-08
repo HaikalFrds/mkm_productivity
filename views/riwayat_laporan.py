@@ -207,7 +207,7 @@ class RiwayatLaporanWidget(QWidget):
                 self.combo_section.addItem(sname, sid)
             self.combo_section.blockSignals(False)
             # combo lain — dengan item "Semua"
-            for combo in (self.combo_section_rekap, self.combo_section_ng, self.combo_prod_section):
+            for combo in (self.combo_section_rekap, self.combo_prod_section):
                 combo.blockSignals(True)
                 for sid, sname in sections:
                     combo.addItem(sname, sid)
@@ -235,11 +235,9 @@ class RiwayatLaporanWidget(QWidget):
         if idx == 1:
             self.load_rekap_bulanan()
         elif idx == 2:
-            self.load_ng_pending()
-        elif idx == 3:
             self.load_produktivitas()
-        elif idx == 4:
-            pass  # tidak auto-load, user harus pilih shop dulu
+        elif idx == 3:
+            pass  # Volume Produksi — tidak auto-load, user harus pilih shop dulu
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
@@ -249,9 +247,8 @@ class RiwayatLaporanWidget(QWidget):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.tabs.addTab(self._build_tab_harian(), "Riwayat Harian")
         self.tabs.addTab(self._build_tab_rekap(), "Rekap Bulanan")
-        self.tabs.addTab(self._build_tab_ng_pending(), "NG & Pending")
         self.tabs.addTab(self._build_tab_produktivitas(), "Produktivitas")
-        self.tabs.addTab(self._build_tab_volume(),       "Volume Produksi")
+        self.tabs.addTab(self._build_tab_volume(),        "Volume Produksi")
         outer.addWidget(self.tabs)
 
     # Tab 1: Riwayat Harian
@@ -1647,10 +1644,15 @@ class RiwayatLaporanWidget(QWidget):
                 for cat in cats:
                     _data_row(cat["name"], cat["hours"])
 
-        # Waktu Tetap 
+        # Kualitas (NG / Inhouse Claim)
+        if data.get("quality_hour", 0) > 0:
+            _grp_row("KUALITAS (NG / Claim)")
+            _data_row("Inhouse Claim", data["quality_hour"])
+
+        # Waktu Tetap
         _grp_row("WAKTU TETAP")
         _data_row("Preparation", data["prep_hour"])
-        _data_row("Sholat",      data["sholat_hour"])
+        _data_row("Sholat",      data["other_hour"])
 
         # Ketidakhadiran
         _grp_row("KETIDAKHADIRAN")
@@ -1681,8 +1683,15 @@ class RiwayatLaporanWidget(QWidget):
         tbl.setItem(r, 1, it_h)
         tbl.setRowHeight(r, 30)
 
-        # Summary
-        balance = loss_hour
+        # Fit tabel agar semua baris terlihat (tidak terpotong)
+        _h = tbl.horizontalHeader().height()
+        for _i in range(tbl.rowCount()):
+            _h += tbl.rowHeight(_i)
+        tbl.setMinimumHeight(_h + 4)
+        tbl.setMaximumHeight(_h + 4)
+
+        # Summary — total loss = line stop + quality (inhouse claim)
+        balance = loss_hour + data.get("quality_hour", 0.0)
 
         ratio = (data["process_hour"] / total_hour * 100) if total_hour > 0 else 0.0
         ratio_color = (

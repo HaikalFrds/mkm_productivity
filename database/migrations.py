@@ -35,6 +35,15 @@ def initialize_tables() -> None:
         # kolom tambahan shift
         "ALTER TABLE shift ADD COLUMN IF NOT EXISTS preparation_min FLOAT DEFAULT 15",
         "ALTER TABLE shift ADD COLUMN IF NOT EXISTS other_min       FLOAT DEFAULT 10",
+        # op_number per shop
+        """
+        CREATE TABLE IF NOT EXISTS op_number (
+            id         SERIAL PRIMARY KEY,
+            section_id INTEGER NOT NULL REFERENCES section(id) ON DELETE CASCADE,
+            op_no      VARCHAR(100) NOT NULL,
+            UNIQUE(section_id, op_no)
+        )
+        """,
     ]
 
     with engine.begin() as conn:

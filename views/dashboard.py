@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QColor
 
-from modules.db_laporan import get_dashboard_data, get_monthly_loss_by_group
+from controllers.dashboard_controller import get_dashboard_data, get_monthly_loss_by_group
 from modules.config import TARGET_PROCESS_RATIO
 
 
@@ -34,17 +34,17 @@ _GROUPS = [
 # (prev: #1e1e1e tbl, #303030 border, #252525 row, #969696 header)
 _TABLE_SS = """
     QTableWidget {
-        background-color: #1a1a1a; border: 1px solid #2e2e2e; gridline-color: #2e2e2e;
+        background-color: #FFFFFF; border: 1px solid #E0E0E0; gridline-color: #F0F0F0;
     }
     QTableWidget::item {
-        color: #f0f0f0; padding: 4px 8px;
-        background-color: #222222; border-bottom: 1px solid #2e2e2e;
+        color: #1a1a1a; padding: 4px 8px;
+        background-color: #FFFFFF; border-bottom: 1px solid #F0F0F0;
     }
-    QTableWidget::item:alternate { background-color: #1e1e1e; }
-    QTableWidget::item:selected { background-color: #2a2a2a; }
+    QTableWidget::item:alternate { background-color: #F8F8F8; }
+    QTableWidget::item:selected { background-color: #F0F0F0; }
     QHeaderView::section {
-        background-color: #111111; color: #888888; border: none;
-        border-bottom: 1px solid #2e2e2e; border-right: 1px solid #2e2e2e;
+        background-color: #F5F5F5; color: #888888; border: none;
+        border-bottom: 1px solid #E0E0E0; border-right: 1px solid #E8E8E8;
         padding: 5px 8px; font-weight: bold; font-size: 10px;
         text-transform: uppercase; letter-spacing: 1px;
     }
@@ -55,21 +55,21 @@ _TABLE_SS = """
 
 def _dark_ax(fig, ax):
     """Terapkan dark theme ke axes tunggal."""
-    fig.patch.set_facecolor("#111111")
-    ax.set_facecolor("#111111")
-    ax.tick_params(axis="both", colors="#555555", labelsize=8)
-    ax.spines["left"].set_color("#2e2e2e")
-    ax.spines["bottom"].set_color("#2e2e2e")
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.tick_params(axis="both", colors="#888888", labelsize=8)
+    ax.spines["left"].set_color("#E0E0E0")
+    ax.spines["bottom"].set_color("#E0E0E0")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.yaxis.grid(True, color="#1e1e1e", linewidth=0.5, linestyle="--")
+    ax.yaxis.grid(True, color="#F0F0F0", linewidth=0.5, linestyle="--")
     ax.set_axisbelow(True)
 
 
 def _dark_twin(ax2):
     """Terapkan dark theme ke secondary (twinx) axis."""
-    ax2.tick_params(axis="y", colors="#4fc3f7", labelsize=8)
-    ax2.spines["right"].set_color("#4fc3f7")
+    ax2.tick_params(axis="y", colors="#1a6fa8", labelsize=8)
+    ax2.spines["right"].set_color("#1a6fa8")
     ax2.spines["top"].set_visible(False)
     ax2.spines["left"].set_visible(False)
     ax2.spines["bottom"].set_visible(False)
@@ -85,7 +85,7 @@ class _StatCard(QFrame):
         super().__init__()
         self.setFixedHeight(88)
         self.setStyleSheet(
-            f"QFrame {{ background-color: #222222; border-left: 3px solid {accent}; border-radius: 0px; }}"
+            "QFrame { background-color: #222222; border-left: 3px solid #da291c; border-radius: 0px; }"
         )
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 10, 14, 10)
@@ -288,7 +288,6 @@ class DashboardWidget(QWidget):
         self._tbl.verticalHeader().setVisible(False)
         self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self._tbl.setSelectionBehavior(QTableWidget.SelectRows)
-        self._tbl.setAlternatingRowColors(True)
         self._tbl.setStyleSheet(_TABLE_SS)
         lay.addWidget(self._tbl)
         return card
@@ -419,7 +418,7 @@ class DashboardWidget(QWidget):
                             sel.annotation.set_fontsize(8)
 
                 for xi, yi in zip(px, py):
-                    ax2.annotate(f"{yi:.1f}%",
+                    ax2.annotate(f"{yi:.0f}%",
                                  xy=(xi, yi),
                                  xytext=(0, 8), textcoords="offset points",
                                  ha="center", fontsize=7, color="#4fc3f7",

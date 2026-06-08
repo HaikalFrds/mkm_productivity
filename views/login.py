@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal, QThread
-from modules.db_auth import verify_login
+from controllers.auth_controller import verify_login
 
 
 class LoginWorker(QThread):
@@ -34,7 +34,8 @@ class LoginWindow(QWidget):
         self.setWindowTitle("MKM Productivity System")
         self.setFixedSize(360, 480)
         self.setWindowFlags(Qt.Window)
-        self.setStyleSheet("QWidget { background-color: #111111; }")
+        from styles.theme import ThemeManager
+        self.setStyleSheet("QWidget { background-color: #F5F5F5; }")
         self.setup_ui()
 
     def setup_ui(self):
@@ -45,8 +46,10 @@ class LoginWindow(QWidget):
         card = QFrame()
         card.setObjectName("login_card")
         card.setFixedWidth(300)
+        from styles.theme import ThemeManager
         card.setStyleSheet(
-            "QFrame#login_card { background-color: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 0px; }"
+            "QFrame#login_card { background-color: #FFFFFF; border: 1px solid #E8E8E8;"
+            " border-bottom: 2px solid #E0E0E0; border-radius: 8px; }"
         )
 
         layout = QVBoxLayout(card)
@@ -54,34 +57,42 @@ class LoginWindow(QWidget):
         layout.setSpacing(0)
 
         # Logo
+        accent     = ThemeManager.c("accent")
+        sub_col    = "#888888"
+        div_col    = "#CCCCCC"
+        lbl_col    = "#888888"
+        inp_bg     = "#FFFFFF"
+        inp_border = "#CCCCCC"
+        inp_color  = "#111111"
+
         title = QLabel("MKM")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet(
-            "color: #da291c; font-size: 32pt; font-weight: bold; letter-spacing: 4px;"
+            f"color: {accent}; font-size: 32pt; font-weight: bold; letter-spacing: 4px;"
             " background: transparent; border: none;"
         )
 
         subtitle = QLabel("PRODUCTIVITY SYSTEM")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setStyleSheet(
-            "color: #555555; font-size: 8pt; letter-spacing: 2px;"
+            f"color: {sub_col}; font-size: 8pt; letter-spacing: 2px;"
             " background: transparent; border: none;"
         )
 
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
-        divider.setStyleSheet("background-color: #2e2e2e; border: none; max-height: 1px;")
+        divider.setStyleSheet(f"background-color: {div_col}; border: none; max-height: 1px;")
 
         # Fields
         _lbl_ss = (
-            "color: #888888; font-size: 9pt; letter-spacing: 1px;"
+            f"color: {lbl_col}; font-size: 9pt; letter-spacing: 1px;"
             " background: transparent; border: none; padding: 0px;"
         )
         _inp_ss = (
-            "QLineEdit { background-color: #2a2a2a; border: 1px solid #2e2e2e;"
-            " border-radius: 0px; padding: 0 10px; color: #f0f0f0;"
-            " font-size: 10pt; min-height: 42px; }"
-            "QLineEdit:focus { border: 1px solid #da291c; }"
+            f"QLineEdit {{ background-color: {inp_bg}; border: 1px solid {inp_border};"
+            f" border-radius: 4px; padding: 0 12px; color: {inp_color};"
+            f" font-size: 10pt; min-height: 44px; }}"
+            f"QLineEdit:focus {{ border: 1.5px solid {accent}; background-color: #FFFAFA; }}"
         )
 
         lbl_nik = QLabel("NIK")
@@ -100,7 +111,7 @@ class LoginWindow(QWidget):
         # Error
         self.lbl_error = QLabel("")
         self.lbl_error.setStyleSheet(
-            "color: #da291c; font-size: 9pt; background: transparent;"
+            f"color: {accent}; font-size: 9pt; background: transparent;"
             " border: none; padding: 0px;"
         )
         self.lbl_error.setAlignment(Qt.AlignCenter)
@@ -108,14 +119,17 @@ class LoginWindow(QWidget):
         self.lbl_error.hide()
 
         # Button
+        btn_hover    = "#6B1515"
+        btn_disabled = "#C8A0A0"
         self.btn_login = QPushButton("MASUK")
         self.btn_login.setObjectName("btn_primary")
         self.btn_login.setStyleSheet(
-            "QPushButton { background-color: #da291c; color: #ffffff;"
-            " border: none; border-radius: 0px; font-size: 10pt; font-weight: bold;"
-            " letter-spacing: 1px; min-height: 44px; }"
-            "QPushButton:hover { background-color: #b01e0a; }"
-            "QPushButton:disabled { background-color: #3a1a1a; color: #888888; }"
+            f"QPushButton {{ background-color: {accent}; color: #ffffff;"
+            " border: none; border-radius: 4px; font-size: 10pt; font-weight: bold;"
+            f" letter-spacing: 2px; min-height: 46px; }}"
+            f"QPushButton:hover {{ background-color: {btn_hover}; }}"
+            f"QPushButton:pressed {{ background-color: #551010; }}"
+            f"QPushButton:disabled {{ background-color: {btn_disabled}; color: #BBBBBB; }}"
         )
         self.btn_login.clicked.connect(self.do_login)
         self.input_password.returnPressed.connect(self.do_login)

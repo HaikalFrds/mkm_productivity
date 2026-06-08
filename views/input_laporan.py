@@ -3,44 +3,42 @@ from PySide6.QtWidgets import (
     QLabel, QFrame, QComboBox, QPushButton, QCheckBox,
     QDateEdit, QTimeEdit, QScrollArea, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QAbstractItemView,
-    QPlainTextEdit, QStyledItemDelegate,
 )
-from PySide6.QtCore import Qt, QDate, QTime, QSize, QRect, QEvent, QTimer
-from PySide6.QtGui import QColor, QTextDocument, QTextCursor
+from PySide6.QtCore import Qt, QDate, QTime
+from PySide6.QtGui import QColor
 
-from modules.db_laporan import (
-    simpan_laporan_harian, get_all_sections, get_all_shifts, get_models_by_section,
-    get_all_category_names,
+from controllers.laporan_controller import simpan_laporan_harian
+from controllers.master_controller import (
+    get_all_sections, get_all_shifts, get_models_by_section, get_all_category_names,
 )
 
-# Style constants
-# (prev: #252525 card, #1e1e1e tbl, #303030 border, rgb(40,80,50) btn-add)
-_CARD  = "QFrame { background-color: #222222; border-radius: 0px; }"
+# Style constants — Light Theme
+_CARD  = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E8E8E8; }"
 _TBL   = """
-    QTableWidget { background-color: #1a1a1a; border: 1px solid #2e2e2e; gridline-color: #2e2e2e; }
-    QTableWidget::item { color: #f0f0f0; padding: 3px 6px; background-color: #222222;
-        border-bottom: 1px solid #2e2e2e; }
-    QTableWidget::item:alternate { background-color: #1e1e1e; }
-    QTableWidget::item:selected { background-color: #2a2a2a; color: #ffffff; }
-    QHeaderView::section { background-color: #111111; color: #888888; border: none;
-        border-bottom: 1px solid #2e2e2e; border-right: 1px solid #2e2e2e;
+    QTableWidget { background-color: #FFFFFF; border: 1px solid #E0E0E0; gridline-color: #F0F0F0; }
+    QTableWidget::item { color: #1a1a1a; padding: 3px 6px; background-color: #FFFFFF;
+        border-bottom: 1px solid #F0F0F0; }
+    QTableWidget::item:alternate { background-color: #F8F8F8; }
+    QTableWidget::item:selected { background-color: #F0F0F0; color: #1a1a1a; }
+    QHeaderView::section { background-color: #F5F5F5; color: #888888; border: none;
+        border-bottom: 1px solid #E0E0E0; border-right: 1px solid #E8E8E8;
         padding: 4px 6px; font-weight: bold; font-size: 10px;
         text-transform: uppercase; letter-spacing: 1px; }
 """
 _COMBO_CELL = """
-    QComboBox { background-color: transparent; color: #f0f0f0; border: none;
+    QComboBox { background-color: transparent; color: #1a1a1a; border: none;
         padding: 0px 4px; margin: 0px; font-size: 11px; }
     QComboBox::drop-down { border: none; width: 18px; }
-    QComboBox QAbstractItemView { background-color: #1a1a1a; color: #f0f0f0;
-        selection-background-color: #2a2a2a; border: 1px solid #2e2e2e; }
+    QComboBox QAbstractItemView { background-color: #FFFFFF; color: #1a1a1a;
+        selection-background-color: #F0F0F0; border: 1px solid #CCCCCC; }
 """
-_BTN_ADD = ("QPushButton { background-color: #1a2a1a; color: #22863a;"
-            " border: 1px solid #22863a; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
-            "QPushButton:hover { background-color: #1e341e; }")
-_BTN_DEL = ("QPushButton { background-color: #2a1a1a; color: #da291c;"
-            " border: 1px solid #da291c; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
-            "QPushButton:hover { background-color: #341e1e; }")
-_HDR_LBL = ("color: #f0f0f0; font-size: 11px; font-weight: bold;"
+_BTN_ADD = ("QPushButton { background-color: #E8F5E9; color: #2e7d32;"
+            " border: 1px solid #A5D6A7; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
+            "QPushButton:hover { background-color: #C8E6C9; }")
+_BTN_DEL = ("QPushButton { background-color: #FFEBEE; color: #c62828;"
+            " border: 1px solid #FFCDD2; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
+            "QPushButton:hover { background-color: #FFCDD2; }")
+_HDR_LBL = ("color: #1a1a1a; font-size: 11px; font-weight: bold;"
             " border-left: 2px solid #da291c; padding-left: 8px;"
             " letter-spacing: 1px; text-transform: uppercase;")
 _FLD_LBL = "color: #888888; font-size: 10px; letter-spacing: 1px;"
@@ -71,109 +69,16 @@ def _item(text="", align=Qt.AlignLeft | Qt.AlignVCenter) -> QTableWidgetItem:
     return it
 
 
-class TextBubbleDelegate(QStyledItemDelegate):
-    """Delegate yang menampilkan QPlainTextEdit saat cell diklik.
-    Enter = newline, Tab = tutup+simpan, Escape = tutup tanpa simpan."""
-
-    def __init__(self, table, parent=None):
-        super().__init__(parent)
-        self._table = table
-
-    def createEditor(self, parent, option, index):
-        editor = QPlainTextEdit(parent)
-        editor.setStyleSheet(
-            "QPlainTextEdit { background-color: #2a2a2a; color: #f0f0f0;"
-            " border: 1px solid #da291c; border-radius: 4px;"
-            " font-size: 11px; padding: 4px; }"
-        )
-        editor.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        editor.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
-        editor.installEventFilter(self)
-        return editor
-    
-    def eventFilter(self, editor, event):
-       if event.type() == QEvent.KeyPress:
-           if event.key() in (Qt.Key_Return, Qt.Key_Enter):
-               if event.modifiers() == Qt.ShiftModifier:
-                   editor.insertPlainText("\n")
-                   return True
-               else:
-                   self.commitData.emit(editor)
-                   self.closeEditor.emit(editor)
-                   return True
-           if event.key() == Qt.Key_Tab:
-               self.commitData.emit(editor)
-               self.closeEditor.emit(editor)
-               return True
-           if event.key() == Qt.Key_Escape:
-               self.closeEditor.emit(editor)
-               return True
-       return False
-
-    def setEditorData(self, editor, index):
-        text = index.data(Qt.DisplayRole) or ""
-        editor.setPlainText(text)
-        cursor = editor.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        editor.setTextCursor(cursor)
-
-    def setModelData(self, editor, model, index):
-        text = editor.toPlainText()
-        model.setData(index, text, Qt.EditRole)
-        row = index.row()
-        QTimer.singleShot(0, lambda: self._table.resizeRowToContents(row))
-
-    def updateEditorGeometry(self, editor, option, index):
-        col_w = self._table.columnWidth(index.column())
-        cell_rect = option.rect
-        editor.setGeometry(cell_rect.x(), cell_rect.y(), col_w, 120)
-
-    def paint(self, painter, option, index):
-        text = index.data(Qt.DisplayRole) or ""
-        if not text:
-            super().paint(painter, option, index)
-            return
-        painter.save()
-        doc = QTextDocument()
-        doc.setDefaultFont(option.font)
-        doc.setPlainText(text)
-        doc.setTextWidth(option.rect.width() - 8)
-        painter.translate(option.rect.topLeft())
-        painter.translate(4, 4)
-        doc.drawContents(painter)
-        painter.restore()
-
-    def sizeHint(self, option, index):
-        text = index.data(Qt.DisplayRole) or ""
-        if not text:
-            return QSize(option.rect.width(), 35)
-        fm    = option.fontMetrics
-        col_w = max(self._table.columnWidth(index.column()) - 8, 40)
-        rect  = fm.boundingRect(
-            QRect(0, 0, col_w, 10000),
-            Qt.TextWordWrap | Qt.AlignLeft,
-            text,
-        )
-        return QSize(option.rect.width(), max(35, rect.height() + 8))
-
-
-def _fmt(v: float) -> str:
-    """Format angka dinamis: hilangkan trailing zero, max 4 desimal."""
-    s = f"{v:.4f}".rstrip('0').rstrip('.')
-    return s or "0"
-
-
 # Main Widget
 
 class InputLaporanWidget(QWidget):
     def __init__(self, user: dict, parent=None):
         super().__init__(parent)
         self._user         = user
-        self._shift_map: dict = {}   # name → {total_hours, preparation_min, other_min}
+        self._shift_map: dict = {}   # name → {total_hours, preparation_min, sholat_min}
         self._shift_hours  = 0.0
         self._prep_h       = 15.0 / 60
-        self._other_h      = 10.0 / 60
+        self._sholat_h     = 10.0 / 60
         self._ot_hours     = 0.0
         self._shop_models: list[str] = []
         self._shop_model_hours: dict[str, float] = {}   # model → H/unit (MHU)
@@ -235,7 +140,7 @@ class InputLaporanWidget(QWidget):
                 s["name"]: {
                     "total_hours":     s["total_hours"],
                     "preparation_min": s.get("preparation_min", 15.0),
-                    "other_min":       s.get("other_min", 10.0),
+                    "sholat_min":      s.get("sholat_min", 10.0),
                 }
                 for s in shifts
             }
@@ -256,7 +161,7 @@ class InputLaporanWidget(QWidget):
         data = self._shift_map.get(self.combo_shift.currentText(), {})
         base_hours        = data.get("total_hours", 0.0)
         self._prep_h      = data.get("preparation_min", 15.0) / 60
-        self._other_h     = data.get("other_min", 10.0) / 60
+        self._sholat_h    = data.get("sholat_min", 10.0) / 60
         # Jumat: potong 30 menit (0.5 jam) — hanya untuk Day Shift
         if self.chk_pengganti.isChecked():
             day_map = {"Senin": 1, "Selasa": 2, "Rabu": 3, "Kamis": 4,
@@ -268,9 +173,9 @@ class InputLaporanWidget(QWidget):
         is_day_shift = "night" not in self.combo_shift.currentText().lower()
         self._shift_hours = base_hours - 0.5 if (is_friday and is_day_shift and base_hours > 0) else base_hours
         self._shift_hours += self._ot_hours
-        self._lbl_hour.setText(_fmt(self._shift_hours))
-        self._lbl_prep_val.setText(_fmt(self._prep_h))
-        self._lbl_other_val.setText(_fmt(self._other_h))
+        self._lbl_hour.setText(f"{self._shift_hours:.2f}")
+        self._lbl_prep_val.setText(f"{self._prep_h:.4f}")
+        self._lbl_sholat_val.setText(f"{self._sholat_h:.4f}")
         self._hitung_calc_hour()
 
     def _update_day(self, date: QDate):
@@ -304,6 +209,9 @@ class InputLaporanWidget(QWidget):
         main.addLayout(self._build_footer())
         main.addStretch()
 
+        self._mat_card = self._build_material_panel()
+        main.addWidget(self._mat_card)
+
         scroll.setWidget(container)
         outer.addWidget(scroll)
 
@@ -312,19 +220,19 @@ class InputLaporanWidget(QWidget):
     def _build_header(self) -> QFrame:
         card = QFrame()
         card.setStyleSheet(
-            "QFrame { background-color: #252525; border-radius: 0px;"
-            " border-top: 2px solid #da291c; }"
+            "QFrame { background-color: #FFFFFF; border-radius: 0px;"
+            " border-top: 2px solid #da291c; border-bottom: 1px solid #E8E8E8; }"
         )
         lay = QHBoxLayout(card)
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(8)
 
         _combo_ss = (
-            "QComboBox { background:#1e1e1e; border:1px solid #303030; border-radius:2px;"
-            " padding-left:8px; color:#ffffff; font-size:11px; }"
+            "QComboBox { background:#FFFFFF; border:1px solid #CCCCCC; border-radius:2px;"
+            " padding-left:8px; color:#1a1a1a; font-size:11px; }"
             "QComboBox::drop-down { border:none; width:22px; }"
-            "QComboBox QAbstractItemView { background:#252525; color:#ffffff;"
-            " selection-background-color:#303030; border:1px solid #303030; }"
+            "QComboBox QAbstractItemView { background:#FFFFFF; color:#1a1a1a;"
+            " selection-background-color:#F0F0F0; border:1px solid #CCCCCC; }"
         )
 
         def _lbl(t):
@@ -337,7 +245,7 @@ class InputLaporanWidget(QWidget):
             sep.setFrameShape(QFrame.VLine)
             sep.setFixedWidth(1)
             sep.setFixedHeight(22)
-            sep.setStyleSheet("background-color: #404040; border: none;")
+            sep.setStyleSheet("background-color: #CCCCCC; border: none;")
             return sep
 
         # Shop group
@@ -358,8 +266,8 @@ class InputLaporanWidget(QWidget):
         btn_prev = QPushButton("<")
         btn_prev.setFixedSize(22, 26)
         btn_prev.setStyleSheet(
-            "QPushButton { background:#1e1e1e; color:#fff; border:1px solid #303030; }"
-            "QPushButton:hover { background:#303030; }"
+            "QPushButton { background:#EEEEEE; color:#1a1a1a; border:1px solid #CCCCCC; }"
+            "QPushButton:hover { background:#E0E0E0; }"
         )
         self.input_tanggal = QDateEdit()
         self.input_tanggal.setDate(QDate.currentDate())
@@ -368,8 +276,8 @@ class InputLaporanWidget(QWidget):
         self.input_tanggal.setMinimumWidth(95)
         self.input_tanggal.setDisplayFormat("dd/MM/yyyy")
         self.input_tanggal.setStyleSheet(
-            "QDateEdit { background:#1e1e1e; border:1px solid #303030; border-radius:2px;"
-            " padding-left:8px; color:#ffffff; font-size:11px; }"
+            "QDateEdit { background:#FFFFFF; border:1px solid #CCCCCC; border-radius:2px;"
+            " padding-left:8px; color:#1a1a1a; font-size:11px; }"
             "QDateEdit::drop-down { border:none; width:22px; }"
         )
         btn_next = QPushButton(">")
@@ -386,7 +294,7 @@ class InputLaporanWidget(QWidget):
         lay.addWidget(btn_next)
 
         self._lbl_day = QLabel("—")
-        self._lbl_day.setStyleSheet("color:#da291c; font-size:11px; font-weight:bold; min-width:48px;")
+        self._lbl_day.setStyleSheet("color:#da291c; font-size:11px; font-weight:bold; min-width:48px; background:transparent;")
         lay.addWidget(self._lbl_day)
         self.input_tanggal.dateChanged.connect(self._update_day)
         self._update_day(QDate.currentDate())
@@ -411,7 +319,7 @@ class InputLaporanWidget(QWidget):
         # Hour group
         lay.addWidget(_lbl("Hour"))
         self._lbl_hour = QLabel("—")
-        self._lbl_hour.setStyleSheet("color:#ffffff; font-size:13px; font-weight:bold; min-width:36px;")
+        self._lbl_hour.setStyleSheet("color:#1a1a1a; font-size:13px; font-weight:bold; min-width:36px; background:transparent;")
         lay.addWidget(self._lbl_hour)
 
         lay.addWidget(_vsep())
@@ -433,10 +341,10 @@ class InputLaporanWidget(QWidget):
         # Hari Pengganti group
         self.chk_pengganti = QCheckBox("Hari Pengganti")
         self.chk_pengganti.setStyleSheet(
-            "QCheckBox { color: #888888; font-size: 10px; letter-spacing: 1px; }"
+            "QCheckBox { color: #888888; font-size: 10px; letter-spacing: 1px; background: transparent; }"
             "QCheckBox::indicator { width: 14px; height: 14px; }"
             "QCheckBox::indicator:checked { background: #da291c; border: 1px solid #da291c; }"
-            "QCheckBox::indicator:unchecked { background: #1e1e1e; border: 1px solid #303030; }"
+            "QCheckBox::indicator:unchecked { background: #FFFFFF; border: 1px solid #CCCCCC; }"
         )
         self.chk_pengganti.toggled.connect(self._on_pengganti_toggled)
         lay.addWidget(self.chk_pengganti)
@@ -457,7 +365,7 @@ class InputLaporanWidget(QWidget):
         lbl_user = QLabel(self._user.get("name", "").upper())
         lbl_user.setStyleSheet(
             "color:#da291c; font-size:11px; font-weight:bold;"
-            " padding: 3px 8px; background-color: #1e1e1e;"
+            " padding: 3px 8px; background-color: #F5F5F5;"
         )
         lay.addWidget(lbl_user)
 
@@ -552,32 +460,30 @@ class InputLaporanWidget(QWidget):
 
         def _vlbl(t="—"):
             l = QLabel(t)
-            l.setStyleSheet("color:#ffffff; font-size:11px; font-weight:bold;")
+            l.setStyleSheet("color:#1a1a1a; font-size:11px; font-weight:bold; background:transparent;")
             l.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             return l
 
-        self._lbl_process    = _vlbl()
-        self._lbl_prep_val   = _vlbl(_fmt(self._prep_h))
-        self._lbl_prep_val.setStyleSheet("color:#969696; font-size:11px;")
+        self._lbl_process   = _vlbl()
+        self._lbl_prep_val  = _vlbl(f"{self._prep_h:.4f}")
+        self._lbl_prep_val.setStyleSheet("color:#AAAAAA; font-size:11px; background:transparent;")
         self._lbl_prep_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_quality    = _vlbl("0.0000")
-        self._lbl_linestop   = _vlbl()
-        self._lbl_claim_loss = _vlbl()
+        self._lbl_quality   = _vlbl("0.0000")
+        self._lbl_linestop  = _vlbl()
         self._lbl_absence   = _vlbl()
-        self._lbl_other_val = _vlbl(_fmt(self._other_h))
-        self._lbl_other_val.setStyleSheet("color:#969696; font-size:11px;")
-        self._lbl_other_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_total      = _vlbl()
-        self._lbl_balance    = _vlbl()
+        self._lbl_sholat_val = _vlbl(f"{self._sholat_h:.4f}")
+        self._lbl_sholat_val.setStyleSheet("color:#AAAAAA; font-size:11px; background:transparent;")
+        self._lbl_sholat_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._lbl_total     = _vlbl()
+        self._lbl_balance   = _vlbl()
 
         rows = [
             ("Process",     self._lbl_process),
             ("Preparation", self._lbl_prep_val),
             ("Quality",     self._lbl_quality),
             ("Line Stop",   self._lbl_linestop),
-            ("Claim Loss",  self._lbl_claim_loss),
             ("Absence",     self._lbl_absence),
-            ("Other",       self._lbl_other_val),
+            ("Sholat",      self._lbl_sholat_val),
         ]
         for i, (name, wgt) in enumerate(rows):
             grid.addWidget(_rlbl(name), i, 0)
@@ -586,11 +492,11 @@ class InputLaporanWidget(QWidget):
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
         divider.setFixedHeight(1)
-        divider.setStyleSheet("background-color: #303030; border: none;")
+        divider.setStyleSheet("background-color: #E0E0E0; border: none;")
         grid.addWidget(divider, len(rows), 0, 1, 2)
 
         lbl_total = QLabel("TOTAL")
-        lbl_total.setStyleSheet("color:#969696; font-size:11px; font-weight:bold;")
+        lbl_total.setStyleSheet("color:#888888; font-size:11px; font-weight:bold; background:transparent;")
         grid.addWidget(lbl_total, len(rows) + 1, 0)
         grid.addWidget(self._lbl_total, len(rows) + 1, 1)
 
@@ -600,15 +506,15 @@ class InputLaporanWidget(QWidget):
         bal_frame = QFrame()
         bal_frame.setObjectName("balFrame")
         bal_frame.setStyleSheet(
-            "#balFrame { background-color: #1e1e1e; border: 1px solid #303030;"
+            "#balFrame { background-color: #F5F5F5; border: 1px solid #E0E0E0;"
             " border-left: 3px solid #da291c; }"
         )
         bal_row = QHBoxLayout(bal_frame)
         bal_row.setContentsMargins(8, 5, 8, 5)
         lbl_bal = QLabel("BALANCE")
-        lbl_bal.setStyleSheet("color:#969696; font-size:11px; font-weight:bold;")
+        lbl_bal.setStyleSheet("color:#888888; font-size:11px; font-weight:bold; background:transparent;")
         self._lbl_balance.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_balance.setStyleSheet("color:#ffffff; font-size:13px; font-weight:bold;")
+        self._lbl_balance.setStyleSheet("color:#1a1a1a; font-size:13px; font-weight:bold; background:transparent;")
         bal_row.addWidget(lbl_bal)
         bal_row.addStretch()
         bal_row.addWidget(self._lbl_balance)
@@ -646,22 +552,18 @@ class InputLaporanWidget(QWidget):
         h.setSectionResizeMode(6, QHeaderView.Stretch)
         h.setSectionResizeMode(7, QHeaderView.Stretch)
         self.tbl_claim.setColumnWidth(0,  28)
-        self.tbl_claim.setColumnWidth(1,  85)
-        self.tbl_claim.setColumnWidth(2,  85)
-        self.tbl_claim.setColumnWidth(4,  45)
-        self.tbl_claim.setColumnWidth(5,  65)
-        self.tbl_claim.setColumnWidth(8,  60)
-        self.tbl_claim.setColumnWidth(9,  60)
-        self.tbl_claim.setColumnWidth(10, 60)
+        self.tbl_claim.setColumnWidth(1,  60)
+        self.tbl_claim.setColumnWidth(2,  60)
+        self.tbl_claim.setColumnWidth(4,  42)
+        self.tbl_claim.setColumnWidth(5,  55)
+        self.tbl_claim.setColumnWidth(8,  75)
+        self.tbl_claim.setColumnWidth(9,  50)
+        self.tbl_claim.setColumnWidth(10, 50)
         self.tbl_claim.setColumnWidth(11, 75)
         self.tbl_claim.verticalHeader().setVisible(False)
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_claim.setStyleSheet(_TBL)
         self.tbl_claim.setMinimumHeight(140)
-        _del_c = TextBubbleDelegate(self.tbl_claim)
-        for _col in (3, 6, 7):
-            self.tbl_claim.setItemDelegateForColumn(_col, _del_c)
-        self.tbl_claim.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tbl_claim.itemChanged.connect(self._on_claim_item_changed)
         lay.addWidget(self.tbl_claim)
         return card
@@ -702,21 +604,17 @@ class InputLaporanWidget(QWidget):
         h.setSectionResizeMode(4, QHeaderView.Stretch)
         h.setSectionResizeMode(5, QHeaderView.Stretch)
         self.tbl_ls.setColumnWidth(0,  28)
-        self.tbl_ls.setColumnWidth(1,  85)
-        self.tbl_ls.setColumnWidth(2,  85)
-        self.tbl_ls.setColumnWidth(6,  85)
-        self.tbl_ls.setColumnWidth(7,  60)
-        self.tbl_ls.setColumnWidth(8,  60)
-        self.tbl_ls.setColumnWidth(9,  60)
-        self.tbl_ls.setColumnWidth(10, 60)
+        self.tbl_ls.setColumnWidth(1,  60)
+        self.tbl_ls.setColumnWidth(2,  60)
+        self.tbl_ls.setColumnWidth(6,  80)
+        self.tbl_ls.setColumnWidth(7,  54)
+        self.tbl_ls.setColumnWidth(8,  54)
+        self.tbl_ls.setColumnWidth(9,  52)
+        self.tbl_ls.setColumnWidth(10, 52)
         self.tbl_ls.verticalHeader().setVisible(False)
         self.tbl_ls.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tbl_ls.setStyleSheet(_TBL)
         self.tbl_ls.setMinimumHeight(140)
-        _del_l = TextBubbleDelegate(self.tbl_ls)
-        for _col in (3, 4, 5):
-            self.tbl_ls.setItemDelegateForColumn(_col, _del_l)
-        self.tbl_ls.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tbl_ls.itemChanged.connect(self._hitung_calc_hour)
         lay.addWidget(self.tbl_ls)
         return card
@@ -731,8 +629,8 @@ class InputLaporanWidget(QWidget):
         btn_reset = QPushButton("Reset")
         btn_reset.setMinimumSize(90, 34)
         btn_reset.setStyleSheet(
-            "QPushButton { background:#252525; color:#969696; border:none; font-size:11px; }"
-            "QPushButton:hover { background:#303030; color:#fff; }"
+            "QPushButton { background:#EEEEEE; color:#888888; border:none; font-size:11px; }"
+            "QPushButton:hover { background:#E0E0E0; color:#1a1a1a; }"
         )
         btn_reset.clicked.connect(self.reset_form)
 
@@ -754,7 +652,7 @@ class InputLaporanWidget(QWidget):
         r = self.tbl_prod.rowCount()
         self.tbl_prod.blockSignals(True)
         self.tbl_prod.insertRow(r)
-        self.tbl_prod.setRowHeight(r, 35)
+        self.tbl_prod.setRowHeight(r, 30)
         models = self._shop_models or _MODELS
         combo = _mk_combo(models)
         self.tbl_prod.setCellWidget(r, 0, combo)
@@ -762,8 +660,8 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.setItem(r, 2, _item("", Qt.AlignCenter))  # Act Qty
         plh_it = _item("", Qt.AlignCenter)
         plh_it.setFlags(Qt.ItemIsEnabled)
-        plh_it.setBackground(QColor("#1a1a1a"))
-        plh_it.setForeground(QColor("#606060"))
+        plh_it.setBackground(QColor("#F0F0F0"))
+        plh_it.setForeground(QColor("#AAAAAA"))
         self.tbl_prod.setItem(r, 3, plh_it)                     # Plan H (readonly)
         self.tbl_prod.setItem(r, 4, _item("", Qt.AlignCenter))  # Act H
         self.tbl_prod.blockSignals(False)
@@ -788,7 +686,7 @@ class InputLaporanWidget(QWidget):
         r = self.tbl_absen.rowCount()
         self.tbl_absen.blockSignals(True)
         self.tbl_absen.insertRow(r)
-        self.tbl_absen.setRowHeight(r, 35)
+        self.tbl_absen.setRowHeight(r, 30)
         self.tbl_absen.setItem(r, 0, _item("", Qt.AlignCenter))
         self.tbl_absen.setItem(r, 1, _item("", Qt.AlignCenter))
         self.tbl_absen.setCellWidget(r, 2, _mk_combo(_NOTE_TYPES, popup_w=100))
@@ -804,7 +702,7 @@ class InputLaporanWidget(QWidget):
     def _tambah_claim(self):
         r = self.tbl_claim.rowCount()
         self.tbl_claim.insertRow(r)
-        self.tbl_claim.setRowHeight(r, 35)
+        self.tbl_claim.setRowHeight(r, 30)
 
         no_it = _item(str(r + 1), Qt.AlignCenter)
         no_it.setFlags(Qt.ItemIsEnabled)
@@ -814,11 +712,11 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setCellWidget(r, 1, combo_model)
         combo_model.currentTextChanged.connect(lambda _, row=r: self._calc_claim_stop(row))
         self.tbl_claim.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
-        self.tbl_claim.setItem(r, 3, _item(""))
+        self.tbl_claim.setItem(r, 3, _item("", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 4, _item("", Qt.AlignCenter))
         self.tbl_claim.setCellWidget(r, 5, _mk_combo(_SATUAN, popup_w=70))
-        self.tbl_claim.setItem(r, 6, _item(""))
-        self.tbl_claim.setItem(r, 7, _item(""))
+        self.tbl_claim.setItem(r, 6, _item("", Qt.AlignCenter))
+        self.tbl_claim.setItem(r, 7, _item("", Qt.AlignCenter))
         self.tbl_claim.setCellWidget(r, 8, _mk_combo(self._factors, popup_w=100))
         self.tbl_claim.setItem(r, 9,  _item("0", Qt.AlignCenter))
         self.tbl_claim.setItem(r, 10, _item("0", Qt.AlignCenter))
@@ -834,10 +732,8 @@ class InputLaporanWidget(QWidget):
                     it.setText(str(i + 1))
 
     def _on_claim_item_changed(self, item):
-        if item.column() == 4:    # Qty changed → recalc Stop Hr
+        if item.column() == 4:  # Qty changed
             self._calc_claim_stop(item.row())
-        elif item.column() == 10:  # Lost Hr changed → update balance
-            self._hitung_calc_hour()
 
     def _calc_claim_stop(self, r: int):
         cb_model = self.tbl_claim.cellWidget(r, 1)
@@ -856,14 +752,14 @@ class InputLaporanWidget(QWidget):
         if not stop_it:
             stop_it = _item("0", Qt.AlignCenter)
             self.tbl_claim.setItem(r, 9, stop_it)
-        stop_it.setText(_fmt(stop) if stop > 0 else "0")
+        stop_it.setText(f"{stop:.4f}" if stop > 0 else "0")
         self.tbl_claim.blockSignals(False)
 
     def _tambah_linestop(self):
         r = self.tbl_ls.rowCount()
         self.tbl_ls.blockSignals(True)
         self.tbl_ls.insertRow(r)
-        self.tbl_ls.setRowHeight(r, 35)
+        self.tbl_ls.setRowHeight(r, 30)
 
         no_it = _item(str(r + 1), Qt.AlignCenter)
         no_it.setFlags(Qt.ItemIsEnabled)
@@ -871,16 +767,16 @@ class InputLaporanWidget(QWidget):
 
         self.tbl_ls.setCellWidget(r, 1, _mk_combo(self._shop_models or _MODELS))
         self.tbl_ls.setCellWidget(r, 2, _mk_combo(_OP_ST, popup_w=80))
-        self.tbl_ls.setItem(r, 3, _item(""))
-        self.tbl_ls.setItem(r, 4, _item(""))
-        self.tbl_ls.setItem(r, 5, _item(""))
+        self.tbl_ls.setItem(r, 3, _item("", Qt.AlignCenter))
+        self.tbl_ls.setItem(r, 4, _item("", Qt.AlignCenter))
+        self.tbl_ls.setItem(r, 5, _item("", Qt.AlignCenter))
         self.tbl_ls.setCellWidget(r, 6, _mk_combo(self._factors, popup_w=100))
 
         for col in (7, 8):
             te = QTimeEdit(QTime(0, 0))
             te.setDisplayFormat("HH:mm")
             te.setStyleSheet(
-                "QTimeEdit { background: transparent; color: #ffffff; border: none;"
+                "QTimeEdit { background: transparent; color: #1a1a1a; border: none;"
                 " font-size: 11px; padding: 0px 4px; margin: 0px; }"
                 "QTimeEdit::up-button, QTimeEdit::down-button { width: 0; }"
             )
@@ -928,7 +824,7 @@ class InputLaporanWidget(QWidget):
         if not it:
             it = _item("0", Qt.AlignCenter)
             self.tbl_ls.setItem(r, 9, it)
-        it.setText(_fmt(h))
+        it.setText(f"{h:.4f}")
         self.tbl_ls.blockSignals(False)
 
     # Auto-fill Hour dari MHU
@@ -954,13 +850,13 @@ class InputLaporanWidget(QWidget):
                         plh_it.setBackground(QColor("#1a1a1a"))
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
-                    plh_it.setText(_fmt(qty * mhu) if qty > 0 else "")
+                    plh_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
                 else:  # col == 2, Act Qty → Act H
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
-                    ach_it.setText(_fmt(qty * mhu) if qty > 0 else "")
+                    ach_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
                 self.tbl_prod.blockSignals(False)
         self._hitung_calc_hour()
 
@@ -985,16 +881,74 @@ class InputLaporanWidget(QWidget):
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
                     pq = _qty(1)
-                    plh_it.setText(_fmt(pq * mhu) if pq > 0 else "")
+                    plh_it.setText(f"{pq * mhu:.4f}" if pq > 0 else "")
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
                     aq = _qty(2)
-                    ach_it.setText(_fmt(aq * mhu) if aq > 0 else "")
+                    ach_it.setText(f"{aq * mhu:.4f}" if aq > 0 else "")
                 self.tbl_prod.blockSignals(False)
                 self._hitung_calc_hour()
                 break
+
+    # Material Used
+
+    def _build_material_panel(self) -> QFrame:
+        card = QFrame(); card.setStyleSheet(_CARD)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(10, 10, 10, 10); lay.setSpacing(6)
+
+        hdr = QHBoxLayout()
+        hdr.addWidget(QLabel("Material Used", styleSheet=_HDR_LBL))
+        hdr.addStretch()
+        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba.clicked.connect(self._tambah_material)
+        bd.clicked.connect(self._hapus_material)
+        hdr.addWidget(ba); hdr.addWidget(bd)
+        lay.addLayout(hdr)
+
+        self.tbl_mat = QTableWidget(0, 6)
+        self.tbl_mat.setHorizontalHeaderLabels(
+            ["No", "Material Name", "Mat. No", "Qty", "Satuan", "Keterangan"]
+        )
+        h = self.tbl_mat.horizontalHeader()
+        h.setSectionResizeMode(QHeaderView.Fixed)
+        h.setSectionResizeMode(1, QHeaderView.Stretch)
+        h.setSectionResizeMode(5, QHeaderView.Stretch)
+        self.tbl_mat.setColumnWidth(0, 28)
+        self.tbl_mat.setColumnWidth(2, 90)
+        self.tbl_mat.setColumnWidth(3, 55)
+        self.tbl_mat.setColumnWidth(4, 65)
+        self.tbl_mat.verticalHeader().setVisible(False)
+        self.tbl_mat.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_mat.setStyleSheet(_TBL)
+        self.tbl_mat.setMinimumHeight(120)
+        lay.addWidget(self.tbl_mat)
+        return card
+
+    def _tambah_material(self):
+        r = self.tbl_mat.rowCount()
+        self.tbl_mat.insertRow(r)
+        self.tbl_mat.setRowHeight(r, 28)
+        no_it = _item(str(r + 1), Qt.AlignCenter)
+        no_it.setFlags(Qt.ItemIsEnabled)
+        self.tbl_mat.setItem(r, 0, no_it)
+        self.tbl_mat.setItem(r, 1, _item(""))
+        self.tbl_mat.setItem(r, 2, _item(""))
+        self.tbl_mat.setItem(r, 3, _item("0", Qt.AlignCenter))
+        self.tbl_mat.setCellWidget(r, 4, _mk_combo(_SATUAN, popup_w=70))
+        self.tbl_mat.setItem(r, 5, _item(""))
+
+    def _hapus_material(self):
+        r = self.tbl_mat.currentRow()
+        if r >= 0:
+            self.tbl_mat.removeRow(r)
+            for i in range(self.tbl_mat.rowCount()):
+                it = self.tbl_mat.item(i, 0)
+                if it:
+                    it.setText(str(i + 1))
 
     # Calculation Hour
 
@@ -1002,7 +956,6 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(True)
         self.tbl_absen.blockSignals(True)
         self.tbl_ls.blockSignals(True)
-        self.tbl_claim.blockSignals(True)
 
         def _fval(tbl, row, col):
             it = tbl.item(row, col)
@@ -1013,24 +966,22 @@ class InputLaporanWidget(QWidget):
                     pass
             return 0.0
 
-        process    = sum(_fval(self.tbl_prod,  r, 4)  for r in range(self.tbl_prod.rowCount()))
-        absence    = sum(_fval(self.tbl_absen, r, 3)  for r in range(self.tbl_absen.rowCount()))
-        linestop   = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
-        claim_loss = sum(_fval(self.tbl_claim, r, 10) for r in range(self.tbl_claim.rowCount()))
-        quality    = 0.0
-        total      = self._shift_hours
-        balance    = total - process - self._prep_h - quality - linestop - claim_loss - absence - self._other_h
+        process  = sum(_fval(self.tbl_prod,  r, 4) for r in range(self.tbl_prod.rowCount()))
+        absence  = sum(_fval(self.tbl_absen, r, 3) for r in range(self.tbl_absen.rowCount()))
+        linestop = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
+        quality  = 0.0
+        total    = self._shift_hours
+        balance  = total - process - self._prep_h - quality - linestop - absence - self._sholat_h
 
-        self._lbl_process.setText(_fmt(process))
-        self._lbl_quality.setText(_fmt(quality))
-        self._lbl_linestop.setText(_fmt(linestop))
-        self._lbl_claim_loss.setText(_fmt(claim_loss))
-        self._lbl_absence.setText(_fmt(absence))
-        self._lbl_total.setText(_fmt(total))
+        self._lbl_process.setText(f"{process:.4f}")
+        self._lbl_quality.setText(f"{quality:.4f}")
+        self._lbl_linestop.setText(f"{linestop:.4f}")
+        self._lbl_absence.setText(f"{absence:.4f}")
+        self._lbl_total.setText(f"{total:.4f}")
 
         ok = abs(balance) < 0.001
         clr = "rgb(80,200,100)" if ok else "rgb(220,80,80)"
-        self._lbl_balance.setText(_fmt(balance))
+        self._lbl_balance.setText(f"{balance:.4f}")
         self._lbl_balance.setStyleSheet(
             f"color: {clr}; font-size:13px; font-weight:bold;"
         )
@@ -1038,7 +989,6 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(False)
         self.tbl_absen.blockSignals(False)
         self.tbl_ls.blockSignals(False)
-        self.tbl_claim.blockSignals(False)
 
     # Reset
 
@@ -1048,6 +998,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_absen.setRowCount(0)
         self.tbl_claim.setRowCount(0)
         self.tbl_ls.setRowCount(0)
+        self.tbl_mat.setRowCount(0)
 
         self._hitung_calc_hour()
 
@@ -1183,6 +1134,24 @@ class InputLaporanWidget(QWidget):
             {"role": "Worker",  "plan": 0, "act": 0},
         ]
 
+        # Material Used
+        material_data = []
+        for r in range(self.tbl_mat.rowCount()):
+            name_it = self.tbl_mat.item(r, 1)
+            name = name_it.text().strip() if name_it else ""
+            if not name:
+                continue
+            matno_it = self.tbl_mat.item(r, 2)
+            sat_cb   = self.tbl_mat.cellWidget(r, 4)
+            ket_it   = self.tbl_mat.item(r, 5)
+            material_data.append({
+                "material_name": name,
+                "material_no":   matno_it.text().strip() if matno_it else "",
+                "qty":           _fv(self.tbl_mat, r, 3),
+                "satuan":        sat_cb.currentText() if sat_cb else "",
+                "keterangan":    ket_it.text().strip() if ket_it else "",
+            })
+
         header = {
             "tanggal":     self.input_tanggal.date().toString("yyyy-MM-dd"),
             "shift":       self.combo_shift.currentText(),
@@ -1202,6 +1171,7 @@ class InputLaporanWidget(QWidget):
             inhouse_claim=claim_data,
             manpower=manpower_data,
             absen=absen_data,
+            material_usage=material_data,
         )
         if ok:
             self.reset_form()

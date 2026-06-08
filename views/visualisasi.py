@@ -10,7 +10,8 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.ticker as mticker
 
-from modules.db_laporan import get_all_sections, get_loss_time_per_bulan
+from controllers.master_controller import get_all_sections
+from controllers.analytics_controller import get_loss_time_per_bulan
 from modules.config import TARGET_PROCESS_RATIO
 
 

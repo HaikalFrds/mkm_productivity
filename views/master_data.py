@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTime
 
-from modules.db_laporan import (
+from controllers.master_controller import (
     get_all_sections, tambah_section, edit_section, hapus_section,
     get_all_users, tambah_user, reset_password_user, hapus_user,
     get_all_groups, get_all_kategori, tambah_kategori, edit_kategori, hapus_kategori,
@@ -16,97 +16,36 @@ from modules.db_laporan import (
     update_shift_working_hour, ensure_shift_columns,
     get_models_by_section, tambah_shop_model, edit_shop_model, hapus_shop_model,
 )
+from styles.theme import ThemeManager
 
 
-# ── Styles ──────────────────────────────────────────────────────────────────────
-# (prev: #252525 card, #1e1e1e tbl, #303030 border, #969696 text-sec)
+def _BTN_ADD():
+    c = ThemeManager.colors()
+    return (f"QPushButton {{ color: {c['text_white']}; border: 1px solid {c['accent_dk']};"
+            f" background-color: {c['accent']}; border-radius: 0px; font-size: 11px;"
+            f" font-weight: bold; padding: 0 14px; }}"
+            f"QPushButton:hover {{ background-color: {c['accent_dk']}; }}")
 
-_CARD = "QFrame { background-color: #222222; border-radius: 0px; }"
+def _BTN_EDIT():
+    c = ThemeManager.colors()
+    return (f"QPushButton {{ color: {c['text_hi']}; border: 1px solid {c['border_hi']};"
+            f" background-color: {c['bg_btn']}; border-radius: 0px; padding: 0 8px; }}"
+            f"QPushButton:hover {{ background-color: {c['bg_btn_hov']}; }}")
 
-_TABLE = """
-    QTableWidget {
-        background-color: #1a1a1a;
-        border: 1px solid #2e2e2e; border-radius: 0px;
-        gridline-color: #2e2e2e;
-    }
-    QTableWidget::item {
-        color: #f0f0f0; padding: 4px 8px;
-        background-color: #222222;
-        border-bottom: 1px solid #2e2e2e;
-    }
-    QTableWidget::item:alternate { background-color: #1e1e1e; }
-    QTableWidget::item:selected { background-color: #2a2a2a; color: #ffffff; }
-    QHeaderView::section {
-        background-color: #111111; color: #888888;
-        border: none; border-bottom: 1px solid #2e2e2e;
-        border-right: 1px solid #2e2e2e;
-        padding: 5px 8px; font-weight: bold; font-size: 10px;
-        text-transform: uppercase; letter-spacing: 1px;
-    }
-"""
+def _BTN_DEL():
+    c = ThemeManager.colors()
+    return (f"QPushButton {{ color: {c['text_white']}; border: 1px solid {c['accent_dk']};"
+            f" background-color: {c['accent']}; border-radius: 0px; font-weight: bold; padding: 0 8px; }}"
+            f"QPushButton:hover {{ background-color: {c['accent_dk']}; }}")
 
-_TAB = """
-    QTabWidget::pane { background-color: transparent; border: none; }
-    QTabBar::tab {
-        background-color: #1a1a1a; color: #555555;
-        padding: 8px 22px; margin-right: 2px;
-        border-radius: 0px; font-size: 10px; font-weight: bold;
-        letter-spacing: 1px; text-transform: uppercase;
-    }
-    QTabBar::tab:selected {
-        background-color: #222222; color: #f0f0f0;
-        border-bottom: 2px solid #da291c;
-    }
-    QTabBar::tab:hover:!selected {
-        background-color: #222222; color: #f0f0f0;
-    }
-"""
+def _BTN_RESET_PW():
+    c = ThemeManager.colors()
+    return (f"QPushButton {{ color: {c['text_hi']}; border: 1px solid {c['border_hi']};"
+            f" background-color: {c['bg_btn']}; border-radius: 0px; padding: 0 10px; }}"
+            f"QPushButton:hover {{ background-color: {c['bg_btn_hov']}; }}")
 
-_BTN_ADD = """
-    QPushButton {
-        background-color: #1a2a1a; color: #22863a;
-        border: 1px solid #22863a; border-radius: 0px; font-size: 11px; padding: 0 14px;
-    }
-    QPushButton:hover { background-color: #1e341e; }
-"""
-_BTN_EDIT     = "QPushButton { background-color: #1a2a3a; color: #4a9fd4; border: 1px solid #1a4a6a; border-radius: 0px; padding: 0 8px; } QPushButton:hover { background-color: #1e344a; }"
-_BTN_DEL      = "QPushButton { background-color: #2a1a1a; color: #da291c; border: 1px solid #4a1a1a; border-radius: 0px; padding: 0 8px; } QPushButton:hover { background-color: #341e1e; }"
-_BTN_RESET_PW = "QPushButton { background-color: #2a1a3a; color: #9a5fd4; border: 1px solid #4a1a6a; border-radius: 0px; padding: 0 10px; } QPushButton:hover { background-color: #34204a; }"
-_INPUT = """
-    QLineEdit {
-        background-color: #2a2a2a;
-        border: 1px solid #2e2e2e; border-radius: 0px;
-        padding: 6px 10px; color: #f0f0f0; font-size: 11px;
-        min-height: 30px;
-    }
-    QLineEdit:focus { border: 1px solid #da291c; }
-"""
-_COMBO = """
-    QComboBox {
-        background-color: #2a2a2a; border: 1px solid #2e2e2e;
-        border-radius: 0px; padding-left: 8px;
-        color: #f0f0f0; font-size: 11px; min-height: 30px;
-    }
-    QComboBox::drop-down { border: none; width: 24px; }
-    QComboBox QAbstractItemView {
-        background-color: #1a1a1a; color: #f0f0f0;
-        selection-background-color: #2a2a2a;
-        border: 1px solid #2e2e2e;
-    }
-"""
-_DLG_BG    = "background-color: #1a1a1a; color: #f0f0f0;"
-_LBL_FIELD = "color: #888888; font-size: 10px; letter-spacing: 1px;"
-_CARD_HDR  = ("color: #f0f0f0; font-size: 10px; font-weight: bold;"
-              " border-left: 2px solid #da291c; padding-left: 8px;"
-              " letter-spacing: 1px; text-transform: uppercase;")
-_TIME_EDIT_STYLE = """
-    QTimeEdit {
-        background-color: #2a2a2a; border: 1px solid #2e2e2e;
-        border-radius: 0px; padding: 4px 8px;
-        color: #f0f0f0; font-size: 11px; min-height: 30px;
-    }
-    QTimeEdit:focus { border: 1px solid #da291c; }
-"""
+def _CARD_HDR():
+    return f"font-size: 10px; font-weight: bold; border-left: 2px solid {ThemeManager.c('accent')}; padding-left: 8px;"
 
 
 # ── Dialogs ───────────────────────────────────────────────────────────────────
@@ -116,15 +55,13 @@ class _SectionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Tambah Shop" if not nama else "Edit Shop")
         self.setFixedWidth(340)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
-        lbl = QLabel("Nama Shop"); lbl.setStyleSheet(_LBL_FIELD)
+        lbl = QLabel("Nama Shop"); lbl.setObjectName("field_label")
         lay.addWidget(lbl)
         self.input_nama = QLineEdit(nama)
         self.input_nama.setPlaceholderText("Contoh: CAM SHAFT")
-        self.input_nama.setStyleSheet(_INPUT)
         lay.addWidget(self.input_nama)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Simpan")
@@ -141,24 +78,23 @@ class _UserDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Tambah User")
         self.setFixedWidth(380)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(8)
 
         def _f(label, widget):
-            l = QLabel(label); l.setStyleSheet(_LBL_FIELD)
+            l = QLabel(label); l.setObjectName("field_label")
             lay.addWidget(l); lay.addWidget(widget)
 
         self.input_nik = QLineEdit(); self.input_nik.setPlaceholderText("NIK")
-        self.input_nik.setStyleSheet(_INPUT); _f("NIK", self.input_nik)
+        _f("NIK", self.input_nik)
         self.input_nama = QLineEdit(); self.input_nama.setPlaceholderText("Nama Lengkap")
-        self.input_nama.setStyleSheet(_INPUT); _f("Nama", self.input_nama)
+        _f("Nama", self.input_nama)
         self.combo_role = QComboBox(); self.combo_role.addItems(["operator", "admin"])
-        self.combo_role.setStyleSheet(_COMBO); _f("Role", self.combo_role)
+        _f("Role", self.combo_role)
         self.input_pw = QLineEdit(); self.input_pw.setPlaceholderText("Password")
         self.input_pw.setEchoMode(QLineEdit.Password)
-        self.input_pw.setStyleSheet(_INPUT); _f("Password", self.input_pw)
+        _f("Password", self.input_pw)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Tambah")
@@ -180,16 +116,14 @@ class _ResetPwDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f"Reset Password — {user_name}")
         self.setFixedWidth(340)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
-        lbl = QLabel("Password Baru"); lbl.setStyleSheet(_LBL_FIELD)
+        lbl = QLabel("Password Baru"); lbl.setObjectName("field_label")
         lay.addWidget(lbl)
         self.input_pw = QLineEdit()
         self.input_pw.setPlaceholderText("Password baru")
         self.input_pw.setEchoMode(QLineEdit.Password)
-        self.input_pw.setStyleSheet(_INPUT)
         lay.addWidget(self.input_pw)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Reset")
@@ -206,16 +140,15 @@ class _KategoriDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Tambah Kategori" if not name else "Edit Kategori")
         self.setFixedWidth(360)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
 
         def _f(label, widget):
-            l = QLabel(label); l.setStyleSheet(_LBL_FIELD)
+            l = QLabel(label); l.setObjectName("field_label")
             lay.addWidget(l); lay.addWidget(widget)
 
-        self.combo_group = QComboBox(); self.combo_group.setStyleSheet(_COMBO)
+        self.combo_group = QComboBox()
         for gid, gname in groups:
             self.combo_group.addItem(gname, gid)
         if group_id is not None:
@@ -225,7 +158,6 @@ class _KategoriDialog(QDialog):
         _f("Group", self.combo_group)
         self.input_name = QLineEdit(name)
         self.input_name.setPlaceholderText("Nama kategori")
-        self.input_name.setStyleSheet(_INPUT)
         _f("Nama Kategori", self.input_name)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -245,18 +177,16 @@ class _ModelDialog(QDialog):
         is_edit = bool(nama)
         self.setWindowTitle("Edit Model" if is_edit else "Tambah Model")
         self.setFixedWidth(340)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
 
         def _f(label, widget):
-            l = QLabel(label); l.setStyleSheet(_LBL_FIELD)
+            l = QLabel(label); l.setObjectName("field_label")
             lay.addWidget(l); lay.addWidget(widget)
 
         self.input_nama = QLineEdit(nama)
         self.input_nama.setPlaceholderText("Contoh: 4G15")
-        self.input_nama.setStyleSheet(_INPUT)
         _f("Nama Model", self.input_nama)
 
         self.input_wh = QDoubleSpinBox()
@@ -266,7 +196,7 @@ class _ModelDialog(QDialog):
         self.input_wh.setValue(round(working_hour * 60, 2))
         self.input_wh.setSuffix(" mnt/unit")
         self.input_wh.setMinimumHeight(32)
-        self.input_wh.setStyleSheet(_TIME_EDIT_STYLE)
+        self.input_wh
         _f("Working Hour / MHU (mnt/unit)", self.input_wh)
 
         self.input_ct = QDoubleSpinBox()
@@ -276,11 +206,11 @@ class _ModelDialog(QDialog):
         self.input_ct.setValue(cycle_time)
         self.input_ct.setSuffix(" s/unit")
         self.input_ct.setMinimumHeight(32)
-        self.input_ct.setStyleSheet(_TIME_EDIT_STYLE)
+        self.input_ct
         _f("Cycle Time (s/unit)", self.input_ct)
 
         self._lbl_hint = QLabel()
-        self._lbl_hint.setStyleSheet("color: #555555; font-size: 10px;")
+        self._lbl_hint.setStyleSheet("font-size: 10px;")
         lay.addWidget(self._lbl_hint)
         self.input_wh.valueChanged.connect(self._update_hint)
         self._update_hint()
@@ -311,15 +241,13 @@ class _WorkCenterDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Edit Work Center" if nama else "Tambah Work Center")
         self.setFixedWidth(340)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
-        lbl = QLabel("Nama Work Center"); lbl.setStyleSheet(_LBL_FIELD)
+        lbl = QLabel("Nama Work Center"); lbl.setObjectName("field_label")
         lay.addWidget(lbl)
         self.input_nama = QLineEdit(nama)
         self.input_nama.setPlaceholderText("Contoh: WC-01")
-        self.input_nama.setStyleSheet(_INPUT)
         lay.addWidget(self.input_nama)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Simpan")
@@ -337,26 +265,24 @@ class _ShiftDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Tambah Shift" if not name else "Edit Shift")
         self.setFixedWidth(380)
-        self.setStyleSheet(_DLG_BG)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 20, 20, 16)
         lay.setSpacing(10)
 
         def _f(label, widget):
-            l = QLabel(label); l.setStyleSheet(_LBL_FIELD)
+            l = QLabel(label); l.setObjectName("field_label")
             lay.addWidget(l); lay.addWidget(widget)
 
         self.input_name = QLineEdit(name)
         self.input_name.setPlaceholderText("Nama shift")
-        self.input_name.setStyleSheet(_INPUT)
         _f("Nama Shift", self.input_name)
 
         self.time_start = QTimeEdit(QTime.fromString(start, "HH:mm"))
-        self.time_start.setDisplayFormat("HH:mm"); self.time_start.setStyleSheet(_TIME_EDIT_STYLE)
+        self.time_start.setDisplayFormat("HH:mm"); self.time_start
         _f("Jam Mulai", self.time_start)
 
         self.time_end = QTimeEdit(QTime.fromString(end, "HH:mm"))
-        self.time_end.setDisplayFormat("HH:mm"); self.time_end.setStyleSheet(_TIME_EDIT_STYLE)
+        self.time_end.setDisplayFormat("HH:mm"); self.time_end
         _f("Jam Selesai", self.time_end)
 
         self.input_total = QDoubleSpinBox()
@@ -365,17 +291,17 @@ class _ShiftDialog(QDialog):
         self.input_total.setDecimals(2)
         self.input_total.setValue(total)
         self.input_total.setMinimumHeight(34)
-        self.input_total.setStyleSheet(_TIME_EDIT_STYLE)
+        self.input_total
         _f("Working Hour (H)", self.input_total)
 
         # ── Waktu non-produktif ──────────────────────────────────────────────
         lbl_sep = QLabel("─── Waktu Non-Produktif (menit) ───")
-        lbl_sep.setStyleSheet("color: #666666; font-size: 10px;")
+        lbl_sep.setStyleSheet("font-size: 10px;")
         lay.addWidget(lbl_sep)
 
         row_prep = QHBoxLayout()
         lbl_prep = QLabel("Preparation (Meeting + Prep + Cleaning)")
-        lbl_prep.setStyleSheet(_LBL_FIELD)
+        lbl_prep.setObjectName("field_label")
         self.input_prep = QDoubleSpinBox()
         self.input_prep.setRange(0.0, 60.0)
         self.input_prep.setSingleStep(1.0)
@@ -383,12 +309,12 @@ class _ShiftDialog(QDialog):
         self.input_prep.setValue(preparation_min)
         self.input_prep.setSuffix(" menit")
         self.input_prep.setMinimumHeight(32)
-        self.input_prep.setStyleSheet(_TIME_EDIT_STYLE)
+        self.input_prep
         lay.addWidget(lbl_prep)
         lay.addWidget(self.input_prep)
 
         lbl_other = QLabel("Other")
-        lbl_other.setStyleSheet(_LBL_FIELD)
+        lbl_other.setObjectName("field_label")
         self.input_other = QDoubleSpinBox()
         self.input_other.setRange(0.0, 60.0)
         self.input_other.setSingleStep(1.0)
@@ -396,13 +322,13 @@ class _ShiftDialog(QDialog):
         self.input_other.setValue(other_min)
         self.input_other.setSuffix(" menit")
         self.input_other.setMinimumHeight(32)
-        self.input_other.setStyleSheet(_TIME_EDIT_STYLE)
+        self.input_other
         lay.addWidget(lbl_other)
         lay.addWidget(self.input_other)
 
         # preview
         self._lbl_preview = QLabel()
-        self._lbl_preview.setStyleSheet("color: #666666; font-size: 10px;")
+        self._lbl_preview.setStyleSheet("font-size: 10px;")
         lay.addWidget(self._lbl_preview)
         self.input_prep.valueChanged.connect(self._update_preview)
         self.input_other.valueChanged.connect(self._update_preview)
@@ -454,7 +380,6 @@ class MasterDataWidget(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(_TAB)
         self.tabs.addTab(self._build_tab_data_master(), "Data Master")
         self.tabs.addTab(self._build_tab_user(),        "User")
         outer.addWidget(self.tabs)
@@ -495,17 +420,17 @@ class MasterDataWidget(QWidget):
         return tab
 
     def _build_section_card(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
+        card = QFrame(); card.setObjectName("card")
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 10, 12, 12)
         lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shop")
-        lbl.setStyleSheet(_CARD_HDR)
+        lbl.setStyleSheet(_CARD_HDR())
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Shop")
-        btn.setMinimumSize(130, 30); btn.setStyleSheet(_BTN_ADD)
+        btn.setMinimumSize(130, 30); btn.setStyleSheet(_BTN_ADD())
         btn.clicked.connect(self._tambah_section)
         hdr.addWidget(btn)
         lay.addLayout(hdr)
@@ -521,7 +446,6 @@ class MasterDataWidget(QWidget):
         self.tabel_section.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_section.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_section.setAlternatingRowColors(True)
-        self.tabel_section.setStyleSheet(_TABLE)
         self.tabel_section.setColumnWidth(0, 45)
         self.tabel_section.setColumnWidth(2, 150)
         self.tabel_section.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -529,7 +453,7 @@ class MasterDataWidget(QWidget):
         return card
 
     def _build_shop_model_card(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
+        card = QFrame(); card.setObjectName("card")
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 10, 12, 12)
         lay.setSpacing(8)
@@ -537,22 +461,21 @@ class MasterDataWidget(QWidget):
         # ── Header ──────────────────────────────────────────────────────────────
         hdr = QHBoxLayout()
         lbl = QLabel("Model per Shop")
-        lbl.setStyleSheet(_CARD_HDR)
+        lbl.setStyleSheet(_CARD_HDR())
         hdr.addWidget(lbl)
         hdr.addStretch()
         btn_add = QPushButton("+ Tambah Model")
-        btn_add.setMinimumSize(130, 30); btn_add.setStyleSheet(_BTN_ADD)
+        btn_add.setMinimumSize(130, 30); btn_add.setStyleSheet(_BTN_ADD())
         btn_add.clicked.connect(self._tambah_shop_model)
         hdr.addWidget(btn_add)
         lay.addLayout(hdr)
 
         # ── Shop selector ────────────────────────────────────────────────────────
         sel_row = QHBoxLayout()
-        lbl_shop = QLabel("Shop :"); lbl_shop.setStyleSheet(_LBL_FIELD)
+        lbl_shop = QLabel("Shop :"); lbl_shop.setObjectName("field_label")
         self._combo_shop_model = QComboBox()
         self._combo_shop_model.setMinimumHeight(30)
         self._combo_shop_model.setMinimumWidth(200)
-        self._combo_shop_model.setStyleSheet(_COMBO)
         self._combo_shop_model.currentIndexChanged.connect(self._on_shop_model_changed)
         sel_row.addWidget(lbl_shop)
         sel_row.addWidget(self._combo_shop_model)
@@ -572,7 +495,6 @@ class MasterDataWidget(QWidget):
         self.tabel_model.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_model.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_model.setAlternatingRowColors(True)
-        self.tabel_model.setStyleSheet(_TABLE)
         self.tabel_model.setColumnWidth(0, 45)
         self.tabel_model.setColumnWidth(2, 90)
         self.tabel_model.setColumnWidth(3, 150)
@@ -581,17 +503,17 @@ class MasterDataWidget(QWidget):
         return card
 
     def _build_kategori_card(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
+        card = QFrame(); card.setObjectName("card")
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 10, 12, 12)
         lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Kategori Masalah")
-        lbl.setStyleSheet(_CARD_HDR)
+        lbl.setStyleSheet(_CARD_HDR())
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Kategori")
-        btn.setMinimumSize(145, 30); btn.setStyleSheet(_BTN_ADD)
+        btn.setMinimumSize(145, 30); btn.setStyleSheet(_BTN_ADD())
         btn.clicked.connect(self._tambah_kategori)
         hdr.addWidget(btn)
         lay.addLayout(hdr)
@@ -608,7 +530,6 @@ class MasterDataWidget(QWidget):
         self.tabel_kategori.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_kategori.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_kategori.setAlternatingRowColors(True)
-        self.tabel_kategori.setStyleSheet(_TABLE)
         self.tabel_kategori.setColumnWidth(0, 45)
         self.tabel_kategori.setColumnWidth(1, 130)
         self.tabel_kategori.setColumnWidth(3, 150)
@@ -617,17 +538,17 @@ class MasterDataWidget(QWidget):
         return card
 
     def _build_shift_card(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
+        card = QFrame(); card.setObjectName("card")
         lay = QVBoxLayout(card)
         lay.setContentsMargins(12, 10, 12, 12)
         lay.setSpacing(8)
 
         hdr = QHBoxLayout()
         lbl = QLabel("Shift")
-        lbl.setStyleSheet(_CARD_HDR)
+        lbl.setStyleSheet(_CARD_HDR())
         hdr.addWidget(lbl); hdr.addStretch()
         btn = QPushButton("+ Tambah Shift")
-        btn.setMinimumSize(120, 30); btn.setStyleSheet(_BTN_ADD)
+        btn.setMinimumSize(120, 30); btn.setStyleSheet(_BTN_ADD())
         btn.clicked.connect(self._tambah_shift)
         hdr.addWidget(btn)
         lay.addLayout(hdr)
@@ -651,7 +572,6 @@ class MasterDataWidget(QWidget):
         self.tabel_shift.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_shift.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_shift.setAlternatingRowColors(True)
-        self.tabel_shift.setStyleSheet(_TABLE)
         self.tabel_shift.setColumnWidth(0, 40)
         self.tabel_shift.setColumnWidth(2, 70)
         self.tabel_shift.setColumnWidth(3, 70)
@@ -672,18 +592,18 @@ class MasterDataWidget(QWidget):
         lay.setContentsMargins(15, 15, 15, 15)
         lay.setSpacing(12)
 
-        card_a = QFrame(); card_a.setStyleSheet(_CARD)
+        card_a = QFrame(); card_a.setObjectName("card")
         al = QHBoxLayout(card_a); al.setContentsMargins(16, 12, 16, 12)
         lbl_h = QLabel("Daftar User")
-        lbl_h.setStyleSheet(_CARD_HDR)
+        lbl_h.setStyleSheet(_CARD_HDR())
         al.addWidget(lbl_h); al.addStretch()
         btn_add = QPushButton("+ Tambah User")
-        btn_add.setMinimumSize(120, 32); btn_add.setStyleSheet(_BTN_ADD)
+        btn_add.setMinimumSize(120, 32); btn_add.setStyleSheet(_BTN_ADD())
         btn_add.clicked.connect(self._tambah_user)
         al.addWidget(btn_add)
         lay.addWidget(card_a)
 
-        card_t = QFrame(); card_t.setStyleSheet(_CARD)
+        card_t = QFrame(); card_t.setObjectName("card")
         tl = QVBoxLayout(card_t); tl.setContentsMargins(16, 16, 16, 16)
         self.tabel_user = QTableWidget()
         self.tabel_user.setColumnCount(5)
@@ -698,7 +618,6 @@ class MasterDataWidget(QWidget):
         self.tabel_user.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tabel_user.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabel_user.setAlternatingRowColors(True)
-        self.tabel_user.setStyleSheet(_TABLE)
         self.tabel_user.setColumnWidth(0, 45)
         self.tabel_user.setColumnWidth(1, 110)
         self.tabel_user.setColumnWidth(3, 80)
@@ -728,9 +647,9 @@ class MasterDataWidget(QWidget):
         w = QWidget(); w.setStyleSheet("background: transparent;")
         hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
         hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(28); btn_e.setStyleSheet(_BTN_EDIT())
         btn_e.clicked.connect(lambda _, s=sid, n=sname: self._edit_section(s, n))
-        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(28); btn_d.setStyleSheet(_BTN_DEL())
         btn_d.clicked.connect(lambda _, s=sid, n=sname: self._hapus_section(s, n))
         hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
@@ -823,9 +742,9 @@ class MasterDataWidget(QWidget):
         w = QWidget(); w.setStyleSheet("background: transparent;")
         hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
         hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(28); btn_e.setStyleSheet(_BTN_EDIT())
         btn_e.clicked.connect(lambda _, mm=m: self._edit_shop_model(mm))
-        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(28); btn_d.setStyleSheet(_BTN_DEL())
         btn_d.clicked.connect(lambda _, mm=m: self._hapus_shop_model(mm["id"], mm["model_name"]))
         hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
@@ -898,10 +817,10 @@ class MasterDataWidget(QWidget):
         w = QWidget(); w.setStyleSheet("background: transparent;")
         hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
         hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        btn_pw = QPushButton("Reset PW"); btn_pw.setMinimumWidth(70); btn_pw.setFixedHeight(26)
-        btn_pw.setStyleSheet(_BTN_RESET_PW)
+        btn_pw = QPushButton("Reset PW"); btn_pw.setMinimumWidth(70); btn_pw.setFixedHeight(28)
+        btn_pw.setStyleSheet(_BTN_RESET_PW())
         btn_pw.clicked.connect(lambda _, uid=u["id"], un=u["name"]: self._reset_pw(uid, un))
-        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(28); btn_d.setStyleSheet(_BTN_DEL())
         is_self = u["id"] == self.user.get("id")
         btn_d.setEnabled(not is_self)
         if is_self:
@@ -985,9 +904,9 @@ class MasterDataWidget(QWidget):
         w = QWidget(); w.setStyleSheet("background: transparent;")
         hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
         hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(28); btn_e.setStyleSheet(_BTN_EDIT())
         btn_e.clicked.connect(lambda _, kk=k: self._edit_kategori(kk))
-        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(28); btn_d.setStyleSheet(_BTN_DEL())
         btn_d.clicked.connect(lambda _, kk=k: self._hapus_kategori(kk))
         hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
@@ -1064,9 +983,9 @@ class MasterDataWidget(QWidget):
         w = QWidget(); w.setStyleSheet("background: transparent;")
         hl = QHBoxLayout(w); hl.setContentsMargins(8, 0, 8, 0); hl.setSpacing(8)
         hl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(26); btn_e.setStyleSheet(_BTN_EDIT)
+        btn_e = QPushButton("Edit"); btn_e.setMinimumWidth(56); btn_e.setFixedHeight(28); btn_e.setStyleSheet(_BTN_EDIT())
         btn_e.clicked.connect(lambda _, ss=s: self._edit_shift(ss))
-        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(26); btn_d.setStyleSheet(_BTN_DEL)
+        btn_d = QPushButton("Hapus"); btn_d.setMinimumWidth(56); btn_d.setFixedHeight(28); btn_d.setStyleSheet(_BTN_DEL())
         btn_d.clicked.connect(lambda _, ss=s: self._hapus_shift(ss))
         hl.addWidget(btn_e); hl.addWidget(btn_d)
         return w
@@ -1137,7 +1056,6 @@ def _divider() -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.HLine)
     line.setFixedHeight(1)
-    line.setStyleSheet("background-color: #303030; border: none;")
     return line
 
 

@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 os.environ["QT_FONT_DPI"] = "96"
 
-from modules.db_laporan import initialize_tables
+from database.migrations import initialize_tables
 from modules.config import DEV_MODE, DEV_USER, DEV_START_PAGE
+from styles.theme import ThemeManager
 from views.login import LoginWindow
 
 _login  = None
@@ -40,11 +41,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("assets/icons/icon.ico"))
 
-    try:
-        with open("styles/style.qss", "r") as f:
-            app.setStyleSheet(f.read())
-    except FileNotFoundError:
-        pass
+    ThemeManager.load(app)
 
     initialize_tables()
 

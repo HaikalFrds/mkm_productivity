@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
 
         # Logo area
         logo_frame = QFrame()
-        logo_frame.setStyleSheet("background-color: #111111; padding: 16px;")
+        logo_frame.setStyleSheet("background-color: #FFFFFF; padding: 16px; border-bottom: 1px solid #E8E8E8;")
         logo_layout = QVBoxLayout(logo_frame)
         logo_layout.setContentsMargins(16, 20, 16, 16)
         logo_layout.setSpacing(2)
@@ -46,10 +46,10 @@ class MainWindow(QMainWindow):
 
         lbl_subtitle = QLabel("Productivity System")
         lbl_subtitle.setObjectName("app_subtitle")
-        lbl_subtitle.setStyleSheet("font-size: 9pt; color: #666666; padding: 0;")
+        lbl_subtitle.setStyleSheet("font-size: 9pt; color: #AAAAAA; padding: 0;")
 
         lbl_user = QLabel(f"👤 {self.user.get('name', self.user.get('nik', ''))}")
-        lbl_user.setStyleSheet("font-size: 9pt; color: #969696; padding-top: 8px;")
+        lbl_user.setStyleSheet("font-size: 9pt; color: #888888; padding-top: 8px; background: transparent;")
 
         logo_layout.addWidget(lbl_title)
         logo_layout.addWidget(lbl_subtitle)
@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
         # Divider
         div = QFrame()
         div.setFrameShape(QFrame.HLine)
-        div.setStyleSheet("background-color: #303030; max-height: 1px;")
+        div.setStyleSheet("background-color: #E8E8E8; max-height: 1px;")
         sidebar_layout.addWidget(div)
 
         # Nav buttons
@@ -86,15 +86,15 @@ class MainWindow(QMainWindow):
             QPushButton {
                 background-color: transparent;
                 border: none;
-                border-top: 1px solid #303030;
+                border-top: 1px solid #E8E8E8;
                 padding: 12px 16px;
                 text-align: left;
-                color: #969696;
+                color: #AAAAAA;
                 font-size: 10pt;
             }
             QPushButton:hover {
-                background-color: #252525;
-                color: #ffffff;
+                background-color: #F5F5F5;
+                color: #1a1a1a;
             }
         """)
         btn_logout.clicked.connect(self.logout)
@@ -110,12 +110,12 @@ class MainWindow(QMainWindow):
         # Top bar
         self.topbar = QFrame()
         self.topbar.setFixedHeight(48)
-        self.topbar.setStyleSheet("background-color: #181818; border-bottom: 1px solid #303030;")
+        self.topbar.setStyleSheet("background-color: #FFFFFF; border-bottom: 1px solid #E0E0E0;")
         topbar_layout = QHBoxLayout(self.topbar)
         topbar_layout.setContentsMargins(20, 0, 20, 0)
 
         self.lbl_page = QLabel("Dashboard")
-        self.lbl_page.setStyleSheet("font-size: 12pt; font-weight: bold; color: #ffffff;")
+        self.lbl_page.setStyleSheet("font-size: 12pt; font-weight: bold; color: #1a1a1a;")
         topbar_layout.addWidget(self.lbl_page)
         topbar_layout.addStretch()
 
@@ -140,13 +140,13 @@ class MainWindow(QMainWindow):
                 border-left: 3px solid transparent;
                 padding: 10px 10px 10px 20px;
                 text-align: left;
-                color: #969696;
+                color: #AAAAAA;
                 font-size: 10pt;
             }
             QPushButton:hover {
-                background-color: #252525;
-                color: #ffffff;
-                border-left: 3px solid #303030;
+                background-color: #F5F5F5;
+                color: #1a1a1a;
+                border-left: 3px solid #E0E0E0;
             }
         """)
         btn.clicked.connect(lambda: self.navigate_to(page_id))
@@ -168,23 +168,23 @@ class MainWindow(QMainWindow):
             from views.dashboard import DashboardWidget
             widget = DashboardWidget()
         elif page_id == "input_laporan":
-            from modules.input_laporan import InputLaporanWidget
+            from views.input_laporan import InputLaporanWidget
             widget = InputLaporanWidget(self.user)
         elif page_id == "riwayat":
-            from modules.riwayat_laporan import RiwayatLaporanWidget
+            from views.riwayat_laporan import RiwayatLaporanWidget
             widget = RiwayatLaporanWidget()
         elif page_id == "visualisasi":
-            from modules.visualisasi import VisualisasiWidget
+            from views.visualisasi import VisualisasiWidget
             widget = VisualisasiWidget()
         elif page_id == "master_data":
             if self.user.get("role") == "admin":
-                from modules.master_data import MasterDataWidget
+                from views.master_data import MasterDataWidget
                 widget = MasterDataWidget(self.user)
             else:
                 widget = QWidget()
                 lbl = QLabel("Akses ditolak — halaman ini hanya untuk admin.")
                 lbl.setAlignment(Qt.AlignCenter)
-                lbl.setStyleSheet("color: #666666; font-size: 13pt;")
+                lbl.setStyleSheet("color: #AAAAAA; font-size: 13pt;")
                 QVBoxLayout(widget).addWidget(lbl)
                 self.nav_buttons["master_data"].setVisible(False)
         else:
@@ -215,12 +215,12 @@ class MainWindow(QMainWindow):
             if pid == page_id:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: #252525;
+                        background-color: #F5F5F5;
                         border: none;
                         border-left: 3px solid #da291c;
                         padding: 10px 10px 10px 20px;
                         text-align: left;
-                        color: #ffffff;
+                        color: #1a1a1a;
                         font-size: 10pt;
                     }
                 """)
@@ -232,13 +232,13 @@ class MainWindow(QMainWindow):
                         border-left: 3px solid transparent;
                         padding: 10px 10px 10px 20px;
                         text-align: left;
-                        color: #969696;
+                        color: #AAAAAA;
                         font-size: 10pt;
                     }
                     QPushButton:hover {
-                        background-color: #252525;
-                        color: #ffffff;
-                        border-left: 3px solid #303030;
+                        background-color: #F5F5F5;
+                        color: #1a1a1a;
+                        border-left: 3px solid #E0E0E0;
                     }
                 """)
 

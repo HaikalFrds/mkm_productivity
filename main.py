@@ -1,5 +1,6 @@
 import sys
 import os
+os.environ.setdefault("QT_API", "pyside6")   # harus sebelum qtawesome diimport
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from dotenv import load_dotenv

@@ -19,6 +19,7 @@ from controllers.riwayat_controller import (
     get_production_volume, get_display_line_stop, get_ng_pending,
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
+from modules.icons import ic_view, ic_edit, ic_trash, BTN_ICON_SIZE
 
 
 # Shared styles — Light Theme
@@ -424,7 +425,8 @@ class RiwayatLaporanWidget(QWidget):
             al.setSpacing(8)
             al.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
 
-            btn_lihat = QPushButton("🔍 Lihat")
+            btn_lihat = QPushButton("Lihat")
+            btn_lihat.setIcon(ic_view()); btn_lihat.setIconSize(BTN_ICON_SIZE)
             btn_lihat.setMinimumWidth(70); btn_lihat.setFixedHeight(26)
             btn_lihat.setStyleSheet(
                 "QPushButton { background-color: #E3F2FD; color: #1565C0;"
@@ -433,7 +435,8 @@ class RiwayatLaporanWidget(QWidget):
             )
             btn_lihat.clicked.connect(lambda _, rid=report_id: self._lihat(rid))
 
-            btn_edit = QPushButton("✏ Edit")
+            btn_edit = QPushButton("Edit")
+            btn_edit.setIcon(ic_edit()); btn_edit.setIconSize(BTN_ICON_SIZE)
             btn_edit.setMinimumWidth(58); btn_edit.setFixedHeight(26)
             btn_edit.setStyleSheet(
                 "QPushButton { background-color: #FFF8E1; color: #F57F17;"
@@ -442,7 +445,8 @@ class RiwayatLaporanWidget(QWidget):
             )
             btn_edit.clicked.connect(lambda _, rid=report_id: self._edit(rid))
 
-            btn_hapus = QPushButton("🗑 Hapus")
+            btn_hapus = QPushButton("Hapus")
+            btn_hapus.setIcon(ic_trash()); btn_hapus.setIconSize(BTN_ICON_SIZE)
             btn_hapus.setMinimumWidth(70); btn_hapus.setFixedHeight(26)
             btn_hapus.setStyleSheet(
                 "QPushButton { background-color: #FFEBEE; color: #c62828;"
@@ -635,7 +639,7 @@ class RiwayatLaporanWidget(QWidget):
         process  = sum(p.get("actual_whour", 0) or 0 for p in produksi)
         linestop = sum(c.get("loss_time",    0) or 0 for c in catatan)
         absence  = 0.0   # jam absen tidak disimpan di tabel absen
-        quality  = 0.0
+        quality  = sum(ic.get("lost_hr", 0) or 0 for ic in inhouse_claim)
         _ot_map  = {"-": 0.0, "2H": 2.0, "3H": 3.0, "11.4H": 11.4}
         ot_h     = _ot_map.get(header.get("overtime", "-"), 0.0)
         total    = header.get("shift_duration", 0.0) + ot_h

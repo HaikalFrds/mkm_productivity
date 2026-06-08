@@ -157,7 +157,8 @@ def get_detail_laporan(report_id: int) -> tuple:
         row = session.execute(text("""
             SELECT dr.id, dr.date, sec.name, sh.name,
                    dr.coordinator, dr.approved_by, dr.checked_by,
-                   s.total_hours, s.preparation_min, s.sholat_min
+                   s.total_hours, s.preparation_min, s.sholat_min,
+                   dr.section_id
             FROM daily_report dr
             JOIN section sec ON sec.id = dr.section_id
             JOIN shift   sh  ON sh.id  = dr.shift_id
@@ -180,6 +181,7 @@ def get_detail_laporan(report_id: int) -> tuple:
             elif ot_row[1]: overtime_text = "3H"
             elif ot_row[2]: overtime_text = "11.4H"
 
+        section_id = row[10]
         header = {
             "id": row[0], "date": str(row[1]), "section": row[2],
             "shift": row[3], "coordinator": row[4],
@@ -190,24 +192,36 @@ def get_detail_laporan(report_id: int) -> tuple:
             "overtime": overtime_text,
         }
 
+        # JOIN shop_model untuk recalculate whour dari master (full precision)
         produksi_rows = session.execute(text("""
-            SELECT model, plan_unit, actual_unit, plan_whour, actual_whour,
-                   ot_2h, ot_3h, ot_11h
-            FROM daily_production WHERE report_id = :id ORDER BY id
-        """), {"id": report_id}).fetchall()
-        produksi = [
-            {
+            SELECT dp.model, dp.plan_unit, dp.actual_unit,
+                   dp.plan_whour, dp.actual_whour,
+                   dp.ot_2h, dp.ot_3h, dp.ot_11h,
+                   COALESCE(sm.working_hour, 0) AS mhu
+            FROM daily_production dp
+            LEFT JOIN shop_model sm
+                   ON sm.model_name = dp.model
+                  AND sm.section_id = :section_id
+            WHERE dp.report_id = :id ORDER BY dp.id
+        """), {"id": report_id, "section_id": section_id}).fetchall()
+        produksi = []
+        for r in produksi_rows:
+            plan_u   = float(r[1] or 0)
+            actual_u = float(r[2] or 0)
+            mhu      = float(r[8] or 0)
+            # Jika MHU tersedia, recalculate dari master (hapus efek rounding lama)
+            plan_wh   = plan_u   * mhu if mhu else float(r[3] or 0)
+            actual_wh = actual_u * mhu if mhu else float(r[4] or 0)
+            produksi.append({
                 "model":        r[0],
-                "plan_unit":    float(r[1] or 0),
-                "actual_unit":  float(r[2] or 0),
-                "plan_whour":   float(r[3] or 0),
-                "actual_whour": float(r[4] or 0),
+                "plan_unit":    plan_u,
+                "actual_unit":  actual_u,
+                "plan_whour":   plan_wh,
+                "actual_whour": actual_wh,
                 "ot_2h":        bool(r[5]),
                 "ot_3h":        bool(r[6]),
                 "ot_11h":       bool(r[7]),
-            }
-            for r in produksi_rows
-        ]
+            })
 
         catatan_rows = session.execute(text("""
             SELECT pr.ra_number, pc.name, pr.description, pr.cause,

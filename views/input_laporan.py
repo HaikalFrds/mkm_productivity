@@ -11,6 +11,7 @@ from controllers.laporan_controller import simpan_laporan_harian
 from controllers.master_controller import (
     get_all_sections, get_all_shifts, get_models_by_section, get_all_category_names,
 )
+from modules.icons import ic_add, ic_del, ic_prev, ic_next, BTN_ICON_SIZE, NAV_ICON_SIZE
 
 # Style constants — Light Theme
 _CARD  = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E5E7EB; }"
@@ -260,11 +261,14 @@ class InputLaporanWidget(QWidget):
 
         # Date group
         lay.addWidget(_lbl("Date"))
-        btn_prev = QPushButton("<")
+        btn_prev = QPushButton()
+        btn_prev.setIcon(ic_prev())
+        btn_prev.setIconSize(NAV_ICON_SIZE)
         btn_prev.setFixedSize(22, 26)
         btn_prev.setStyleSheet(
-            "QPushButton { background:#F3F4F6; color:#212121; border:1px solid #D1D5DB; }"
-            "QPushButton:hover { background:#D1D5DB; }"
+            "QPushButton { background:#F3F4F6; color:#6B7280; border:1px solid #D1D5DB;"
+            " font-size:9px; }"
+            "QPushButton:hover { background:#D1D5DB; color:#212121; }"
         )
         self.input_tanggal = QDateEdit()
         self.input_tanggal.setDate(QDate.currentDate())
@@ -275,11 +279,42 @@ class InputLaporanWidget(QWidget):
         self.input_tanggal.setStyleSheet(
             "QDateEdit { background:#FFFFFF; border:1px solid #D1D5DB; border-radius:2px;"
             " padding-left:8px; color:#212121; font-size:11px; }"
-            "QDateEdit::drop-down { border:none; width:22px; }"
+            "QDateEdit::drop-down { border:none; width:0px; }"
         )
-        btn_next = QPushButton(">")
+        # ── Style kalender popup ─────────────────────────────────────────────
+        cal = self.input_tanggal.calendarWidget()
+        cal.setStyleSheet("""
+            QCalendarWidget QWidget#qt_calendar_navigationbar {
+                background-color: #F8F9FA; border-bottom: 1px solid #E5E7EB; }
+            QCalendarWidget QToolButton {
+                color: #212121; background: transparent; border: none;
+                font-size: 11px; font-weight: bold; padding: 4px 8px; }
+            QCalendarWidget QToolButton:hover { background-color: #F3F4F6; }
+            QCalendarWidget QMenu {
+                background-color: #FFFFFF; color: #212121;
+                border: 1px solid #D1D5DB; }
+            QCalendarWidget QSpinBox {
+                color: #212121; background-color: #FFFFFF;
+                border: 1px solid #D1D5DB; selection-background-color: #E60012; }
+            QCalendarWidget QAbstractItemView {
+                background-color: #FFFFFF; color: #6B7280;
+                selection-background-color: #E60012; selection-color: #FFFFFF;
+                outline: none; }
+            QCalendarWidget QAbstractItemView:disabled { color: #D1D5DB; }
+            QCalendarWidget QHeaderView::section {
+                background-color: #F8F9FA; color: #9CA3AF;
+                font-size: 10px; font-weight: bold;
+                border: none; border-bottom: 1px solid #E5E7EB; padding: 3px; }
+        """)
+        btn_next = QPushButton()
+        btn_next.setIcon(ic_next())
+        btn_next.setIconSize(NAV_ICON_SIZE)
         btn_next.setFixedSize(22, 26)
-        btn_next.setStyleSheet(btn_prev.styleSheet())
+        btn_next.setStyleSheet(
+            "QPushButton { background:#F3F4F6; color:#6B7280; border:1px solid #D1D5DB;"
+            " font-size:9px; }"
+            "QPushButton:hover { background:#D1D5DB; color:#212121; }"
+        )
         btn_prev.clicked.connect(
             lambda: self.input_tanggal.setDate(self.input_tanggal.date().addDays(-1))
         )
@@ -386,8 +421,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("Production Volume", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("Add"); ba.setIcon(ic_add()); ba.setIconSize(BTN_ICON_SIZE); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del"); bd.setIcon(ic_del()); bd.setIconSize(BTN_ICON_SIZE); bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_produksi)
         bd.clicked.connect(self._hapus_produksi)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -415,8 +450,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("Absence", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("Add"); ba.setIcon(ic_add()); ba.setIconSize(BTN_ICON_SIZE); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del"); bd.setIcon(ic_del()); bd.setIconSize(BTN_ICON_SIZE); bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_absen)
         bd.clicked.connect(self._hapus_absen)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -530,8 +565,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("In House (Reject) and Market Claim", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("Add"); ba.setIcon(ic_add()); ba.setIconSize(BTN_ICON_SIZE); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del"); bd.setIcon(ic_del()); bd.setIconSize(BTN_ICON_SIZE); bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_claim)
         bd.clicked.connect(self._hapus_claim)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -583,8 +618,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(title)
         hdr.addStretch()
-        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("Add"); ba.setIcon(ic_add()); ba.setIconSize(BTN_ICON_SIZE); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("Del"); bd.setIcon(ic_del()); bd.setIconSize(BTN_ICON_SIZE); bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_linestop)
         bd.clicked.connect(self._hapus_linestop)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -733,8 +768,9 @@ class InputLaporanWidget(QWidget):
                     it.setText(str(i + 1))
 
     def _on_claim_item_changed(self, item):
-        if item.column() == 4:  # Qty changed
+        if item.column() == 4:  # Qty changed → recalc Hour (col 9)
             self._calc_claim_stop(item.row())
+        self._hitung_calc_hour()  # Lost (col 10) atau perubahan apapun → update Quality
 
     def _calc_claim_stop(self, r: int):
         cb_model = self.tbl_claim.cellWidget(r, 1)
@@ -865,13 +901,13 @@ class InputLaporanWidget(QWidget):
                         plh_it.setBackground(QColor("#212121"))
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
-                    plh_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                    plh_it.setText(f"{qty * mhu:.6f}" if qty > 0 else "")
                 else:  # col == 2, Act Qty → Act H
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
-                    ach_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
+                    ach_it.setText(f"{qty * mhu:.6f}" if qty > 0 else "")
                 self.tbl_prod.blockSignals(False)
         self._hitung_calc_hour()
 
@@ -896,13 +932,13 @@ class InputLaporanWidget(QWidget):
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
                     pq = _qty(1)
-                    plh_it.setText(f"{pq * mhu:.4f}" if pq > 0 else "")
+                    plh_it.setText(f"{pq * mhu:.6f}" if pq > 0 else "")
                     ach_it = self.tbl_prod.item(r, 4)
                     if not ach_it:
                         ach_it = _item("", Qt.AlignCenter)
                         self.tbl_prod.setItem(r, 4, ach_it)
                     aq = _qty(2)
-                    ach_it.setText(f"{aq * mhu:.4f}" if aq > 0 else "")
+                    ach_it.setText(f"{aq * mhu:.6f}" if aq > 0 else "")
                 self.tbl_prod.blockSignals(False)
                 self._hitung_calc_hour()
                 break
@@ -913,6 +949,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(True)
         self.tbl_absen.blockSignals(True)
         self.tbl_ls.blockSignals(True)
+        self.tbl_claim.blockSignals(True)
 
         def _fval(tbl, row, col):
             it = tbl.item(row, col)
@@ -923,10 +960,10 @@ class InputLaporanWidget(QWidget):
                     pass
             return 0.0
 
-        process  = sum(_fval(self.tbl_prod,  r, 4) for r in range(self.tbl_prod.rowCount()))
-        absence  = sum(_fval(self.tbl_absen, r, 3) for r in range(self.tbl_absen.rowCount()))
+        process  = sum(_fval(self.tbl_prod,  r, 4)  for r in range(self.tbl_prod.rowCount()))
+        absence  = sum(_fval(self.tbl_absen, r, 3)  for r in range(self.tbl_absen.rowCount()))
         linestop = sum(_fval(self.tbl_ls,    r, 10) for r in range(self.tbl_ls.rowCount()))
-        quality  = 0.0
+        quality  = sum(_fval(self.tbl_claim, r, 10) for r in range(self.tbl_claim.rowCount()))
         total    = self._shift_hours
         balance  = total - process - self._prep_h - quality - linestop - absence - self._sholat_h
 
@@ -946,6 +983,7 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.blockSignals(False)
         self.tbl_absen.blockSignals(False)
         self.tbl_ls.blockSignals(False)
+        self.tbl_claim.blockSignals(False)
 
     # Reset
 
@@ -996,12 +1034,18 @@ class InputLaporanWidget(QWidget):
             model = cb.currentText() if cb else ""
             if not model:
                 continue
+            mhu       = self._shop_model_hours.get(model, 0.0)
+            plan_u    = _fv(self.tbl_prod, r, 1)
+            actual_u  = _fv(self.tbl_prod, r, 2)
+            # Hitung langsung dari raw float — tidak melalui cell text yg sudah di-format
+            plan_wh   = plan_u   * mhu if mhu else _fv(self.tbl_prod, r, 3)
+            actual_wh = actual_u * mhu if mhu else _fv(self.tbl_prod, r, 4)
             produksi.append({
                 "model":        model,
-                "plan_unit":    _fv(self.tbl_prod, r, 1),
-                "actual_unit":  _fv(self.tbl_prod, r, 2),
-                "plan_whour":   _fv(self.tbl_prod, r, 3),
-                "actual_whour": _fv(self.tbl_prod, r, 4),
+                "plan_unit":    plan_u,
+                "actual_unit":  actual_u,
+                "plan_whour":   plan_wh,
+                "actual_whour": actual_wh,
                 "ot_2h":  self._ot_hours == 2.0,
                 "ot_3h":  self._ot_hours == 3.0,
                 "ot_11h": self._ot_hours == 11.0,

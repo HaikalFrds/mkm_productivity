@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor
 
 from controllers.dashboard_controller import get_dashboard_data, get_monthly_loss_by_group
 from modules.config import TARGET_PROCESS_RATIO
+from modules.icons import ic_refresh, TOOL_ICON_SIZE
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -156,7 +157,8 @@ class DashboardWidget(QWidget):
         self._lbl_date.setStyleSheet("color: #6B7280; font-size: 11px;")
         self._refresh_date()
 
-        btn = QPushButton("↺  Refresh")
+        btn = QPushButton("Refresh")
+        btn.setIcon(ic_refresh()); btn.setIconSize(TOOL_ICON_SIZE)
         btn.setFixedSize(88, 28)
         btn.setStyleSheet(
             "QPushButton { background-color: #F3F4F6; color: #6B7280;"

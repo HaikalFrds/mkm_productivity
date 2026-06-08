@@ -10,18 +10,6 @@ from database.session import engine
 def initialize_tables() -> None:
     """Pastikan semua tabel & kolom opsional sudah ada di database."""
     ddl_statements = [
-        # material_usage
-        """
-        CREATE TABLE IF NOT EXISTS material_usage (
-            id            SERIAL PRIMARY KEY,
-            report_id     INTEGER NOT NULL REFERENCES daily_report(id) ON DELETE CASCADE,
-            material_name VARCHAR(200),
-            material_no   VARCHAR(100),
-            qty           FLOAT DEFAULT 0,
-            satuan        VARCHAR(50),
-            keterangan    TEXT
-        )
-        """,
         # shop_model
         """
         CREATE TABLE IF NOT EXISTS shop_model (

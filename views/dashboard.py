@@ -1,4 +1,4 @@
-﻿import matplotlib
+import matplotlib
 matplotlib.use("QtAgg")
 import mplcursors
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -16,12 +16,11 @@ from controllers.dashboard_controller import get_dashboard_data, get_monthly_los
 from modules.config import TARGET_PROCESS_RATIO
 
 
-# Constants
+# ── Constants ────────────────────────────────────────────────────────────────
 
 _MONTHS  = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]
 _DAYS_ID = ["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"]
 
-# (hex_color, db_group_name) — urutan order_num
 _GROUPS = [
     ("#cc3333", "Production"),
     ("#2255aa", "Maintenance"),
@@ -30,44 +29,49 @@ _GROUPS = [
     ("#8e44ad", "Production Engineering"),
 ]
 
+# ── Light-theme style constants (sama dengan input_laporan) ──────────────────
+_CARD    = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E5E7EB; }"
+_HDR_LBL = ("color: #212121; font-size: 11px; font-weight: bold;"
+            " border-left: 2px solid #E60012; padding-left: 8px;"
+            " letter-spacing: 1px; text-transform: uppercase;")
+_FLD_LBL = "color: #6B7280; font-size: 10px; letter-spacing: 1px;"
 
-# (prev: #1e1e1e tbl, #303030 border, #252525 row, #969696 header)
 _TABLE_SS = """
     QTableWidget {
-        background-color: #FFFFFF; border: 1px solid #E0E0E0; gridline-color: #F0F0F0;
+        background-color: #FFFFFF; border: 1px solid #D1D5DB; gridline-color: #F3F4F6;
     }
     QTableWidget::item {
-        color: #1a1a1a; padding: 4px 8px;
-        background-color: #FFFFFF; border-bottom: 1px solid #F0F0F0;
+        color: #212121; padding: 4px 8px;
+        background-color: #FFFFFF; border-bottom: 1px solid #F3F4F6;
     }
-    QTableWidget::item:alternate { background-color: #F8F8F8; }
-    QTableWidget::item:selected { background-color: #F0F0F0; }
+    QTableWidget::item:alternate { background-color: #F9FAFB; }
+    QTableWidget::item:selected  { background-color: #F3F4F6; }
     QHeaderView::section {
-        background-color: #F5F5F5; color: #888888; border: none;
-        border-bottom: 1px solid #E0E0E0; border-right: 1px solid #E8E8E8;
+        background-color: #F8F9FA; color: #6B7280; border: none;
+        border-bottom: 1px solid #D1D5DB; border-right: 1px solid #E5E7EB;
         padding: 5px 8px; font-weight: bold; font-size: 10px;
         text-transform: uppercase; letter-spacing: 1px;
     }
 """
 
 
-# Chart helpers 
+# ── Chart helpers ─────────────────────────────────────────────────────────────
 
-def _dark_ax(fig, ax):
-    """Terapkan dark theme ke axes tunggal."""
+def _style_ax(fig, ax):
+    """Light theme untuk axes — konsisten dengan warna app."""
     fig.patch.set_facecolor("#FFFFFF")
     ax.set_facecolor("#FFFFFF")
-    ax.tick_params(axis="both", colors="#888888", labelsize=8)
-    ax.spines["left"].set_color("#E0E0E0")
-    ax.spines["bottom"].set_color("#E0E0E0")
+    ax.tick_params(axis="both", colors="#6B7280", labelsize=8)
+    ax.spines["left"].set_color("#D1D5DB")
+    ax.spines["bottom"].set_color("#D1D5DB")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.yaxis.grid(True, color="#F0F0F0", linewidth=0.5, linestyle="--")
+    ax.yaxis.grid(True, color="#F3F4F6", linewidth=0.5, linestyle="--")
     ax.set_axisbelow(True)
 
 
-def _dark_twin(ax2):
-    """Terapkan dark theme ke secondary (twinx) axis."""
+def _style_twin(ax2):
+    """Light theme untuk secondary (twinx) axis."""
     ax2.tick_params(axis="y", colors="#1a6fa8", labelsize=8)
     ax2.spines["right"].set_color("#1a6fa8")
     ax2.spines["top"].set_visible(False)
@@ -78,14 +82,15 @@ def _dark_twin(ax2):
     ax2.yaxis.tick_right()
 
 
-# StatCard
+# ── StatCard ─────────────────────────────────────────────────────────────────
 
 class _StatCard(QFrame):
     def __init__(self, title: str, init_val: str, subtitle: str, accent: str):
         super().__init__()
         self.setFixedHeight(88)
         self.setStyleSheet(
-            "QFrame { background-color: #222222; border-left: 3px solid #da291c; border-radius: 0px; }"
+            "QFrame { background-color: #FFFFFF; border-radius: 0px;"
+            " border: 1px solid #E5E7EB; border-top: 3px solid #E60012; }"
         )
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 10, 14, 10)
@@ -93,19 +98,19 @@ class _StatCard(QFrame):
 
         lbl_t = QLabel(title)
         lbl_t.setStyleSheet(
-            "color: #888888; font-size: 9px; letter-spacing: 1px;"
+            "color: #6B7280; font-size: 9px; letter-spacing: 1px;"
             " text-transform: uppercase; background: transparent; border: none;"
         )
 
         self._val = QLabel(init_val)
         self._val.setStyleSheet(
-            "color: #ffffff; font-size: 26px; font-weight: bold;"
+            "color: #212121; font-size: 26px; font-weight: bold;"
             " background: transparent; border: none;"
         )
 
         lbl_s = QLabel(subtitle)
         lbl_s.setStyleSheet(
-            "color: #555555; font-size: 9px; background: transparent; border: none;"
+            "color: #9CA3AF; font-size: 9px; background: transparent; border: none;"
         )
 
         lay.addWidget(lbl_t)
@@ -117,7 +122,7 @@ class _StatCard(QFrame):
         self._val.setText(v)
 
 
-# DashboardWidget
+# ── DashboardWidget ───────────────────────────────────────────────────────────
 
 class DashboardWidget(QWidget):
     def __init__(self, parent=None):
@@ -128,8 +133,8 @@ class DashboardWidget(QWidget):
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 10, 16, 12)
-        outer.setSpacing(10)
+        outer.setContentsMargins(12, 10, 12, 12)
+        outer.setSpacing(8)
 
         outer.addLayout(self._build_header())
         outer.addLayout(self._build_stat_row())
@@ -142,34 +147,27 @@ class DashboardWidget(QWidget):
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
 
-        lbl = QLabel("DASHBOARD PRODUKSI")
-        lbl.setStyleSheet(
-            "color: #f0f0f0; font-size: 12px; font-weight: bold; letter-spacing: 2px;"
-        )
-
-        self._lbl_date = QLabel()
-        self._lbl_date.setStyleSheet("color: #555555; font-size: 11px;")
-        self._refresh_date()
-
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
-        sep.setFixedWidth(1)
-        sep.setFixedHeight(16)
-        sep.setStyleSheet("background-color: #404040; border: none;")
+        sep.setFixedWidth(1); sep.setFixedHeight(16)
+        sep.setStyleSheet("background-color: #D1D5DB; border: none;")
+
+        self._lbl_date = QLabel()
+        self._lbl_date.setStyleSheet("color: #6B7280; font-size: 11px;")
+        self._refresh_date()
 
         btn = QPushButton("↺  Refresh")
-        btn.setFixedSize(88, 26)
+        btn.setFixedSize(88, 28)
         btn.setStyleSheet(
-            "QPushButton { background-color: #2a2a2a; color: #aaaaaa;"
-            "  border: 1px solid #3a3a3a; font-size: 11px; }"
-            "QPushButton:hover { background-color: #353535; color: #ffffff; }"
+            "QPushButton { background-color: #F3F4F6; color: #6B7280;"
+            "  border: 1px solid #D1D5DB; font-size: 11px; border-radius: 0px; }"
+            "QPushButton:hover { background-color: #D1D5DB; color: #212121; }"
         )
         btn.clicked.connect(self.load_data)
 
-        row.addWidget(lbl)
-        row.addSpacing(12)
+        row.addSpacing(4)
         row.addWidget(sep)
-        row.addSpacing(12)
+        row.addSpacing(8)
         row.addWidget(self._lbl_date)
         row.addStretch()
         row.addWidget(btn)
@@ -186,8 +184,8 @@ class DashboardWidget(QWidget):
 
     def _build_stat_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(10)
-        self._c_laporan  = _StatCard("LAPORAN HARI INI",      "0",      "laporan harian",    "#da291c")
+        row.setSpacing(8)
+        self._c_laporan  = _StatCard("LAPORAN HARI INI",      "0",      "laporan harian",    "#E60012")
         self._c_loss_hr  = _StatCard("LOSS TIME HARI INI",    "0.00 H", "jam terbuang",      "#e67e22")
         self._c_process  = _StatCard("PROCESS RATIO BLN INI", "— %",    "efisiensi produksi","#4fc3f7")
         self._c_loss_bln = _StatCard("TOTAL LOSS BLN INI",    "0.00 H", "akumulasi bulanan", "#27ae60")
@@ -199,28 +197,25 @@ class DashboardWidget(QWidget):
 
     def _build_main_chart_card(self) -> QFrame:
         card = QFrame()
-        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 10, 14, 10)
         lay.setSpacing(6)
 
         hdr = QHBoxLayout()
         lbl = QLabel("PERFORMANCE — Loss Time per Bulan + Process Ratio")
-        lbl.setStyleSheet(
-            "color: #dddddd; font-size: 11px; font-weight: bold;"
-            " border-left: 3px solid #da291c; padding-left: 8px;"
-        )
+        lbl.setStyleSheet(_HDR_LBL)
         self._lbl_year = QLabel()
-        self._lbl_year.setStyleSheet("color: #444444; font-size: 10px;")
+        self._lbl_year.setStyleSheet(_FLD_LBL)
         hdr.addWidget(lbl); hdr.addStretch(); hdr.addWidget(self._lbl_year)
         lay.addLayout(hdr)
 
-        self._fig = Figure(facecolor="#111111")
+        self._fig = Figure(facecolor="#FFFFFF")
         self._fig.subplots_adjust(left=0.07, right=0.93, top=0.88, bottom=0.13)
         self._ax1 = self._fig.add_subplot(111)
         self._ax2 = self._ax1.twinx()
-        _dark_ax(self._fig, self._ax1)
-        _dark_twin(self._ax2)
+        _style_ax(self._fig, self._ax1)
+        _style_twin(self._ax2)
 
         self._canvas = FigureCanvas(self._fig)
         self._canvas.setMinimumHeight(220)
@@ -232,29 +227,26 @@ class DashboardWidget(QWidget):
 
     def _build_bottom_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(8)
         row.addWidget(self._build_top3_card(), stretch=2)
         row.addWidget(self._build_recent_card(), stretch=3)
         return row
 
     def _build_top3_card(self) -> QFrame:
         card = QFrame()
-        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 10, 14, 10)
         lay.setSpacing(6)
 
         lbl = QLabel("THE BIG THREE — Loss Bulan Ini")
-        lbl.setStyleSheet(
-            "color: #dddddd; font-size: 11px; font-weight: bold;"
-            " border-left: 3px solid #da291c; padding-left: 8px;"
-        )
+        lbl.setStyleSheet(_HDR_LBL)
         lay.addWidget(lbl)
 
-        self._fig3 = Figure(facecolor="#111111")
+        self._fig3 = Figure(facecolor="#FFFFFF")
         self._fig3.subplots_adjust(left=0.30, right=0.88, top=0.88, bottom=0.14)
         self._ax3 = self._fig3.add_subplot(111)
-        _dark_ax(self._fig3, self._ax3)
+        _style_ax(self._fig3, self._ax3)
 
         self._canvas3 = FigureCanvas(self._fig3)
         self._canvas3.setMinimumHeight(130)
@@ -264,16 +256,13 @@ class DashboardWidget(QWidget):
 
     def _build_recent_card(self) -> QFrame:
         card = QFrame()
-        card.setStyleSheet("QFrame { background-color: #1a1a1a; border-radius: 0px; }")
+        card.setStyleSheet(_CARD)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 10, 14, 10)
         lay.setSpacing(6)
 
         lbl = QLabel("LAPORAN TERBARU")
-        lbl.setStyleSheet(
-            "color: #dddddd; font-size: 11px; font-weight: bold;"
-            " border-left: 3px solid #da291c; padding-left: 8px;"
-        )
+        lbl.setStyleSheet(_HDR_LBL)
         lay.addWidget(lbl)
 
         self._tbl = QTableWidget()
@@ -288,6 +277,7 @@ class DashboardWidget(QWidget):
         self._tbl.verticalHeader().setVisible(False)
         self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         self._tbl.setSelectionBehavior(QTableWidget.SelectRows)
+        self._tbl.setAlternatingRowColors(True)
         self._tbl.setStyleSheet(_TABLE_SS)
         lay.addWidget(self._tbl)
         return card
@@ -343,8 +333,8 @@ class DashboardWidget(QWidget):
     def _update_main_chart(self, monthly: list):
         ax1, ax2 = self._ax1, self._ax2
         ax1.cla(); ax2.cla()
-        _dark_ax(self._fig, ax1)
-        _dark_twin(ax2)
+        _style_ax(self._fig, ax1)
+        _style_twin(ax2)
 
         x = list(range(12))
         has_data = monthly and any(
@@ -361,7 +351,6 @@ class DashboardWidget(QWidget):
                 bottoms = [b + h for b, h in zip(bottoms, heights)]
             max_total = max(bottoms) if bottoms else 1.0
 
-            # Hover tooltip untuk bar
             self._cursor = mplcursors.cursor(ax1, hover=mplcursors.HoverMode.Transient)
 
             @self._cursor.connect("add")
@@ -383,20 +372,19 @@ class DashboardWidget(QWidget):
                     lines.append(f"  Total Hour: {total_hour:.2f} H")
                     lines.append(f"  Process Ratio: {pct:.1f}%")
                     sel.annotation.set_text("\n".join(lines))
-                    sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#da291c", lw=1)
-                    sel.annotation.set_color("#f0f0f0")
+                    sel.annotation.get_bbox_patch().set(fc="#FFFFFF", alpha=0.95, ec="#E60012", lw=1)
+                    sel.annotation.set_color("#212121")
                     sel.annotation.set_fontsize(8)
 
             ax1.set_ylim(0, max_total * 1.5)
 
-            # Process % line
-            pcts  = [monthly[i]["process_pct"] for i in range(12)]
-            px    = [i for i, p in enumerate(pcts) if monthly[i]["total_hour"] > 0]
-            py    = [pcts[i] for i in px]
+            pcts = [monthly[i]["process_pct"] for i in range(12)]
+            px   = [i for i, p in enumerate(pcts) if monthly[i]["total_hour"] > 0]
+            py   = [pcts[i] for i in px]
             if px:
-                ax2.plot(px, py, color="#4fc3f7", linewidth=1.8,
-                         marker="o", markersize=4, markerfacecolor="#111111",
-                         markeredgecolor="#4fc3f7", markeredgewidth=1.5,
+                ax2.plot(px, py, color="#1a6fa8", linewidth=1.8,
+                         marker="o", markersize=4, markerfacecolor="#FFFFFF",
+                         markeredgecolor="#1a6fa8", markeredgewidth=1.5,
                          zorder=6, label="Process %")
                 line_objs = ax2.get_lines()
                 if line_objs:
@@ -413,39 +401,35 @@ class DashboardWidget(QWidget):
                                 f"  Process Ratio: {pct:.1f}%\n"
                                 f"  Total Hour: {total:.2f} H"
                             )
-                            sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#4fc3f7", lw=1)
-                            sel.annotation.set_color("#f0f0f0")
+                            sel.annotation.get_bbox_patch().set(fc="#FFFFFF", alpha=0.95, ec="#1a6fa8", lw=1)
+                            sel.annotation.set_color("#212121")
                             sel.annotation.set_fontsize(8)
 
                 for xi, yi in zip(px, py):
                     ax2.annotate(f"{yi:.0f}%",
                                  xy=(xi, yi),
                                  xytext=(0, 8), textcoords="offset points",
-                                 ha="center", fontsize=7, color="#4fc3f7",
+                                 ha="center", fontsize=7, color="#1a6fa8",
                                  fontweight="bold", zorder=7)
 
-            # Target line
-            ax2.axhline(y=TARGET_PROCESS_RATIO, color="#da291c", linestyle="--",
-                        linewidth=1.0, alpha=0.5, zorder=4,
+            ax2.axhline(y=TARGET_PROCESS_RATIO, color="#E60012", linestyle="--",
+                        linewidth=1.0, alpha=0.6, zorder=4,
                         label=f"Target {TARGET_PROCESS_RATIO:.0f}%")
             ax2.text(11.6, TARGET_PROCESS_RATIO + 2, f"{TARGET_PROCESS_RATIO:.0f}%",
-                     fontsize=8, color="#e74c3c", ha="left", va="bottom",
-                     fontweight="bold")
+                     fontsize=8, color="#E60012", ha="left", va="bottom", fontweight="bold")
 
         else:
-            # Empty state
             ax1.set_ylim(0, 10)
             ax1.text(0.5, 0.5, "Belum ada data untuk tahun ini",
                      transform=ax1.transAxes, ha="center", va="center",
-                     color="#444444", fontsize=11)
+                     color="#9CA3AF", fontsize=11)
 
-        # Axis formatting — selalu dijalankan
         ax1.set_xlim(-0.5, 11.5)
         ax1.set_xticks(x)
-        ax1.set_xticklabels(_MONTHS, fontsize=8, color="#888888")
-        ax1.set_ylabel("Loss (H)", fontsize=8, color="#888888", labelpad=4)
+        ax1.set_xticklabels(_MONTHS, fontsize=8, color="#6B7280")
+        ax1.set_ylabel("Loss (H)", fontsize=8, color="#6B7280", labelpad=4)
         ax2.set_ylim(0, 115)
-        ax2.set_ylabel("Process (%)", fontsize=8, color="#4fc3f7", labelpad=4)
+        ax2.set_ylabel("Process (%)", fontsize=8, color="#1a6fa8", labelpad=4)
 
         if has_data:
             h1, l1 = ax1.get_legend_handles_labels()
@@ -454,7 +438,7 @@ class DashboardWidget(QWidget):
                 h1 + h2, l1 + l2,
                 loc="upper left", fontsize=7, ncol=3,
                 framealpha=0.0, facecolor="none",
-                labelcolor="#888888", edgecolor="none",
+                labelcolor="#6B7280", edgecolor="none",
             )
 
         self._canvas.draw()
@@ -462,7 +446,7 @@ class DashboardWidget(QWidget):
     def _update_top3(self, categories: list):
         ax = self._ax3
         ax.cla()
-        _dark_ax(self._fig3, ax)
+        _style_ax(self._fig3, ax)
 
         top3 = [c for c in sorted(categories, key=lambda c: c["hours"], reverse=True)
                 if c["hours"] > 0][:3]
@@ -470,7 +454,7 @@ class DashboardWidget(QWidget):
         if top3:
             names  = [c["group"] for c in top3]
             vals   = [c["hours"] for c in top3]
-            colors = [next((col for col, gn in _GROUPS if gn == n), "#888888") for n in names]
+            colors = [next((col for col, gn in _GROUPS if gn == n), "#6B7280") for n in names]
             ypos   = list(range(len(top3)))
             max_v  = max(vals)
 
@@ -487,28 +471,28 @@ class DashboardWidget(QWidget):
                         f"  {g['group']}\n"
                         f"  Loss: {g['hours']:.2f} H"
                     )
-                    sel.annotation.get_bbox_patch().set(fc="#1a1a1a", alpha=0.92, ec="#da291c", lw=1)
-                    sel.annotation.set_color("#f0f0f0")
+                    sel.annotation.get_bbox_patch().set(fc="#FFFFFF", alpha=0.95, ec="#E60012", lw=1)
+                    sel.annotation.set_color("#212121")
                     sel.annotation.set_fontsize(8)
 
             ax.set_yticks(ypos)
-            ax.set_yticklabels(names, fontsize=8.5, color="#cccccc")
+            ax.set_yticklabels(names, fontsize=8.5, color="#6B7280")
             for i, v in enumerate(vals):
                 ax.text(v + max_v * 0.03, i, f"{v:.2f} H",
-                        va="center", fontsize=8, color="#888888")
+                        va="center", fontsize=8, color="#6B7280")
             ax.set_xlim(0, max_v * 1.45)
             ax.set_ylim(-0.5, len(top3) - 0.5)
-            ax.xaxis.grid(True, color="#2e2e2e", linewidth=0.5)
+            ax.xaxis.grid(True, color="#F3F4F6", linewidth=0.5)
             ax.set_axisbelow(True)
         else:
             ax.set_xlim(0, 1); ax.set_ylim(0, 1)
             ax.set_xticks([]); ax.set_yticks([])
             ax.text(0.5, 0.5, "Tidak ada data",
                     transform=ax.transAxes, ha="center", va="center",
-                    color="#444444", fontsize=10)
+                    color="#9CA3AF", fontsize=10)
 
-        ax.set_title("Top 3 Groups (Bln Ini)", fontsize=9, color="#888888", pad=5)
-        ax.spines["bottom"].set_color("#404040")
+        ax.set_title("Top 3 Groups (Bln Ini)", fontsize=9, color="#6B7280", pad=5)
+        ax.spines["bottom"].set_color("#D1D5DB")
         self._canvas3.draw()
 
     def _update_recent(self, recent: list):
@@ -531,4 +515,3 @@ class DashboardWidget(QWidget):
 
     def refresh_data(self, *_):
         self.load_data()
-

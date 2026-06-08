@@ -35,7 +35,7 @@ class LoginWindow(QWidget):
         self.setFixedSize(360, 480)
         self.setWindowFlags(Qt.Window)
         from styles.theme import ThemeManager
-        self.setStyleSheet("QWidget { background-color: #F5F5F5; }")
+        self.setStyleSheet("QWidget { background-color: #F8F9FA; }")
         self.setup_ui()
 
     def setup_ui(self):
@@ -48,8 +48,8 @@ class LoginWindow(QWidget):
         card.setFixedWidth(300)
         from styles.theme import ThemeManager
         card.setStyleSheet(
-            "QFrame#login_card { background-color: #FFFFFF; border: 1px solid #E8E8E8;"
-            " border-bottom: 2px solid #E0E0E0; border-radius: 8px; }"
+            "QFrame#login_card { background-color: #FFFFFF; border: 1px solid #E5E7EB;"
+            " border-bottom: 2px solid #D1D5DB; border-radius: 8px; }"
         )
 
         layout = QVBoxLayout(card)
@@ -58,11 +58,11 @@ class LoginWindow(QWidget):
 
         # Logo
         accent     = ThemeManager.c("accent")
-        sub_col    = "#888888"
-        div_col    = "#CCCCCC"
-        lbl_col    = "#888888"
+        sub_col    = "#6B7280"
+        div_col    = "#D1D5DB"
+        lbl_col    = "#6B7280"
         inp_bg     = "#FFFFFF"
-        inp_border = "#CCCCCC"
+        inp_border = "#D1D5DB"
         inp_color  = "#111111"
 
         title = QLabel("MKM")

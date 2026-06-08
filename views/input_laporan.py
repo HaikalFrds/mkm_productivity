@@ -13,24 +13,24 @@ from controllers.master_controller import (
 )
 
 # Style constants — Light Theme
-_CARD  = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E8E8E8; }"
+_CARD  = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E5E7EB; }"
 _TBL   = """
-    QTableWidget { background-color: #FFFFFF; border: 1px solid #E0E0E0; gridline-color: #F0F0F0; }
-    QTableWidget::item { color: #1a1a1a; padding: 3px 6px; background-color: #FFFFFF;
-        border-bottom: 1px solid #F0F0F0; }
-    QTableWidget::item:alternate { background-color: #F8F8F8; }
-    QTableWidget::item:selected { background-color: #F0F0F0; color: #1a1a1a; }
-    QHeaderView::section { background-color: #F5F5F5; color: #888888; border: none;
-        border-bottom: 1px solid #E0E0E0; border-right: 1px solid #E8E8E8;
+    QTableWidget { background-color: #FFFFFF; border: 1px solid #D1D5DB; gridline-color: #F3F4F6; }
+    QTableWidget::item { color: #212121; padding: 3px 6px; background-color: #FFFFFF;
+        border-bottom: 1px solid #F3F4F6; }
+    QTableWidget::item:alternate { background-color: #F9FAFB; }
+    QTableWidget::item:selected { background-color: #F3F4F6; color: #212121; }
+    QHeaderView::section { background-color: #F8F9FA; color: #6B7280; border: none;
+        border-bottom: 1px solid #D1D5DB; border-right: 1px solid #E5E7EB;
         padding: 4px 6px; font-weight: bold; font-size: 10px;
         text-transform: uppercase; letter-spacing: 1px; }
 """
 _COMBO_CELL = """
-    QComboBox { background-color: transparent; color: #1a1a1a; border: none;
+    QComboBox { background-color: transparent; color: #212121; border: none;
         padding: 0px 4px; margin: 0px; font-size: 11px; }
     QComboBox::drop-down { border: none; width: 18px; }
-    QComboBox QAbstractItemView { background-color: #FFFFFF; color: #1a1a1a;
-        selection-background-color: #F0F0F0; border: 1px solid #CCCCCC; }
+    QComboBox QAbstractItemView { background-color: #FFFFFF; color: #212121;
+        selection-background-color: #F3F4F6; border: 1px solid #D1D5DB; }
 """
 _BTN_ADD = ("QPushButton { background-color: #E8F5E9; color: #2e7d32;"
             " border: 1px solid #A5D6A7; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
@@ -38,10 +38,10 @@ _BTN_ADD = ("QPushButton { background-color: #E8F5E9; color: #2e7d32;"
 _BTN_DEL = ("QPushButton { background-color: #FFEBEE; color: #c62828;"
             " border: 1px solid #FFCDD2; border-radius: 0px; padding: 0 10px; font-size: 11px; }"
             "QPushButton:hover { background-color: #FFCDD2; }")
-_HDR_LBL = ("color: #1a1a1a; font-size: 11px; font-weight: bold;"
-            " border-left: 2px solid #da291c; padding-left: 8px;"
+_HDR_LBL = ("color: #212121; font-size: 11px; font-weight: bold;"
+            " border-left: 2px solid #E60012; padding-left: 8px;"
             " letter-spacing: 1px; text-transform: uppercase;")
-_FLD_LBL = "color: #888888; font-size: 10px; letter-spacing: 1px;"
+_FLD_LBL = "color: #6B7280; font-size: 10px; letter-spacing: 1px;"
 
 # Model & operation codes — bisa diperluas dari master data nanti
 _MODELS  = ["4G15", "4G63", "4M40", "6D16", "6D16E", "6D16T",
@@ -209,9 +209,6 @@ class InputLaporanWidget(QWidget):
         main.addLayout(self._build_footer())
         main.addStretch()
 
-        self._mat_card = self._build_material_panel()
-        main.addWidget(self._mat_card)
-
         scroll.setWidget(container)
         outer.addWidget(scroll)
 
@@ -221,18 +218,18 @@ class InputLaporanWidget(QWidget):
         card = QFrame()
         card.setStyleSheet(
             "QFrame { background-color: #FFFFFF; border-radius: 0px;"
-            " border-top: 2px solid #da291c; border-bottom: 1px solid #E8E8E8; }"
+            " border-top: 2px solid #E60012; border-bottom: 1px solid #E5E7EB; }"
         )
         lay = QHBoxLayout(card)
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(8)
 
         _combo_ss = (
-            "QComboBox { background:#FFFFFF; border:1px solid #CCCCCC; border-radius:2px;"
-            " padding-left:8px; color:#1a1a1a; font-size:11px; }"
+            "QComboBox { background:#FFFFFF; border:1px solid #D1D5DB; border-radius:2px;"
+            " padding-left:8px; color:#212121; font-size:11px; }"
             "QComboBox::drop-down { border:none; width:22px; }"
-            "QComboBox QAbstractItemView { background:#FFFFFF; color:#1a1a1a;"
-            " selection-background-color:#F0F0F0; border:1px solid #CCCCCC; }"
+            "QComboBox QAbstractItemView { background:#FFFFFF; color:#212121;"
+            " selection-background-color:#F3F4F6; border:1px solid #D1D5DB; }"
         )
 
         def _lbl(t):
@@ -245,7 +242,7 @@ class InputLaporanWidget(QWidget):
             sep.setFrameShape(QFrame.VLine)
             sep.setFixedWidth(1)
             sep.setFixedHeight(22)
-            sep.setStyleSheet("background-color: #CCCCCC; border: none;")
+            sep.setStyleSheet("background-color: #D1D5DB; border: none;")
             return sep
 
         # Shop group
@@ -266,8 +263,8 @@ class InputLaporanWidget(QWidget):
         btn_prev = QPushButton("<")
         btn_prev.setFixedSize(22, 26)
         btn_prev.setStyleSheet(
-            "QPushButton { background:#EEEEEE; color:#1a1a1a; border:1px solid #CCCCCC; }"
-            "QPushButton:hover { background:#E0E0E0; }"
+            "QPushButton { background:#F3F4F6; color:#212121; border:1px solid #D1D5DB; }"
+            "QPushButton:hover { background:#D1D5DB; }"
         )
         self.input_tanggal = QDateEdit()
         self.input_tanggal.setDate(QDate.currentDate())
@@ -276,8 +273,8 @@ class InputLaporanWidget(QWidget):
         self.input_tanggal.setMinimumWidth(95)
         self.input_tanggal.setDisplayFormat("dd/MM/yyyy")
         self.input_tanggal.setStyleSheet(
-            "QDateEdit { background:#FFFFFF; border:1px solid #CCCCCC; border-radius:2px;"
-            " padding-left:8px; color:#1a1a1a; font-size:11px; }"
+            "QDateEdit { background:#FFFFFF; border:1px solid #D1D5DB; border-radius:2px;"
+            " padding-left:8px; color:#212121; font-size:11px; }"
             "QDateEdit::drop-down { border:none; width:22px; }"
         )
         btn_next = QPushButton(">")
@@ -294,7 +291,7 @@ class InputLaporanWidget(QWidget):
         lay.addWidget(btn_next)
 
         self._lbl_day = QLabel("—")
-        self._lbl_day.setStyleSheet("color:#da291c; font-size:11px; font-weight:bold; min-width:48px; background:transparent;")
+        self._lbl_day.setStyleSheet("color:#E60012; font-size:11px; font-weight:bold; min-width:48px; background:transparent;")
         lay.addWidget(self._lbl_day)
         self.input_tanggal.dateChanged.connect(self._update_day)
         self._update_day(QDate.currentDate())
@@ -319,7 +316,7 @@ class InputLaporanWidget(QWidget):
         # Hour group
         lay.addWidget(_lbl("Hour"))
         self._lbl_hour = QLabel("—")
-        self._lbl_hour.setStyleSheet("color:#1a1a1a; font-size:13px; font-weight:bold; min-width:36px; background:transparent;")
+        self._lbl_hour.setStyleSheet("color:#212121; font-size:13px; font-weight:bold; min-width:36px; background:transparent;")
         lay.addWidget(self._lbl_hour)
 
         lay.addWidget(_vsep())
@@ -341,10 +338,10 @@ class InputLaporanWidget(QWidget):
         # Hari Pengganti group
         self.chk_pengganti = QCheckBox("Hari Pengganti")
         self.chk_pengganti.setStyleSheet(
-            "QCheckBox { color: #888888; font-size: 10px; letter-spacing: 1px; background: transparent; }"
+            "QCheckBox { color: #6B7280; font-size: 10px; letter-spacing: 1px; background: transparent; }"
             "QCheckBox::indicator { width: 14px; height: 14px; }"
-            "QCheckBox::indicator:checked { background: #da291c; border: 1px solid #da291c; }"
-            "QCheckBox::indicator:unchecked { background: #FFFFFF; border: 1px solid #CCCCCC; }"
+            "QCheckBox::indicator:checked { background: #E60012; border: 1px solid #E60012; }"
+            "QCheckBox::indicator:unchecked { background: #FFFFFF; border: 1px solid #D1D5DB; }"
         )
         self.chk_pengganti.toggled.connect(self._on_pengganti_toggled)
         lay.addWidget(self.chk_pengganti)
@@ -364,8 +361,8 @@ class InputLaporanWidget(QWidget):
 
         lbl_user = QLabel(self._user.get("name", "").upper())
         lbl_user.setStyleSheet(
-            "color:#da291c; font-size:11px; font-weight:bold;"
-            " padding: 3px 8px; background-color: #F5F5F5;"
+            "color:#E60012; font-size:11px; font-weight:bold;"
+            " padding: 3px 8px; background-color: #F8F9FA;"
         )
         lay.addWidget(lbl_user)
 
@@ -389,8 +386,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("Production Volume", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_produksi)
         bd.clicked.connect(self._hapus_produksi)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -418,8 +415,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("Absence", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_absen)
         bd.clicked.connect(self._hapus_absen)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -460,19 +457,19 @@ class InputLaporanWidget(QWidget):
 
         def _vlbl(t="—"):
             l = QLabel(t)
-            l.setStyleSheet("color:#1a1a1a; font-size:11px; font-weight:bold; background:transparent;")
+            l.setStyleSheet("color:#212121; font-size:11px; font-weight:bold; background:transparent;")
             l.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             return l
 
         self._lbl_process   = _vlbl()
         self._lbl_prep_val  = _vlbl(f"{self._prep_h:.4f}")
-        self._lbl_prep_val.setStyleSheet("color:#AAAAAA; font-size:11px; background:transparent;")
+        self._lbl_prep_val.setStyleSheet("color:#9CA3AF; font-size:11px; background:transparent;")
         self._lbl_prep_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._lbl_quality   = _vlbl("0.0000")
         self._lbl_linestop  = _vlbl()
         self._lbl_absence   = _vlbl()
         self._lbl_sholat_val = _vlbl(f"{self._sholat_h:.4f}")
-        self._lbl_sholat_val.setStyleSheet("color:#AAAAAA; font-size:11px; background:transparent;")
+        self._lbl_sholat_val.setStyleSheet("color:#9CA3AF; font-size:11px; background:transparent;")
         self._lbl_sholat_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._lbl_total     = _vlbl()
         self._lbl_balance   = _vlbl()
@@ -492,11 +489,11 @@ class InputLaporanWidget(QWidget):
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
         divider.setFixedHeight(1)
-        divider.setStyleSheet("background-color: #E0E0E0; border: none;")
+        divider.setStyleSheet("background-color: #D1D5DB; border: none;")
         grid.addWidget(divider, len(rows), 0, 1, 2)
 
         lbl_total = QLabel("TOTAL")
-        lbl_total.setStyleSheet("color:#888888; font-size:11px; font-weight:bold; background:transparent;")
+        lbl_total.setStyleSheet("color:#6B7280; font-size:11px; font-weight:bold; background:transparent;")
         grid.addWidget(lbl_total, len(rows) + 1, 0)
         grid.addWidget(self._lbl_total, len(rows) + 1, 1)
 
@@ -506,15 +503,15 @@ class InputLaporanWidget(QWidget):
         bal_frame = QFrame()
         bal_frame.setObjectName("balFrame")
         bal_frame.setStyleSheet(
-            "#balFrame { background-color: #F5F5F5; border: 1px solid #E0E0E0;"
-            " border-left: 3px solid #da291c; }"
+            "#balFrame { background-color: #F8F9FA; border: 1px solid #D1D5DB;"
+            " border-left: 3px solid #E60012; }"
         )
         bal_row = QHBoxLayout(bal_frame)
         bal_row.setContentsMargins(8, 5, 8, 5)
         lbl_bal = QLabel("BALANCE")
-        lbl_bal.setStyleSheet("color:#888888; font-size:11px; font-weight:bold; background:transparent;")
+        lbl_bal.setStyleSheet("color:#6B7280; font-size:11px; font-weight:bold; background:transparent;")
         self._lbl_balance.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_balance.setStyleSheet("color:#1a1a1a; font-size:13px; font-weight:bold; background:transparent;")
+        self._lbl_balance.setStyleSheet("color:#212121; font-size:13px; font-weight:bold; background:transparent;")
         bal_row.addWidget(lbl_bal)
         bal_row.addStretch()
         bal_row.addWidget(self._lbl_balance)
@@ -533,8 +530,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(QLabel("In House (Reject) and Market Claim", styleSheet=_HDR_LBL))
         hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_claim)
         bd.clicked.connect(self._hapus_claim)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -562,9 +559,11 @@ class InputLaporanWidget(QWidget):
         self.tbl_claim.setColumnWidth(11, 75)
         self.tbl_claim.verticalHeader().setVisible(False)
         self.tbl_claim.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_claim.setWordWrap(True)
         self.tbl_claim.setStyleSheet(_TBL)
         self.tbl_claim.setMinimumHeight(140)
         self.tbl_claim.itemChanged.connect(self._on_claim_item_changed)
+        self.tbl_claim.itemChanged.connect(self._auto_resize_claim_row)
         lay.addWidget(self.tbl_claim)
         return card
 
@@ -584,8 +583,8 @@ class InputLaporanWidget(QWidget):
         hdr = QHBoxLayout()
         hdr.addWidget(title)
         hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
+        ba = QPushButton("＋ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
+        bd = QPushButton("✕ Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
         ba.clicked.connect(self._tambah_linestop)
         bd.clicked.connect(self._hapus_linestop)
         hdr.addWidget(ba); hdr.addWidget(bd)
@@ -613,9 +612,11 @@ class InputLaporanWidget(QWidget):
         self.tbl_ls.setColumnWidth(10, 52)
         self.tbl_ls.verticalHeader().setVisible(False)
         self.tbl_ls.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_ls.setWordWrap(True)
         self.tbl_ls.setStyleSheet(_TBL)
         self.tbl_ls.setMinimumHeight(140)
         self.tbl_ls.itemChanged.connect(self._hitung_calc_hour)
+        self.tbl_ls.itemChanged.connect(self._auto_resize_ls_row)
         lay.addWidget(self.tbl_ls)
         return card
 
@@ -629,16 +630,16 @@ class InputLaporanWidget(QWidget):
         btn_reset = QPushButton("Reset")
         btn_reset.setMinimumSize(90, 34)
         btn_reset.setStyleSheet(
-            "QPushButton { background:#EEEEEE; color:#888888; border:none; font-size:11px; }"
-            "QPushButton:hover { background:#E0E0E0; color:#1a1a1a; }"
+            "QPushButton { background:#F3F4F6; color:#6B7280; border:none; font-size:11px; }"
+            "QPushButton:hover { background:#D1D5DB; color:#212121; }"
         )
         btn_reset.clicked.connect(self.reset_form)
 
         btn_save = QPushButton("Simpan Laporan")
         btn_save.setMinimumSize(140, 34)
         btn_save.setStyleSheet(
-            "QPushButton { background:#da291c; color:#fff; border:none; font-size:11px; font-weight:bold; }"
-            "QPushButton:hover { background:#b01e0a; }"
+            "QPushButton { background:#E60012; color:#fff; border:none; font-size:11px; font-weight:bold; }"
+            "QPushButton:hover { background:#C0000F; }"
         )
         btn_save.clicked.connect(self.simpan_laporan)
 
@@ -660,8 +661,8 @@ class InputLaporanWidget(QWidget):
         self.tbl_prod.setItem(r, 2, _item("", Qt.AlignCenter))  # Act Qty
         plh_it = _item("", Qt.AlignCenter)
         plh_it.setFlags(Qt.ItemIsEnabled)
-        plh_it.setBackground(QColor("#F0F0F0"))
-        plh_it.setForeground(QColor("#AAAAAA"))
+        plh_it.setBackground(QColor("#F3F4F6"))
+        plh_it.setForeground(QColor("#9CA3AF"))
         self.tbl_prod.setItem(r, 3, plh_it)                     # Plan H (readonly)
         self.tbl_prod.setItem(r, 4, _item("", Qt.AlignCenter))  # Act H
         self.tbl_prod.blockSignals(False)
@@ -776,7 +777,7 @@ class InputLaporanWidget(QWidget):
             te = QTimeEdit(QTime(0, 0))
             te.setDisplayFormat("HH:mm")
             te.setStyleSheet(
-                "QTimeEdit { background: transparent; color: #1a1a1a; border: none;"
+                "QTimeEdit { background: transparent; color: #212121; border: none;"
                 " font-size: 11px; padding: 0px 4px; margin: 0px; }"
                 "QTimeEdit::up-button, QTimeEdit::down-button { width: 0; }"
             )
@@ -827,6 +828,20 @@ class InputLaporanWidget(QWidget):
         it.setText(f"{h:.4f}")
         self.tbl_ls.blockSignals(False)
 
+    def _auto_resize_ls_row(self, item):
+        """Row tbl_ls mengembang otomatis kalau teks panjang (wrap)."""
+        self.tbl_ls.resizeRowToContents(item.row())
+        h = self.tbl_ls.rowHeight(item.row())
+        if h < 30:
+            self.tbl_ls.setRowHeight(item.row(), 30)
+
+    def _auto_resize_claim_row(self, item):
+        """Row tbl_claim mengembang otomatis kalau teks panjang (wrap)."""
+        self.tbl_claim.resizeRowToContents(item.row())
+        h = self.tbl_claim.rowHeight(item.row())
+        if h < 30:
+            self.tbl_claim.setRowHeight(item.row(), 30)
+
     # Auto-fill Hour dari MHU
 
     def _on_prod_item_changed(self, item):
@@ -847,7 +862,7 @@ class InputLaporanWidget(QWidget):
                     if not plh_it:
                         plh_it = _item("", Qt.AlignCenter)
                         plh_it.setFlags(Qt.ItemIsEnabled)
-                        plh_it.setBackground(QColor("#1a1a1a"))
+                        plh_it.setBackground(QColor("#212121"))
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
                     plh_it.setText(f"{qty * mhu:.4f}" if qty > 0 else "")
@@ -877,7 +892,7 @@ class InputLaporanWidget(QWidget):
                     if not plh_it:
                         plh_it = _item("", Qt.AlignCenter)
                         plh_it.setFlags(Qt.ItemIsEnabled)
-                        plh_it.setBackground(QColor("#1a1a1a"))
+                        plh_it.setBackground(QColor("#212121"))
                         plh_it.setForeground(QColor("#606060"))
                         self.tbl_prod.setItem(r, 3, plh_it)
                     pq = _qty(1)
@@ -891,64 +906,6 @@ class InputLaporanWidget(QWidget):
                 self.tbl_prod.blockSignals(False)
                 self._hitung_calc_hour()
                 break
-
-    # Material Used
-
-    def _build_material_panel(self) -> QFrame:
-        card = QFrame(); card.setStyleSheet(_CARD)
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(10, 10, 10, 10); lay.setSpacing(6)
-
-        hdr = QHBoxLayout()
-        hdr.addWidget(QLabel("Material Used", styleSheet=_HDR_LBL))
-        hdr.addStretch()
-        ba = QPushButton("+ Add"); ba.setFixedHeight(24); ba.setStyleSheet(_BTN_ADD)
-        bd = QPushButton("Del");   bd.setFixedHeight(24); bd.setStyleSheet(_BTN_DEL)
-        ba.clicked.connect(self._tambah_material)
-        bd.clicked.connect(self._hapus_material)
-        hdr.addWidget(ba); hdr.addWidget(bd)
-        lay.addLayout(hdr)
-
-        self.tbl_mat = QTableWidget(0, 6)
-        self.tbl_mat.setHorizontalHeaderLabels(
-            ["No", "Material Name", "Mat. No", "Qty", "Satuan", "Keterangan"]
-        )
-        h = self.tbl_mat.horizontalHeader()
-        h.setSectionResizeMode(QHeaderView.Fixed)
-        h.setSectionResizeMode(1, QHeaderView.Stretch)
-        h.setSectionResizeMode(5, QHeaderView.Stretch)
-        self.tbl_mat.setColumnWidth(0, 28)
-        self.tbl_mat.setColumnWidth(2, 90)
-        self.tbl_mat.setColumnWidth(3, 55)
-        self.tbl_mat.setColumnWidth(4, 65)
-        self.tbl_mat.verticalHeader().setVisible(False)
-        self.tbl_mat.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tbl_mat.setStyleSheet(_TBL)
-        self.tbl_mat.setMinimumHeight(120)
-        lay.addWidget(self.tbl_mat)
-        return card
-
-    def _tambah_material(self):
-        r = self.tbl_mat.rowCount()
-        self.tbl_mat.insertRow(r)
-        self.tbl_mat.setRowHeight(r, 28)
-        no_it = _item(str(r + 1), Qt.AlignCenter)
-        no_it.setFlags(Qt.ItemIsEnabled)
-        self.tbl_mat.setItem(r, 0, no_it)
-        self.tbl_mat.setItem(r, 1, _item(""))
-        self.tbl_mat.setItem(r, 2, _item(""))
-        self.tbl_mat.setItem(r, 3, _item("0", Qt.AlignCenter))
-        self.tbl_mat.setCellWidget(r, 4, _mk_combo(_SATUAN, popup_w=70))
-        self.tbl_mat.setItem(r, 5, _item(""))
-
-    def _hapus_material(self):
-        r = self.tbl_mat.currentRow()
-        if r >= 0:
-            self.tbl_mat.removeRow(r)
-            for i in range(self.tbl_mat.rowCount()):
-                it = self.tbl_mat.item(i, 0)
-                if it:
-                    it.setText(str(i + 1))
 
     # Calculation Hour
 
@@ -998,7 +955,6 @@ class InputLaporanWidget(QWidget):
         self.tbl_absen.setRowCount(0)
         self.tbl_claim.setRowCount(0)
         self.tbl_ls.setRowCount(0)
-        self.tbl_mat.setRowCount(0)
 
         self._hitung_calc_hour()
 
@@ -1134,24 +1090,6 @@ class InputLaporanWidget(QWidget):
             {"role": "Worker",  "plan": 0, "act": 0},
         ]
 
-        # Material Used
-        material_data = []
-        for r in range(self.tbl_mat.rowCount()):
-            name_it = self.tbl_mat.item(r, 1)
-            name = name_it.text().strip() if name_it else ""
-            if not name:
-                continue
-            matno_it = self.tbl_mat.item(r, 2)
-            sat_cb   = self.tbl_mat.cellWidget(r, 4)
-            ket_it   = self.tbl_mat.item(r, 5)
-            material_data.append({
-                "material_name": name,
-                "material_no":   matno_it.text().strip() if matno_it else "",
-                "qty":           _fv(self.tbl_mat, r, 3),
-                "satuan":        sat_cb.currentText() if sat_cb else "",
-                "keterangan":    ket_it.text().strip() if ket_it else "",
-            })
-
         header = {
             "tanggal":     self.input_tanggal.date().toString("yyyy-MM-dd"),
             "shift":       self.combo_shift.currentText(),
@@ -1171,7 +1109,6 @@ class InputLaporanWidget(QWidget):
             inhouse_claim=claim_data,
             manpower=manpower_data,
             absen=absen_data,
-            material_usage=material_data,
         )
         if ok:
             self.reset_form()

@@ -4,44 +4,48 @@ import os
 # Palette definitions
 _PALETTES = {
     "light": {
-        # Surfaces — Industrial Utilitarian Dark
-        "bg_app":      "#111111",
-        "bg_sidebar":  "#0d0d0d",
-        "bg_logo":     "#111111",
-        "bg_card":     "#222222",
-        "bg_card2":    "#1a1a1a",
-        "bg_input":    "#2a2a2a",
-        "bg_btn":      "#2a2a2a",
-        "bg_btn_hov":  "#333333",
-        "bg_header":   "#111111",
-        # Borders
-        "border_hi":   "#2e2e2e",
-        "border_lo":   "#2e2e2e",
+        # Surfaces — Mitsubishi Light (60-30-10)
+        "bg_app":      "#F8F9FA",   # 60% — off-white canvas
+        "bg_sidebar":  "#FFFFFF",   # sidebar putih bersih
+        "bg_logo":     "#FFFFFF",
+        "bg_card":     "#FFFFFF",   # card putih
+        "bg_card2":    "#F9FAFB",
+        "bg_input":    "#FFFFFF",
+        "bg_btn":      "#F3F4F6",   # button abu-abu terang
+        "bg_btn_hov":  "#D1D5DB",
+        "bg_header":   "#F8F9FA",
+        # Borders — 30% structural grey
+        "border_hi":   "#D1D5DB",
+        "border_lo":   "#E5E7EB",
         # Text
-        "text_hi":     "#f0f0f0",
-        "text_mid":    "#888888",
-        "text_lo":     "#555555",
-        "text_white":  "#ffffff",
-        # Accent
-        "accent":      "#da291c",
-        "accent_dk":   "#b01e0a",
-        "accent_bg":   "#2a1a1a",
-        "accent_bdr":  "#4a1a1a",
+        "text_hi":     "#212121",   # primary text — Dark Charcoal
+        "text_mid":    "#6B7280",   # secondary text
+        "text_lo":     "#9CA3AF",   # muted / placeholder
+        "text_white":  "#FFFFFF",
+        # Accent — 10% Mitsubishi Red
+        "accent":      "#E60012",
+        "accent_dk":   "#C0000F",
+        "accent_bg":   "#FFF0F0",   # light red bg untuk hover states
+        "accent_bdr":  "#FFCDD2",
+        # Status colors (pabrik: OK / Warning / NG)
+        "status_ok":   "#28A745",   # Aman / Target tercapai
+        "status_warn": "#FFC107",   # Warning / Pending
+        "status_ng":   "#E60012",   # NG / Loss Time kritis
         # Chart
-        "chart_bg":    "#111111",
-        "chart_ax":    "#111111",
-        "chart_grid":  "#1e1e1e",
-        "chart_spine": "#2e2e2e",
-        "chart_tick":  "#555555",
-        "chart_label": "#888888",
-        "chart_line":  "#4a9fd4",
+        "chart_bg":    "#FFFFFF",
+        "chart_ax":    "#F8F9FA",
+        "chart_grid":  "#F3F4F6",
+        "chart_spine": "#D1D5DB",
+        "chart_tick":  "#9CA3AF",
+        "chart_label": "#6B7280",
+        "chart_line":  "#1a6fa8",
         # Sidebar nav
-        "nav_active_bg":   "#252525",
-        "nav_active_text": "#ffffff",
-        "nav_inactive":    "#555555",
-        "nav_hover_bg":    "#252525",
-        "nav_hover_bdr":   "#2e2e2e",
-        "nav_hover_text":  "#f0f0f0",
+        "nav_active_bg":   "#F8F9FA",
+        "nav_active_text": "#212121",
+        "nav_inactive":    "#9CA3AF",
+        "nav_hover_bg":    "#F8F9FA",
+        "nav_hover_bdr":   "#D1D5DB",
+        "nav_hover_text":  "#212121",
     },
 }
 
@@ -102,7 +106,7 @@ def fix_calendar(date_edit) -> None:
             image: none;
         }}
         QCalendarWidget QHeaderView::section {{
-            background-color: #F5F5F5;
+            background-color: #F8F9FA;
             color: {text_mid};
             border: none;
             border-bottom: 1px solid {border};

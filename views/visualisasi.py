@@ -15,48 +15,59 @@ from controllers.analytics_controller import get_loss_time_per_bulan
 from modules.config import TARGET_PROCESS_RATIO
 
 
-# ── Styles ────────────────────────────────────────────────────────────────────
+# ── Light-theme style constants (sama dengan input_laporan & dashboard) ───────
 
-# (prev: #252525 card, #1e1e1e input, #303030 border)
-_CARD_STYLE = "QFrame { background-color: #222222; border-radius: 0px; }"
+_CARD    = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E5E7EB; }"
+_HDR_LBL = ("color: #212121; font-size: 11px; font-weight: bold;"
+            " border-left: 2px solid #E60012; padding-left: 8px;"
+            " letter-spacing: 1px; text-transform: uppercase;")
+_FLD_LBL = "color: #6B7280; font-size: 10px; letter-spacing: 1px;"
 
 _COMBO_STYLE = """
     QComboBox {
-        background-color: #2a2a2a; border: 1px solid #2e2e2e;
+        background-color: #FFFFFF; border: 1px solid #D1D5DB;
         border-radius: 0px; padding-left: 8px;
-        color: #f0f0f0; font-size: 11px; min-height: 30px;
+        color: #212121; font-size: 11px; min-height: 30px;
     }
-    QComboBox:focus { border: 1px solid #da291c; }
+    QComboBox:focus { border: 1px solid #E60012; }
     QComboBox::drop-down { border: none; width: 24px; }
     QComboBox QAbstractItemView {
-        background-color: #1a1a1a; color: #f0f0f0;
-        selection-background-color: #2a2a2a;
-        border: 1px solid #2e2e2e;
+        background-color: #FFFFFF; color: #212121;
+        selection-background-color: #F3F4F6;
+        border: 1px solid #D1D5DB;
     }
 """
 
 _BTN_TAMPIL = """
     QPushButton {
-        background-color: #da291c; color: #ffffff;
+        background-color: #E60012; color: #ffffff;
         border: none; border-radius: 0px; font-size: 11px; padding: 0 16px;
-        min-height: 30px; letter-spacing: 1px; text-transform: uppercase;
+        min-height: 30px; letter-spacing: 1px;
     }
-    QPushButton:hover { background-color: #b01e0a; }
+    QPushButton:hover { background-color: #C0000F; }
 """
+
+# ── Chart colour constants — light theme ─────────────────────────────────────
+
+BG_FIG   = "#FFFFFF"
+BG_AXES  = "#FFFFFF"
+COL_TEXT = "#6B7280"
+COL_GRID = "#F3F4F6"
+PLAN_COLOR = "#E60012"
 
 # ── Category colour map ───────────────────────────────────────────────────────
 
 _CAT_COLORS = {
-    "Machine":    "#2196F3",
-    "Man":        "#4CAF50",
-    "Mdl Chg":    "#AB47BC",
-    "Model Change": "#AB47BC",
-    "Setting":    "#FF9800",
-    "Repair":     "#F44336",
-    "Material":   "#FFEB3B",
-    "Method":     "#00BCD4",
-    "Others":     "#78909C",
-    "Lainnya":    "#78909C",
+    "Machine":       "#2196F3",
+    "Man":           "#4CAF50",
+    "Mdl Chg":       "#AB47BC",
+    "Model Change":  "#AB47BC",
+    "Setting":       "#FF9800",
+    "Repair":        "#F44336",
+    "Material":      "#FFEB3B",
+    "Method":        "#00BCD4",
+    "Others":        "#78909C",
+    "Lainnya":       "#78909C",
 }
 
 _FALLBACK_COLORS = [
@@ -66,12 +77,6 @@ _FALLBACK_COLORS = [
 
 _MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
            "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-
-BG_FIG  = "#282C34"
-BG_AXES = "#21252B"
-COL_TEXT = "#ABB2BF"
-COL_GRID = "#3E4451"
-PLAN_COLOR = "#FF4444"
 
 
 def _cat_color(name: str, used: dict) -> str:
@@ -113,26 +118,39 @@ class VisualisasiWidget(QWidget):
 
     def _setup_ui(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(15, 15, 15, 15)
-        outer.setSpacing(12)
+        outer.setContentsMargins(12, 10, 12, 12)
+        outer.setSpacing(8)
 
         # ── Filter card ───────────────────────────────────────────────────────
         card_f = QFrame()
-        card_f.setStyleSheet(_CARD_STYLE)
+        card_f.setStyleSheet(
+            "QFrame { background-color: #FFFFFF; border-radius: 0px;"
+            " border-top: 2px solid #E60012; border-bottom: 1px solid #E5E7EB; }"
+        )
         fl = QHBoxLayout(card_f)
-        fl.setContentsMargins(16, 12, 16, 12)
-        fl.setSpacing(10)
+        fl.setContentsMargins(12, 8, 12, 8)
+        fl.setSpacing(8)
 
         fl.addWidget(_lbl("Section"))
         self.combo_section = QComboBox()
         self.combo_section.setMinimumWidth(165)
+        self.combo_section.setMinimumHeight(28)
         self.combo_section.setStyleSheet(_COMBO_STYLE)
         self.combo_section.addItem("Semua", None)
         fl.addWidget(self.combo_section)
 
+        def _vsep():
+            s = QFrame(); s.setFrameShape(QFrame.VLine)
+            s.setFixedWidth(1); s.setFixedHeight(22)
+            s.setStyleSheet("background-color: #D1D5DB; border: none;")
+            return s
+
+        fl.addSpacing(4); fl.addWidget(_vsep()); fl.addSpacing(4)
+
         fl.addWidget(_lbl("Tahun"))
         self.combo_tahun = QComboBox()
         self.combo_tahun.setMinimumWidth(90)
+        self.combo_tahun.setMinimumHeight(28)
         self.combo_tahun.setStyleSheet(_COMBO_STYLE)
         now = QDate.currentDate().year()
         for y in range(now - 2, now + 1):
@@ -152,11 +170,11 @@ class VisualisasiWidget(QWidget):
 
         # ── Stat cards ────────────────────────────────────────────────────────
         stat_row = QHBoxLayout()
-        stat_row.setSpacing(12)
+        stat_row.setSpacing(8)
 
-        self._lbl_total_loss, c1 = _make_stat_card("Total Loss Time", "— hr", "#da291c")
-        self._lbl_biggest_cat, c2 = _make_stat_card("Kategori Terbesar", "—", "#da291c")
-        self._lbl_avg_ratio,  c3 = _make_stat_card("Rata-rata Process Ratio", "— %", "#da291c")
+        self._lbl_total_loss, c1 = _make_stat_card("Total Loss Time",       "— hr")
+        self._lbl_biggest_cat, c2 = _make_stat_card("Kategori Terbesar",     "—")
+        self._lbl_avg_ratio,  c3  = _make_stat_card("Rata-rata Process Ratio","— %")
 
         stat_row.addWidget(c1)
         stat_row.addWidget(c2)
@@ -165,7 +183,7 @@ class VisualisasiWidget(QWidget):
 
         # ── Chart card ────────────────────────────────────────────────────────
         card_c = QFrame()
-        card_c.setStyleSheet(_CARD_STYLE)
+        card_c.setStyleSheet(_CARD)
         cl = QVBoxLayout(card_c)
         cl.setContentsMargins(12, 12, 12, 12)
 
@@ -187,7 +205,7 @@ class VisualisasiWidget(QWidget):
         ax.text(
             0.5, 0.5, "Pilih Section & Tahun, lalu klik Tampilkan",
             ha="center", va="center", transform=ax.transAxes,
-            color=COL_TEXT, fontsize=12,
+            color="#9CA3AF", fontsize=12,
         )
         self.canvas.draw()
 
@@ -204,17 +222,14 @@ class VisualisasiWidget(QWidget):
         self._update_chart(data, tahun)
 
     def _update_stat_cards(self, data: list):
-        # Total loss time sepanjang tahun
         total_loss = sum(sum(d["loss_by_category"].values()) for d in data)
 
-        # Kategori dengan total loss tertinggi
         cat_totals: dict[str, float] = {}
         for d in data:
             for cat, val in d["loss_by_category"].items():
                 cat_totals[cat] = cat_totals.get(cat, 0.0) + val
         biggest = max(cat_totals, key=cat_totals.get) if cat_totals else None
 
-        # Rata-rata process ratio (skip bulan tanpa data)
         ratios = [
             d["process_hour"] / d["total_hour"] * 100
             for d in data if d["total_hour"] > 0
@@ -228,7 +243,6 @@ class VisualisasiWidget(QWidget):
     def _update_chart(self, data: list, tahun: int):
         self.fig.clear()
 
-        # collect all categories present in data
         all_cats: list[str] = []
         for d in data:
             for k in d["loss_by_category"]:
@@ -238,59 +252,57 @@ class VisualisasiWidget(QWidget):
         x      = list(range(12))
         labels = _MONTHS
 
-        # ── Axes ──────────────────────────────────────────────────────────────
-        ax_bar = self.fig.add_subplot(111)
+        ax_bar  = self.fig.add_subplot(111)
         ax_line = ax_bar.twinx()
         _style_axes(ax_bar, self.fig)
         _style_axes_right(ax_line)
 
         # ── Stacked bars ──────────────────────────────────────────────────────
-        bar_w    = 0.55
-        bottoms  = [0.0] * 12
+        bar_w   = 0.55
+        bottoms = [0.0] * 12
         used_dyn: dict = {}
 
         for cat in all_cats:
-            vals = [d["loss_by_category"].get(cat, 0.0) for d in data]
+            vals  = [d["loss_by_category"].get(cat, 0.0) for d in data]
             color = _cat_color(cat, used_dyn)
             ax_bar.bar(x, vals, bar_w, bottom=bottoms, color=color,
-                       label=cat, zorder=3)
+                       label=cat, zorder=3, alpha=0.9)
             bottoms = [b + v for b, v in zip(bottoms, vals)]
 
         # ── Label total di atas tiap bar ─────────────────────────────────────
         for xi, total in zip(x, bottoms):
             if total > 0:
                 ax_bar.text(
-                    xi, total + 0.05, f"{total:.2f}",
+                    xi, total + 0.02, f"{total:.2f}",
                     ha="center", va="bottom", fontsize=8,
-                    color="white", fontweight="bold", zorder=6,
+                    color="#212121", fontweight="bold", zorder=6,
                 )
 
         # ── Process ratio line ────────────────────────────────────────────────
         ratios = []
         for d in data:
-            if d["total_hour"] > 0:
-                ratios.append(d["process_hour"] / d["total_hour"] * 100)
-            else:
-                ratios.append(None)
+            ratios.append(d["process_hour"] / d["total_hour"] * 100
+                          if d["total_hour"] > 0 else None)
 
-        ax_line.plot(x, ratios, color="#00E5FF", linewidth=2,
-                     marker="o", markersize=5, label="Process Ratio %",
-                     zorder=4)
+        ax_line.plot(x, ratios, color="#1a6fa8", linewidth=2,
+                     marker="o", markersize=5, markerfacecolor="#FFFFFF",
+                     markeredgecolor="#1a6fa8", markeredgewidth=1.5,
+                     label="Process Ratio %", zorder=4)
 
-        # add value labels on the line (skip None)
         for xi, rv in zip(x, ratios):
             if rv is not None:
                 ax_line.annotate(
                     f"{rv:.1f}%", xy=(xi, rv),
                     xytext=(0, 7), textcoords="offset points",
-                    ha="center", fontsize=7.5, color="#00E5FF",
+                    ha="center", fontsize=7.5, color="#1a6fa8",
                 )
 
         # ── Plan target line ──────────────────────────────────────────────────
         ax_line.axhline(TARGET_PROCESS_RATIO, color=PLAN_COLOR, linewidth=1.5,
-                        linestyle="--", zorder=5, label=f"Plan {TARGET_PROCESS_RATIO:.0f}%")
+                        linestyle="--", zorder=5, alpha=0.6,
+                        label=f"Plan {TARGET_PROCESS_RATIO:.0f}%")
         ax_line.text(11.55, TARGET_PROCESS_RATIO + 0.8, f"{TARGET_PROCESS_RATIO:.0f}%",
-                     color=PLAN_COLOR, fontsize=8, va="bottom", ha="right")
+                     color=PLAN_COLOR, fontsize=8, va="bottom", ha="right", fontweight="bold")
 
         # ── Axes config ───────────────────────────────────────────────────────
         ax_bar.set_xticks(x)
@@ -301,24 +313,24 @@ class VisualisasiWidget(QWidget):
         ax_bar.tick_params(axis="x", colors=COL_TEXT)
 
         ax_line.set_ylim(0, 110)
-        ax_line.set_ylabel("Process Ratio (%)", color="#00E5FF", fontsize=9)
-        ax_line.tick_params(axis="y", colors="#00E5FF", labelsize=8)
+        ax_line.set_ylabel("Process Ratio (%)", color="#1a6fa8", fontsize=9)
+        ax_line.tick_params(axis="y", colors="#1a6fa8", labelsize=8)
         ax_line.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.0f%%"))
 
         # ── Title ─────────────────────────────────────────────────────────────
         sec_text = self.combo_section.currentText()
         self.fig.suptitle(
             f"Performance Chart — {sec_text}  |  {tahun}",
-            color="white", fontsize=11, fontweight="bold", y=0.98,
+            color="#212121", fontsize=11, fontweight="bold", y=0.98,
         )
 
         # ── Legend ────────────────────────────────────────────────────────────
-        handles_bar, labels_bar = ax_bar.get_legend_handles_labels()
+        handles_bar,  labels_bar  = ax_bar.get_legend_handles_labels()
         handles_line, labels_line = ax_line.get_legend_handles_labels()
         ax_bar.legend(
             handles_bar + handles_line, labels_bar + labels_line,
             loc="upper left", fontsize=8,
-            facecolor=BG_AXES, edgecolor=COL_GRID,
+            facecolor="#FFFFFF", edgecolor="#E5E7EB",
             labelcolor=COL_TEXT, ncol=min(len(all_cats) + 2, 6),
         )
 
@@ -328,11 +340,12 @@ class VisualisasiWidget(QWidget):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_stat_card(title: str, default_val: str, accent: str) -> tuple:
-    """Return (value_QLabel, card_QFrame)."""
+def _make_stat_card(title: str, default_val: str) -> tuple:
+    """Return (value_QLabel, card_QFrame) — light theme, sama dengan dashboard."""
     card = QFrame()
     card.setStyleSheet(
-        "QFrame { background-color: #252525; border-radius: 0px; }"
+        "QFrame { background-color: #FFFFFF; border-radius: 0px;"
+        " border: 1px solid #E5E7EB; border-top: 3px solid #E60012; }"
     )
     card.setFixedHeight(86)
     lay = QVBoxLayout(card)
@@ -341,48 +354,48 @@ def _make_stat_card(title: str, default_val: str, accent: str) -> tuple:
 
     lbl_title = QLabel(title)
     lbl_title.setStyleSheet(
-        "color: #969696; font-size: 10px; background: transparent;"
+        "color: #6B7280; font-size: 10px; letter-spacing: 1px;"
+        " background: transparent; border: none;"
     )
     lbl_title.setAlignment(Qt.AlignLeft)
 
     lbl_val = QLabel(default_val)
     lbl_val.setStyleSheet(
-        "color: #ffffff; font-size: 18px; font-weight: bold; background: transparent;"
+        "color: #212121; font-size: 18px; font-weight: bold;"
+        " background: transparent; border: none;"
     )
     lbl_val.setAlignment(Qt.AlignLeft)
-
-    accent_line = QFrame()
-    accent_line.setFixedHeight(3)
-    accent_line.setStyleSheet(
-        f"QFrame {{ background-color: {accent}; border-radius: 2px; }}"
-    )
 
     lay.addWidget(lbl_title)
     lay.addWidget(lbl_val)
     lay.addStretch()
-    lay.addWidget(accent_line)
 
     return lbl_val, card
 
 
 def _lbl(text: str) -> QLabel:
     lbl = QLabel(text)
-    lbl.setStyleSheet("color: #969696; font-size: 11px;")
+    lbl.setStyleSheet(_FLD_LBL)
     return lbl
 
 
 def _style_axes(ax, fig):
     fig.patch.set_facecolor(BG_FIG)
     ax.set_facecolor(BG_AXES)
-    for spine in ax.spines.values():
-        spine.set_edgecolor(COL_GRID)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#D1D5DB")
+    ax.spines["bottom"].set_color("#D1D5DB")
     ax.tick_params(colors=COL_TEXT)
     ax.yaxis.label.set_color(COL_TEXT)
     ax.xaxis.label.set_color(COL_TEXT)
     ax.grid(axis="y", color=COL_GRID, linewidth=0.5, linestyle="--", zorder=0)
+    ax.set_axisbelow(True)
 
 
 def _style_axes_right(ax):
     ax.set_facecolor("none")
-    for spine in ax.spines.values():
-        spine.set_edgecolor(COL_GRID)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["right"].set_color("#1a6fa8")

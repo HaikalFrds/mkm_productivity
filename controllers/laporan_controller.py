@@ -8,7 +8,7 @@ from sqlalchemy import text
 from database.session import get_session
 from models.laporan import (
     DailyReport, DailyProduction, ProblemRecord,
-    Manpower, Absen, InhouseClaim, MaterialUsage,
+    Manpower, Absen, InhouseClaim,
 )
 from models.master import Section, Shift, ProblemCategory
 
@@ -21,7 +21,6 @@ def simpan_laporan_harian(
     inhouse_claim: list = None,
     manpower: list = None,
     absen: list = None,
-    material_usage: list = None,
 ) -> tuple[bool, str]:
     try:
         with get_session() as session:
@@ -129,19 +128,6 @@ def simpan_laporan_harian(
                     keterangan=ab.get("keterangan")  or None,
                 ))
 
-            # 9. Material usage
-            for mat in (material_usage or []):
-                if not mat.get("material_name"):
-                    continue
-                session.add(MaterialUsage(
-                    report_id=report.id,
-                    material_name=mat.get("material_name") or None,
-                    material_no=mat.get("material_no")   or None,
-                    qty=mat.get("qty")            or 0,
-                    satuan=mat.get("satuan")         or None,
-                    keterangan=mat.get("keterangan")     or None,
-                ))
-
             saved_id = report.id  # simpan sebelum session close
 
         return True, f"Laporan berhasil disimpan! (ID: {saved_id})"
@@ -164,13 +150,14 @@ def hapus_laporan(report_id: int) -> tuple[bool, str]:
 
 def get_detail_laporan(report_id: int) -> tuple:
     """
-    Return (header, produksi, catatan, manpower, absen, inhouse_claim, materials).
+    Return (header, produksi, catatan, manpower, absen, inhouse_claim).
     Pakai text() query untuk fleksibilitas JOIN yang kompleks.
     """
     with get_session() as session:
         row = session.execute(text("""
             SELECT dr.id, dr.date, sec.name, sh.name,
-                   dr.coordinator, dr.approved_by, dr.checked_by, s.total_hours
+                   dr.coordinator, dr.approved_by, dr.checked_by,
+                   s.total_hours, s.preparation_min, s.sholat_min
             FROM daily_report dr
             JOIN section sec ON sec.id = dr.section_id
             JOIN shift   sh  ON sh.id  = dr.shift_id
@@ -179,7 +166,7 @@ def get_detail_laporan(report_id: int) -> tuple:
         """), {"id": report_id}).fetchone()
 
         if not row:
-            return None, [], [], [], [], [], []
+            return None, [], [], [], [], []
 
         # Overtime
         ot_row = session.execute(text("""
@@ -197,7 +184,9 @@ def get_detail_laporan(report_id: int) -> tuple:
             "id": row[0], "date": str(row[1]), "section": row[2],
             "shift": row[3], "coordinator": row[4],
             "approved_by": row[5], "checked_by": row[6],
-            "shift_duration": float(row[7]) if row[7] is not None else 0.0,
+            "shift_duration":   float(row[7]) if row[7] is not None else 0.0,
+            "preparation_min":  float(row[8]) if row[8] is not None else 15.0,
+            "sholat_min":       float(row[9]) if row[9] is not None else 10.0,
             "overtime": overtime_text,
         }
 
@@ -278,17 +267,4 @@ def get_detail_laporan(report_id: int) -> tuple:
             for r in inhouse_rows
         ]
 
-        material_rows = session.execute(text("""
-            SELECT material_name, material_no, qty, satuan, keterangan
-            FROM material_usage WHERE report_id = :id ORDER BY id
-        """), {"id": report_id}).fetchall()
-        materials = [
-            {
-                "material_name": r[0] or "", "material_no": r[1] or "",
-                "qty": float(r[2] or 0), "satuan": r[3] or "",
-                "keterangan": r[4] or "",
-            }
-            for r in material_rows
-        ]
-
-    return header, produksi, catatan, manpower, absen, inhouse_claim, materials
+    return header, produksi, catatan, manpower, absen, inhouse_claim

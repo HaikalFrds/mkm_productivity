@@ -25,7 +25,6 @@ class DailyReport(Base):
     manpower    = relationship("Manpower",         back_populates="report", cascade="all, delete-orphan")
     absen       = relationship("Absen",            back_populates="report", cascade="all, delete-orphan")
     inhouse     = relationship("InhouseClaim",     back_populates="report", cascade="all, delete-orphan")
-    materials   = relationship("MaterialUsage",    back_populates="report", cascade="all, delete-orphan")
 
 
 class DailyProduction(Base):
@@ -113,15 +112,3 @@ class InhouseClaim(Base):
     report = relationship("DailyReport", back_populates="inhouse")
 
 
-class MaterialUsage(Base):
-    __tablename__ = "material_usage"
-
-    id            = Column(Integer, primary_key=True)
-    report_id     = Column(Integer, ForeignKey("daily_report.id"), nullable=False)
-    material_name = Column(String(200))
-    material_no   = Column(String(100))
-    qty           = Column(Float, default=0)
-    satuan        = Column(String(50))
-    keterangan    = Column(Text)
-
-    report = relationship("DailyReport", back_populates="materials")

@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QFrame, QStackedWidget,
 )
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import Qt, QSize, Signal, QTimer
 
 
 class MainWindow(QMainWindow):
@@ -17,6 +17,9 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.load_pages()
         self.navigate_to("dashboard")
+        # Preload halaman lain di background setelah dashboard tampil (200ms delay)
+        self._preload_queue = ["input_laporan", "riwayat", "visualisasi", "master_data"]
+        QTimer.singleShot(200, self._preload_next_page)
 
     def setup_ui(self):
         central = QWidget()
@@ -196,6 +199,16 @@ class MainWindow(QMainWindow):
         self.stack.insertWidget(idx, widget)
         self.pages[page_id] = widget
         self._page_loaded.add(page_id)
+
+    def _preload_next_page(self):
+        """Preload halaman berikutnya dari antrian — satu per satu agar UI tidak freeze."""
+        if not self._preload_queue:
+            return
+        page_id = self._preload_queue.pop(0)
+        self._ensure_page_loaded(page_id)
+        if self._preload_queue:
+            # 80ms jeda antar halaman agar event loop tetap responsif
+            QTimer.singleShot(80, self._preload_next_page)
 
     def navigate_to(self, page_id: str):
         page_names = {

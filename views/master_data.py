@@ -19,6 +19,7 @@ from controllers.master_controller import (
 )
 from styles.theme import ThemeManager
 from modules.icons import ic_add, ic_edit, ic_trash, BTN_ICON_SIZE
+from modules.view_optimizer import LazyViewMixin
 
 
 def _BTN_ADD():
@@ -385,20 +386,22 @@ class _ShiftDialog(QDialog):
 
 # ── Widget ────────────────────────────────────────────────────────────────────
 
-class MasterDataWidget(QWidget):
+class MasterDataWidget(LazyViewMixin, QWidget):
     def __init__(self, user: dict, parent=None):
         super().__init__(parent)
         self.user = user
         self._setup_ui()
 
-    def showEvent(self, event):
-        super().showEvent(event)
+    def _on_first_show(self):
         self._load_sections()
         self._load_shop_model_sections()
         self._load_op_number_sections()
         self._load_users()
         self._load_kategori()
         self._load_shifts()
+
+    def _on_show(self):
+        pass  # data master jarang berubah — tidak perlu reload tiap klik
 
     # ── UI ────────────────────────────────────────────────────────────────────
 

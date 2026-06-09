@@ -13,6 +13,7 @@ from controllers.master_controller import (
     get_op_numbers_by_section,
 )
 from modules.icons import ic_add, ic_del, ic_prev, ic_next, BTN_ICON_SIZE, NAV_ICON_SIZE
+from modules.view_optimizer import LazyViewMixin
 
 # Style constants — Light Theme
 _CARD  = "QFrame { background-color: #FFFFFF; border-radius: 0px; border: 1px solid #E5E7EB; }"
@@ -73,7 +74,7 @@ def _item(text="", align=Qt.AlignLeft | Qt.AlignVCenter) -> QTableWidgetItem:
 
 # Main Widget
 
-class InputLaporanWidget(QWidget):
+class InputLaporanWidget(LazyViewMixin, QWidget):
     def __init__(self, user: dict, parent=None):
         super().__init__(parent)
         self._user         = user
@@ -91,11 +92,13 @@ class InputLaporanWidget(QWidget):
 
     # lifecycle
 
-    def showEvent(self, event):
-        super().showEvent(event)
+    def _on_first_show(self):
         self._reload_sections()
         self._reload_shifts()
         self._reload_factors()
+
+    def _on_show(self):
+        pass  # state form dipertahankan — tidak perlu reload tiap klik
 
     def _reload_factors(self):
         names = get_all_category_names()

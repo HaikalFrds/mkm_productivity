@@ -13,6 +13,7 @@ import matplotlib.ticker as mticker
 from controllers.master_controller import get_all_sections
 from controllers.analytics_controller import get_loss_time_per_bulan
 from modules.config import TARGET_PROCESS_RATIO
+from modules.view_optimizer import LazyViewMixin
 
 
 # ── Light-theme style constants (sama dengan input_laporan & dashboard) ───────
@@ -90,26 +91,24 @@ def _cat_color(name: str, used: dict) -> str:
 
 # ── Widget ────────────────────────────────────────────────────────────────────
 
-class VisualisasiWidget(QWidget):
+class VisualisasiWidget(LazyViewMixin, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._sections_loaded = False
         self._setup_ui()
 
-    def showEvent(self, event):
-        super().showEvent(event)
+    def _on_first_show(self):
         self._load_sections_once()
 
+    def _on_show(self):
+        pass  # chart hanya di-refresh kalau user klik Tampilkan
+
     def _load_sections_once(self):
-        if self._sections_loaded:
-            return
         try:
             sections = get_all_sections()
             self.combo_section.blockSignals(True)
             for sid, sname in sections:
                 self.combo_section.addItem(sname, sid)
             self.combo_section.blockSignals(False)
-            self._sections_loaded = True
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Peringatan", f"Gagal memuat daftar section: {e}")

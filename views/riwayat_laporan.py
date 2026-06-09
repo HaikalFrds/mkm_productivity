@@ -20,6 +20,7 @@ from controllers.riwayat_controller import (
 )
 from modules.export_excel import export_loss_time_record, export_inhouse_ng_pending
 from modules.icons import ic_view, ic_edit, ic_trash, BTN_ICON_SIZE
+from modules.view_optimizer import LazyViewMixin
 
 
 # Shared styles — Light Theme
@@ -185,16 +186,18 @@ class _RiwayatWorker(QThread):
 
 # Widget
 
-class RiwayatLaporanWidget(QWidget):
+class RiwayatLaporanWidget(LazyViewMixin, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._sections_loaded = False
         self._setup_ui()
 
-    def showEvent(self, event):
-        super().showEvent(event)
+    def _on_first_show(self):
         self._load_sections_once()
         self.load_data_harian()
+
+    def _on_show(self):
+        self.load_data_harian()  # refresh data terbaru setiap kembali ke halaman ini
 
     def _load_sections_once(self):
         if self._sections_loaded:

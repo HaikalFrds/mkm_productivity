@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor
 from controllers.dashboard_controller import get_dashboard_data, get_monthly_loss_by_group
 from modules.config import TARGET_PROCESS_RATIO
 from modules.icons import ic_refresh, TOOL_ICON_SIZE
+from modules.view_optimizer import LazyViewMixin
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ class _StatCard(QFrame):
 
 # ── DashboardWidget ───────────────────────────────────────────────────────────
 
-class DashboardWidget(QWidget):
+class DashboardWidget(LazyViewMixin, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
@@ -286,9 +287,11 @@ class DashboardWidget(QWidget):
 
     # Events
 
-    def showEvent(self, event):
-        super().showEvent(event)
+    def _on_first_show(self):
         self.load_data()
+
+    def _on_show(self):
+        self.load_data()  # dashboard selalu fresh — data hari ini bisa berubah
 
     # Data
 

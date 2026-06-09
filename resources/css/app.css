@@ -49,6 +49,7 @@
     --color-blue-300: #93c5fd;
     --color-blue-400: #60a5fa;
     --color-blue-500: #3b82f6;
+    --color-blue-600: #2563eb;
     --color-blue-700: #1d4ed8;
     --color-blue-800: #1e40af;
 
@@ -167,4 +168,22 @@
     /* Inhouse / LineStop Lost column highlight */
     .bg-red-100 { background-color: #fee2e2; }
     .text-red-700 { color: #b91c1c; }
+
+    /* Master Data — tab indicator & form panel */
+    .border-b-2       { border-bottom-width: 2px; }
+    .border-l-2       { border-left-width: 2px; }
+    .border-transparent { border-color: transparent; }
+    .bg-yellow-50     { background-color: #fefce8; }
+    .bg-blue-50       { background-color: #eff6ff; }
+    .bg-green-50      { background-color: #f0fdf4; }
+    .bg-green-200     { background-color: #bbf7d0; }
+    .text-blue-600    { color: #2563eb; }
+    .text-green-700   { color: #15803d; }
+    .border-blue-200  { border-color: #bfdbfe; }
+    .border-green-200 { border-color: #bbf7d0; }
+    .hover\:text-gray-700:hover  { color: #374151; }
+    .hover\:text-blue-800:hover  { color: #1e40af; }
+    .hover\:border-gray-300:hover { border-color: #d1d5db; }
+    .hover\:bg-gray-50:hover     { background-color: #f9fafb; }
+    .hover\:bg-red-700:hover     { background-color: #b91c1c; }
 }

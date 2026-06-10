@@ -27,12 +27,12 @@
                     ['route' => 'riwayat',       'label' => 'Riwayat Laporan'],
                     ['route' => 'master-data',   'label' => 'Master Data'],
                 ];
-                $current = request()->routeIs(Route::currentRouteName());
             @endphp
 
             @foreach ($nav as $item)
                 @php $active = request()->routeIs($item['route']); @endphp
                 <a href="{{ route($item['route']) }}"
+                   wire:navigate
                    class="flex items-center px-5 py-2.5 text-sm font-medium transition-colors
                           {{ $active
                               ? 'text-gray-900 bg-gray-50 border-l-4 border-red-600 pl-[17px]'
